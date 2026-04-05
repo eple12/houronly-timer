@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="타이머">
+<meta name="theme-color" content="#0a0a0a">
+<title>타이머</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Noto+Sans+KR:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --border: #2a2a2a;
+    --accent: #e8ff47;
+    --text: #f0f0f0;
+    --muted: #666;
+    --danger: #ff4747;
+  }
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans KR', sans-serif;
+    overflow: hidden;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    padding: env(safe-area-inset-top, 16px) 20px env(safe-area-inset-bottom, 16px);
+  }
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0 8px;
+    flex-shrink: 0;
+  }
+  .header h1 {
+    font-size: 11px; font-weight: 400;
+    letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted);
+  }
+  .status-row { display: flex; align-items: center; gap: 6px; }
+  .status-text { font-size: 10px; letter-spacing: 0.1em; color: var(--muted); text-transform: uppercase; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); transition: background 0.3s; }
+  .dot.active { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  .dot.done { background: var(--danger); }
+
+  .display-area {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 8px;
+  }
+  .time-display {
+    font-family: 'Space Mono', monospace;
+    font-size: clamp(48px, 15vw, 88px);
+    font-weight: 700; letter-spacing: -2px; line-height: 1;
+    color: var(--text); transition: color 0.4s; text-align: center;
+  }
+  .time-display.done { color: var(--danger); animation: pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .time-label { font-size: 11px; letter-spacing: 0.25em; color: var(--muted); text-transform: uppercase; text-align: center; }
+
+  .progress-bar {
+    width: 100%; max-width: 360px; height: 2px;
+    background: var(--border); border-radius: 1px; margin-top: 16px; overflow: hidden;
+  }
+  .progress-fill { height: 100%; background: var(--accent); border-radius: 1px; width: 0%; transition: width 1s linear; }
+
+  .meta-row { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 6px; }
+  .elapsed-label { font-size: 12px; color: var(--muted); }
+  .end-label { font-size: 11px; color: var(--muted); opacity: 0.6; }
+
+  .restore-banner {
+    display: none;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 14px;
+    font-size: 12px; color: var(--muted); text-align: center; margin-top: 10px;
+  }
+  .restore-banner b { color: var(--accent); font-weight: 500; }
+
+  .controls {
+    flex-shrink: 0; display: flex; flex-direction: column; gap: 10px; padding-bottom: 8px;
+  }
+  .input-row { display: flex; gap: 8px; align-items: center; }
+  .input-group { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+  .input-group label {
+    font-size: 10px; letter-spacing: 0.15em; color: var(--muted);
+    text-align: center; text-transform: uppercase;
+  }
+  .input-group input {
+    width: 100%; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); font-family: 'Space Mono', monospace;
+    font-size: 22px; font-weight: 700; text-align: center; padding: 12px 4px;
+    outline: none; transition: border-color 0.2s; -webkit-appearance: none; appearance: none;
+  }
+  .input-group input:focus { border-color: var(--accent); }
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+  .colon {
+    font-family: 'Space Mono', monospace; font-size: 24px; font-weight: 700;
+    color: var(--muted); padding-bottom: 18px; flex-shrink: 0;
+  }
+  .btn-row { display: flex; gap: 8px; }
+  .btn {
+    flex: 1; padding: 14px 8px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text); font-family: 'Noto Sans KR', sans-serif;
+    font-size: 14px; font-weight: 500; cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s; -webkit-appearance: none;
+  }
+  .btn:active { transform: scale(0.96); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #0a0a0a; font-weight: 700; }
+  .btn:disabled { opacity: 0.3; pointer-events: none; }
+  .presets { display: flex; gap: 6px; flex-wrap: wrap; }
+  .preset-btn {
+    flex: 1; min-width: 0; padding: 8px 4px; border-radius: 6px;
+    border: 1px solid var(--border); background: transparent; color: var(--muted);
+    font-family: 'Space Mono', monospace; font-size: 11px; cursor: pointer;
+    transition: color 0.15s, border-color 0.15s; white-space: nowrap;
+  }
+  .preset-btn:active { color: var(--accent); border-color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>타이머</h1>
+  <div class="status-row">
+    <span class="status-text" id="statusText"></span>
+    <div class="dot" id="statusDot"></div>
+  </div>
+</div>
+
+<div class="display-area">
+  <div class="time-display" id="timeDisplay">00:00:00</div>
+  <div class="time-label">시간 : 분 : 초</div>
+  <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+  <div class="meta-row">
+    <div class="elapsed-label" id="elapsedLabel">—</div>
+    <div class="end-label" id="endLabel"></div>
+  </div>
+  <div class="restore-banner" id="restoreBanner">세션 복원됨 — <b id="restoreInfo"></b></div>
+</div>
+
+<div class="controls">
+  <div class="presets">
+    <button class="preset-btn" data-h="24">24h</button>
+    <button class="preset-btn" data-h="48">48h</button>
+    <button class="preset-btn" data-h="72">72h</button>
+    <button class="preset-btn" data-h="168">1주</button>
+    <button class="preset-btn" data-h="336">2주</button>
+    <button class="preset-btn" data-h="1176">7주</button>
+  </div>
+  <div class="input-row">
+    <div class="input-group">
+      <label>시간</label>
+      <input type="number" id="hInput" min="0" max="1176" placeholder="0" inputmode="numeric">
+    </div>
+    <div class="colon">:</div>
+    <div class="input-group">
+      <label>분</label>
+      <input type="number" id="mInput" min="0" max="59" placeholder="0" inputmode="numeric">
+    </div>
+    <div class="colon">:</div>
+    <div class="input-group">
+      <label>초</label>
+      <input type="number" id="sInput" min="0" max="59" placeholder="0" inputmode="numeric">
+    </div>
+  </div>
+  <div class="btn-row">
+    <button class="btn" id="fsBtn">⛶</button>
+    <button class="btn" id="resetBtn">초기화</button>
+    <button class="btn primary" id="startBtn">시작</button>
+    <button class="btn" id="pauseBtn" disabled>일시정지</button>
+  </div>
+</div>
+
+<script>
+const STORE_KEY = 'timer_v2';
+
+// goalEpoch: ms timestamp of when remaining hits 0 (null if not running)
+// pausedRemaining: seconds left when paused (null if running or idle)
+// totalSeconds: original full duration
+
+let goalEpoch = null;
+let pausedRemaining = null;
+let totalSeconds = 0;
+let ticker = null;
+
+const $ = id => document.getElementById(id);
+const timeDisplay  = $('timeDisplay');
+const elapsedLabel = $('elapsedLabel');
+const endLabel     = $('endLabel');
+const progressFill = $('progressFill');
+const statusDot    = $('statusDot');
+const statusText   = $('statusText');
+const restoreBanner= $('restoreBanner');
+const restoreInfo  = $('restoreInfo');
+const startBtn     = $('startBtn');
+const pauseBtn     = $('pauseBtn');
+const resetBtn     = $('resetBtn');
+const hInput       = $('hInput');
+const mInput       = $('mInput');
+const sInput       = $('sInput');
+
+function fmt(secs) {
+  secs = Math.max(0, secs);
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function fmtElapsed(secs) {
+  if (secs <= 0) return '—';
+  const h = Math.floor(secs/3600), m = Math.floor((secs%3600)/60), s = secs%60;
+  let p = [];
+  if (h) p.push(`${h}시간`);
+  if (m) p.push(`${m}분`);
+  if (s || !p.length) p.push(`${s}초`);
+  return '경과 ' + p.join(' ');
+}
+
+function fmtDate(ms) {
+  const d = new Date(ms);
+  return `종료 ${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+function getRem() {
+  if (goalEpoch !== null) return Math.max(0, Math.round((goalEpoch - Date.now()) / 1000));
+  if (pausedRemaining !== null) return pausedRemaining;
+  return 0;
+}
+function isRunning() { return goalEpoch !== null; }
+function isPaused()  { return goalEpoch === null && pausedRemaining !== null; }
+function isIdle()    { return goalEpoch === null && pausedRemaining === null; }
+
+function save() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ goalEpoch, pausedRemaining, totalSeconds })); } catch(e) {}
+}
+function clearSave() { try { localStorage.removeItem(STORE_KEY); } catch(e) {} }
+
+function render() {
+  const rem = getRem();
+  const done = rem === 0 && totalSeconds > 0;
+
+  timeDisplay.textContent = fmt(rem);
+  timeDisplay.classList.toggle('done', done);
+
+  if (totalSeconds > 0) {
+    const elapsed = totalSeconds - rem;
+    progressFill.style.width = Math.min(100, (elapsed / totalSeconds) * 100).toFixed(2) + '%';
+    elapsedLabel.textContent = fmtElapsed(elapsed);
+  } else {
+    progressFill.style.width = '0%';
+    elapsedLabel.textContent = '—';
+  }
+
+  endLabel.textContent = goalEpoch ? fmtDate(goalEpoch) : '';
+
+  if (done) {
+    statusDot.className = 'dot done';
+    statusText.textContent = '완료';
+  } else if (isRunning()) {
+    statusDot.className = 'dot active';
+    statusText.textContent = '진행중';
+  } else if (isPaused()) {
+    statusDot.className = 'dot';
+    statusText.textContent = '일시정지';
+  } else {
+    statusDot.className = 'dot';
+    statusText.textContent = '';
+  }
+
+  startBtn.disabled = isRunning() || done;
+  startBtn.textContent = isRunning() ? '실행중' : (isPaused() ? '계속' : '시작');
+  pauseBtn.disabled = isIdle() || done;
+  pauseBtn.textContent = isPaused() ? '계속' : '일시정지';
+}
+
+function startTick() {
+  clearInterval(ticker);
+  ticker = setInterval(() => {
+    const rem = getRem();
+    render();
+    save();
+    if (rem === 0) {
+      clearInterval(ticker); ticker = null;
+      goalEpoch = null;
+      if ('vibrate' in navigator) navigator.vibrate([400,200,400,200,400]);
+      render(); save();
+    }
+  }, 500); // 500ms for precision without drift
+}
+
+function doStart() {
+  const rem = getRem();
+  if (rem <= 0) return;
+  goalEpoch = Date.now() + rem * 1000;
+  pausedRemaining = null;
+  startTick();
+  render(); save();
+}
+
+function doPause() {
+  if (!isRunning()) return;
+  pausedRemaining = getRem();
+  goalEpoch = null;
+  clearInterval(ticker); ticker = null;
+  render(); save();
+}
+
+function doReset() {
+  clearInterval(ticker); ticker = null;
+  goalEpoch = null; pausedRemaining = null;
+  render(); clearSave();
+  restoreBanner.style.display = 'none';
+}
+
+function setDuration(secs) {
+  doReset();
+  totalSeconds = secs;
+  pausedRemaining = secs;
+  render(); save();
+}
+
+startBtn.addEventListener('click', () => {
+  if (isPaused()) { doStart(); return; }
+  if (isIdle()) {
+    const h = parseInt(hInput.value)||0, m = parseInt(mInput.value)||0, s = parseInt(sInput.value)||0;
+    const t = h*3600+m*60+s;
+    if (!t) return;
+    totalSeconds = t; pausedRemaining = t;
+  }
+  doStart();
+});
+
+pauseBtn.addEventListener('click', () => {
+  if (isRunning()) doPause();
+  else if (isPaused()) doStart();
+});
+
+resetBtn.addEventListener('click', doReset);
+
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    hInput.value = btn.dataset.h; mInput.value = 0; sInput.value = 0;
+    setDuration(parseInt(btn.dataset.h) * 3600);
+  });
+});
+
+[hInput, mInput, sInput].forEach(inp => {
+  inp.addEventListener('change', () => {
+    const h = parseInt(hInput.value)||0, m = parseInt(mInput.value)||0, s = parseInt(sInput.value)||0;
+    const t = h*3600+m*60+s;
+    if (t) setDuration(t);
+  });
+});
+
+// ── Restore on load ──────────────────────────────────
+(function restore() {
+  let saved;
+  try { saved = JSON.parse(localStorage.getItem(STORE_KEY)); } catch(e) {}
+  if (!saved) { render(); return; }
+
+  totalSeconds = saved.totalSeconds || 0;
+
+  if (saved.goalEpoch) {
+    const rem = Math.round((saved.goalEpoch - Date.now()) / 1000);
+    if (rem > 0) {
+      goalEpoch = saved.goalEpoch;
+      restoreInfo.textContent = fmt(rem) + ' 남음';
+      restoreBanner.style.display = 'block';
+      startTick();
+    } else {
+      // Finished while closed
+      goalEpoch = null; pausedRemaining = 0;
+      restoreInfo.textContent = '타이머가 종료되었습니다';
+      restoreBanner.style.display = 'block';
+    }
+  } else if (saved.pausedRemaining > 0) {
+    pausedRemaining = saved.pausedRemaining;
+    restoreInfo.textContent = fmt(pausedRemaining) + ' (일시정지 상태)';
+    restoreBanner.style.display = 'block';
+  }
+
+  render();
+})();
+
+// Wake lock (화면 유지 시도)
+async function reqWakeLock() {
+  if ('wakeLock' in navigator) try { await navigator.wakeLock.request('screen'); } catch(e) {}
+}
+reqWakeLock();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reqWakeLock(); });
+
+const fsBtn = $('fsBtn');
+fsBtn.addEventListener('click', () => {
+  const el = document.documentElement;
+  if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+    const req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen;
+    if (req) req.call(el);
+  } else {
+    const ex = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen;
+    if (ex) ex.call(document);
+  }
+});
+['fullscreenchange','webkitfullscreenchange'].forEach(ev => {
+  document.addEventListener(ev, () => {
+    fsBtn.textContent = (document.fullscreenElement || document.webkitFullscreenElement) ? '✕' : '⛶';
+  });
+});
+</script>
+</body>
+</html>
