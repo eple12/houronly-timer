@@ -253,8 +253,13 @@
 <div class="modal-overlay" id="calModal">
   <div class="modal">
     <div class="modal-header">
-      <span class="modal-title">종료 날짜 설정</span>
+      <span class="modal-title" id="calTitle">종료 날짜 설정</span>
       <button class="modal-close" id="calClose">✕</button>
+    </div>
+
+    <div style="display:flex;gap:6px;margin-bottom:4px;">
+      <button id="tabEnd" style="flex:1;padding:8px;border-radius:6px;border:1px solid var(--accent);background:var(--accent);color:#0a0a0a;font-size:12px;font-weight:700;cursor:pointer;">종료 시각</button>
+      <button id="tabStart" style="flex:1;padding:8px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:12px;cursor:pointer;">시작 시각</button>
     </div>
 
     <div class="cal-nav">
@@ -287,16 +292,19 @@
 </div>
 
 <script>
-const STORE_KEY = 'timer_v2';
+const STORE_KEY = 'timer_v3';
 
-// goalEpoch: ms timestamp of when remaining hits 0 (null if not running)
-// pausedRemaining: seconds left when paused (null if running or idle)
-// totalSeconds: original full duration
+// goalEpoch:       ms when timer reaches 0 (null if not running)
+// startEpoch:      ms when timer originally started (for progress bar)
+// pausedRemaining: seconds left when paused
+// totalSeconds:    original full duration
 
 let goalEpoch = null;
+let startEpoch = null;
 let pausedRemaining = null;
 let totalSeconds = 0;
-let ticker = null;
+let rafId = null;
+let lastDisplayed = -1;
 
 const $ = id => document.getElementById(id);
 const timeDisplay  = $('timeDisplay');
@@ -338,7 +346,7 @@ function fmtDate(ms) {
 }
 
 function getRem() {
-  if (goalEpoch !== null) return Math.max(0, Math.round((goalEpoch - Date.now()) / 1000));
+  if (goalEpoch !== null) return Math.max(0, Math.floor((goalEpoch - Date.now()) / 1000));
   if (pausedRemaining !== null) return pausedRemaining;
   return 0;
 }
@@ -347,7 +355,7 @@ function isPaused()  { return goalEpoch === null && pausedRemaining !== null; }
 function isIdle()    { return goalEpoch === null && pausedRemaining === null; }
 
 function save() {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify({ goalEpoch, pausedRemaining, totalSeconds })); } catch(e) {}
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ goalEpoch, startEpoch, pausedRemaining, totalSeconds })); } catch(e) {}
 }
 function clearSave() { try { localStorage.removeItem(STORE_KEY); } catch(e) {} }
 
@@ -355,16 +363,25 @@ function render() {
   const rem = getRem();
   const done = rem === 0 && totalSeconds > 0;
 
-  timeDisplay.textContent = fmt(rem);
-  timeDisplay.classList.toggle('done', done);
+  if (rem !== lastDisplayed) {
+    lastDisplayed = rem;
+    timeDisplay.textContent = fmt(rem);
+    timeDisplay.classList.toggle('done', done);
 
-  if (totalSeconds > 0) {
-    const elapsed = totalSeconds - rem;
-    progressFill.style.width = Math.min(100, (elapsed / totalSeconds) * 100).toFixed(2) + '%';
-    elapsedLabel.textContent = fmtElapsed(elapsed);
-  } else {
-    progressFill.style.width = '0%';
-    elapsedLabel.textContent = '—';
+    // Progress: based on startEpoch → goalEpoch span
+    if (startEpoch && goalEpoch && totalSeconds > 0) {
+      const span = goalEpoch - startEpoch;
+      const elapsed = Date.now() - startEpoch;
+      progressFill.style.width = Math.min(100, Math.max(0, (elapsed / span) * 100)).toFixed(2) + '%';
+      elapsedLabel.textContent = fmtElapsed(Math.floor((Date.now() - startEpoch) / 1000));
+    } else if (totalSeconds > 0) {
+      const elapsed = totalSeconds - rem;
+      progressFill.style.width = Math.min(100, (elapsed / totalSeconds) * 100).toFixed(2) + '%';
+      elapsedLabel.textContent = fmtElapsed(elapsed);
+    } else {
+      progressFill.style.width = '0%';
+      elapsedLabel.textContent = '—';
+    }
   }
 
   endLabel.textContent = goalEpoch ? fmtDate(goalEpoch) : '';
@@ -388,7 +405,6 @@ function render() {
   pauseBtn.disabled = isIdle() || done;
   pauseBtn.textContent = isPaused() ? '계속' : '일시정지';
 
-  // 실행 중일 때 입력 잠금
   const locked = isRunning();
   [hInput, mInput, sInput].forEach(inp => {
     inp.disabled = locked;
@@ -402,25 +418,29 @@ function render() {
 }
 
 function startTick() {
-  clearInterval(ticker);
-  ticker = setInterval(() => {
-    const rem = getRem();
+  if (rafId) cancelAnimationFrame(rafId);
+  function loop() {
     render();
-    save();
-    if (rem === 0) {
-      clearInterval(ticker); ticker = null;
+    if (getRem() === 0 && goalEpoch !== null) {
       goalEpoch = null;
       if ('vibrate' in navigator) navigator.vibrate([400,200,400,200,400]);
       render(); save();
+      rafId = null;
+      return;
     }
-  }, 500); // 500ms for precision without drift
+    save();
+    rafId = requestAnimationFrame(loop);
+  }
+  rafId = requestAnimationFrame(loop);
 }
 
 function doStart() {
   const rem = getRem();
   if (rem <= 0) return;
+  if (!startEpoch) startEpoch = Date.now();
   goalEpoch = Date.now() + rem * 1000;
   pausedRemaining = null;
+  lastDisplayed = -1;
   startTick();
   render(); save();
 }
@@ -429,13 +449,14 @@ function doPause() {
   if (!isRunning()) return;
   pausedRemaining = getRem();
   goalEpoch = null;
-  clearInterval(ticker); ticker = null;
+  if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
   render(); save();
 }
 
 function doReset() {
-  clearInterval(ticker); ticker = null;
-  goalEpoch = null; pausedRemaining = null;
+  if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+  goalEpoch = null; startEpoch = null; pausedRemaining = null;
+  lastDisplayed = -1;
   render(); clearSave();
   restoreBanner.style.display = 'none';
 }
@@ -489,16 +510,16 @@ document.querySelectorAll('.preset-btn').forEach(btn => {
   if (!saved) { render(); return; }
 
   totalSeconds = saved.totalSeconds || 0;
+  startEpoch = saved.startEpoch || null;
 
   if (saved.goalEpoch) {
-    const rem = Math.round((saved.goalEpoch - Date.now()) / 1000);
+    const rem = Math.floor((saved.goalEpoch - Date.now()) / 1000);
     if (rem > 0) {
       goalEpoch = saved.goalEpoch;
       restoreInfo.textContent = fmt(rem) + ' 남음';
       restoreBanner.style.display = 'block';
       startTick();
     } else {
-      // Finished while closed
       goalEpoch = null; pausedRemaining = 0;
       restoreInfo.textContent = '타이머가 종료되었습니다';
       restoreBanner.style.display = 'block';
@@ -543,22 +564,44 @@ const calGrid    = $('calGrid');
 const calH       = $('calH');
 const calM       = $('calM');
 const calS       = $('calS');
+const calTitle   = $('calTitle');
+const tabEnd     = $('tabEnd');
+const tabStart   = $('tabStart');
 
 let calYear, calMonth, calSelected = null;
+let calMode = 'end'; // 'end' | 'start'
 
 const DAYS = ['일','월','화','수','목','금','토'];
 const MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+
+function setTab(mode) {
+  calMode = mode;
+  const isEnd = mode === 'end';
+  calTitle.textContent = isEnd ? '종료 날짜 설정' : '시작 날짜 설정';
+  tabEnd.style.background   = isEnd ? 'var(--accent)' : 'transparent';
+  tabEnd.style.color        = isEnd ? '#0a0a0a' : 'var(--muted)';
+  tabEnd.style.borderColor  = isEnd ? 'var(--accent)' : 'var(--border)';
+  tabEnd.style.fontWeight   = isEnd ? '700' : '400';
+  tabStart.style.background = !isEnd ? 'var(--accent)' : 'transparent';
+  tabStart.style.color      = !isEnd ? '#0a0a0a' : 'var(--muted)';
+  tabStart.style.borderColor= !isEnd ? 'var(--accent)' : 'var(--border)';
+  tabStart.style.fontWeight = !isEnd ? '700' : '400';
+  calSelected = null;
+  renderCal();
+}
+
+tabEnd.addEventListener('click',   () => setTab('end'));
+tabStart.addEventListener('click', () => setTab('start'));
 
 function openCal() {
   const now = new Date();
   calYear  = now.getFullYear();
   calMonth = now.getMonth();
   calSelected = null;
-  // prefill time with now+1h
   calH.value = now.getHours();
   calM.value = now.getMinutes();
   calS.value = 0;
-  renderCal();
+  setTab('end');
   calModal.classList.add('open');
 }
 
@@ -573,18 +616,17 @@ function renderCal() {
 
   const firstDay = new Date(calYear, calMonth, 1).getDay();
   const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
-  const today = new Date();
-  today.setHours(0,0,0,0);
+  const today = new Date(); today.setHours(0,0,0,0);
 
-  for (let i = 0; i < firstDay; i++) {
-    calGrid.appendChild(document.createElement('div'));
-  }
+  for (let i = 0; i < firstDay; i++) calGrid.appendChild(document.createElement('div'));
+
   for (let d = 1; d <= daysInMonth; d++) {
     const btn = document.createElement('button');
     btn.className = 'cal-day';
     btn.textContent = d;
     const thisDate = new Date(calYear, calMonth, d);
-    if (thisDate < today) btn.classList.add('past');
+    // For 'end' mode: past days are disabled. For 'start' mode: all days allowed.
+    if (calMode === 'end' && thisDate < today) btn.classList.add('past');
     if (calSelected && thisDate.toDateString() === calSelected.toDateString()) btn.classList.add('selected');
     if (thisDate.toDateString() === today.toDateString()) btn.classList.add('today');
     btn.addEventListener('click', () => {
@@ -608,23 +650,42 @@ $('calClose').addEventListener('click', () => calModal.classList.remove('open'))
 calModal.addEventListener('click', e => { if (e.target === calModal) calModal.classList.remove('open'); });
 
 $('calConfirm').addEventListener('click', () => {
-  if (!calSelected) return;
+  if (!calSelected) { alert('날짜를 선택해주세요.'); return; }
   const h = parseInt(calH.value)||0;
   const m = parseInt(calM.value)||0;
   const s = parseInt(calS.value)||0;
   const target = new Date(calSelected);
   target.setHours(h, m, s, 0);
-  const diffSecs = Math.round((target - Date.now()) / 1000);
-  if (diffSecs <= 0) { alert('과거 시점은 설정할 수 없어요.'); return; }
-  calModal.classList.remove('open');
-  // Set as goal directly (already-running style)
-  clearInterval(ticker); ticker = null;
-  totalSeconds = diffSecs;
-  goalEpoch = target.getTime();
-  pausedRemaining = null;
-  restoreBanner.style.display = 'none';
-  startTick();
-  render(); save();
+
+  if (calMode === 'end') {
+    const diffSecs = Math.floor((target - Date.now()) / 1000);
+    if (diffSecs <= 0) { alert('과거 시점은 종료 시각으로 설정할 수 없어요.'); return; }
+    calModal.classList.remove('open');
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    totalSeconds = diffSecs;
+    goalEpoch = target.getTime();
+    startEpoch = Date.now();
+    pausedRemaining = null;
+    lastDisplayed = -1;
+    restoreBanner.style.display = 'none';
+    startTick();
+    render(); save();
+  } else {
+    // start mode: set startEpoch, recalc totalSeconds from start→now + remaining
+    if (target > new Date()) { alert('시작 시각은 현재보다 과거여야 해요.'); return; }
+    calModal.classList.remove('open');
+    const newStart = target.getTime();
+    // keep goalEpoch if running, else use current pausedRemaining to calc new goal
+    if (goalEpoch) {
+      startEpoch = newStart;
+      totalSeconds = Math.floor((goalEpoch - newStart) / 1000);
+    } else if (pausedRemaining !== null) {
+      startEpoch = newStart;
+      totalSeconds = Math.floor((Date.now() - newStart) / 1000) + pausedRemaining;
+    }
+    lastDisplayed = -1;
+    render(); save();
+  }
 });
 
 $('calBtn').addEventListener('click', () => { if (!isRunning()) openCal(); });
