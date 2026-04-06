@@ -76,7 +76,7 @@
   .meta-row { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 6px; }
   .elapsed-label { font-size: 12px; color: var(--muted); }
   .end-label { font-size: 11px; color: var(--muted); opacity: 0.6; }
- 
+
   .restore-banner {
     display: none;
     background: var(--surface); border: 1px solid var(--border);
@@ -125,6 +125,74 @@
     transition: color 0.15s, border-color 0.15s; white-space: nowrap;
   }
   .preset-btn:active { color: var(--accent); border-color: var(--accent); }
+
+  /* ── Calendar modal ── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.75); z-index: 100;
+    align-items: flex-end; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px 16px 0 0; width: 100%; max-width: 480px;
+    padding: 20px 20px 32px; display: flex; flex-direction: column; gap: 16px;
+  }
+  .modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .modal-title { font-size: 13px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); }
+  .modal-close {
+    background: none; border: none; color: var(--muted); font-size: 20px;
+    cursor: pointer; padding: 0 4px; line-height: 1;
+  }
+
+  /* Calendar */
+  .cal-nav {
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .cal-month {
+    font-family: 'Space Mono', monospace; font-size: 14px; font-weight: 700; color: var(--text);
+  }
+  .cal-arrow {
+    background: none; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); font-size: 16px; width: 32px; height: 32px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  .cal-arrow:active { background: var(--border); }
+  .cal-grid {
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px;
+  }
+  .cal-dow {
+    font-size: 10px; color: var(--muted); text-align: center;
+    padding: 4px 0; letter-spacing: 0.05em;
+  }
+  .cal-day {
+    aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+    border-radius: 6px; font-family: 'Space Mono', monospace; font-size: 13px;
+    cursor: pointer; border: 1px solid transparent; color: var(--text);
+    background: none; transition: background 0.1s, border-color 0.1s;
+  }
+  .cal-day:empty { cursor: default; }
+  .cal-day.today { border-color: var(--muted); }
+  .cal-day.selected { background: var(--accent); color: #0a0a0a; font-weight: 700; border-color: var(--accent); }
+  .cal-day.past { color: var(--muted); }
+  .cal-day:not(:empty):not(.past):hover { background: var(--border); }
+
+  /* Time pickers */
+  .time-pickers {
+    display: flex; gap: 8px; align-items: center;
+  }
+  .time-pickers .input-group input { font-size: 18px; padding: 10px 4px; }
+  .time-pickers .colon { padding-bottom: 14px; font-size: 18px; }
+
+  .modal-confirm {
+    width: 100%; padding: 14px; border-radius: 10px;
+    background: var(--accent); border: none; color: #0a0a0a;
+    font-family: 'Noto Sans KR', sans-serif; font-size: 15px; font-weight: 700;
+    cursor: pointer;
+  }
+  .modal-confirm:active { opacity: 0.8; }
 </style>
 </head>
 <body>
@@ -155,7 +223,8 @@
     <button class="preset-btn" data-h="72">72h</button>
     <button class="preset-btn" data-h="168">1주</button>
     <button class="preset-btn" data-h="336">2주</button>
-    <button class="preset-btn" data-h="1176">7주</button>
+    <button class="preset-btn" data-h="720">1달</button>
+    <button class="preset-btn" id="calBtn" style="border-color:var(--accent);color:var(--accent);">📅 날짜</button>
   </div>
   <div class="input-row">
     <div class="input-group">
@@ -178,6 +247,42 @@
     <button class="btn" id="resetBtn">초기화</button>
     <button class="btn primary" id="startBtn">시작</button>
     <button class="btn" id="pauseBtn" disabled>일시정지</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="calModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">종료 날짜 설정</span>
+      <button class="modal-close" id="calClose">✕</button>
+    </div>
+
+    <div class="cal-nav">
+      <button class="cal-arrow" id="calPrev">‹</button>
+      <span class="cal-month" id="calMonth"></span>
+      <button class="cal-arrow" id="calNext">›</button>
+    </div>
+
+    <div class="cal-grid" id="calGrid"></div>
+
+    <div class="time-pickers">
+      <div class="input-group">
+        <label>시</label>
+        <input type="number" id="calH" min="0" max="23" placeholder="0" inputmode="numeric">
+      </div>
+      <div class="colon">:</div>
+      <div class="input-group">
+        <label>분</label>
+        <input type="number" id="calM" min="0" max="59" placeholder="0" inputmode="numeric">
+      </div>
+      <div class="colon">:</div>
+      <div class="input-group">
+        <label>초</label>
+        <input type="number" id="calS" min="0" max="59" placeholder="0" inputmode="numeric">
+      </div>
+    </div>
+
+    <button class="modal-confirm" id="calConfirm">설정</button>
   </div>
 </div>
 
@@ -282,6 +387,18 @@ function render() {
   startBtn.textContent = isRunning() ? '실행중' : (isPaused() ? '계속' : '시작');
   pauseBtn.disabled = isIdle() || done;
   pauseBtn.textContent = isPaused() ? '계속' : '일시정지';
+
+  // 실행 중일 때 입력 잠금
+  const locked = isRunning();
+  [hInput, mInput, sInput].forEach(inp => {
+    inp.disabled = locked;
+    inp.style.opacity = locked ? '0.3' : '1';
+  });
+  document.querySelectorAll('.preset-btn').forEach(b => {
+    b.disabled = locked;
+    b.style.opacity = locked ? '0.3' : '1';
+    b.style.pointerEvents = locked ? 'none' : '';
+  });
 }
 
 function startTick() {
@@ -350,6 +467,7 @@ resetBtn.addEventListener('click', doReset);
 
 document.querySelectorAll('.preset-btn').forEach(btn => {
   btn.addEventListener('click', () => {
+    if (isRunning()) return;
     hInput.value = btn.dataset.h; mInput.value = 0; sInput.value = 0;
     setDuration(parseInt(btn.dataset.h) * 3600);
   });
@@ -357,6 +475,7 @@ document.querySelectorAll('.preset-btn').forEach(btn => {
 
 [hInput, mInput, sInput].forEach(inp => {
   inp.addEventListener('change', () => {
+    if (isRunning()) return;
     const h = parseInt(hInput.value)||0, m = parseInt(mInput.value)||0, s = parseInt(sInput.value)||0;
     const t = h*3600+m*60+s;
     if (t) setDuration(t);
@@ -416,6 +535,99 @@ fsBtn.addEventListener('click', () => {
     fsBtn.textContent = (document.fullscreenElement || document.webkitFullscreenElement) ? '✕' : '⛶';
   });
 });
+
+// ── Calendar modal ────────────────────────────────────
+const calModal   = $('calModal');
+const calMonthEl = $('calMonth');
+const calGrid    = $('calGrid');
+const calH       = $('calH');
+const calM       = $('calM');
+const calS       = $('calS');
+
+let calYear, calMonth, calSelected = null;
+
+const DAYS = ['일','월','화','수','목','금','토'];
+const MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+
+function openCal() {
+  const now = new Date();
+  calYear  = now.getFullYear();
+  calMonth = now.getMonth();
+  calSelected = null;
+  // prefill time with now+1h
+  calH.value = now.getHours();
+  calM.value = now.getMinutes();
+  calS.value = 0;
+  renderCal();
+  calModal.classList.add('open');
+}
+
+function renderCal() {
+  calMonthEl.textContent = `${calYear}년 ${MONTHS[calMonth]}`;
+  calGrid.innerHTML = '';
+  DAYS.forEach(d => {
+    const el = document.createElement('div');
+    el.className = 'cal-dow'; el.textContent = d;
+    calGrid.appendChild(el);
+  });
+
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+  const today = new Date();
+  today.setHours(0,0,0,0);
+
+  for (let i = 0; i < firstDay; i++) {
+    calGrid.appendChild(document.createElement('div'));
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const btn = document.createElement('button');
+    btn.className = 'cal-day';
+    btn.textContent = d;
+    const thisDate = new Date(calYear, calMonth, d);
+    if (thisDate < today) btn.classList.add('past');
+    if (calSelected && thisDate.toDateString() === calSelected.toDateString()) btn.classList.add('selected');
+    if (thisDate.toDateString() === today.toDateString()) btn.classList.add('today');
+    btn.addEventListener('click', () => {
+      if (btn.classList.contains('past')) return;
+      calSelected = new Date(calYear, calMonth, d);
+      renderCal();
+    });
+    calGrid.appendChild(btn);
+  }
+}
+
+$('calPrev').addEventListener('click', () => {
+  calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; }
+  renderCal();
+});
+$('calNext').addEventListener('click', () => {
+  calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; }
+  renderCal();
+});
+$('calClose').addEventListener('click', () => calModal.classList.remove('open'));
+calModal.addEventListener('click', e => { if (e.target === calModal) calModal.classList.remove('open'); });
+
+$('calConfirm').addEventListener('click', () => {
+  if (!calSelected) return;
+  const h = parseInt(calH.value)||0;
+  const m = parseInt(calM.value)||0;
+  const s = parseInt(calS.value)||0;
+  const target = new Date(calSelected);
+  target.setHours(h, m, s, 0);
+  const diffSecs = Math.round((target - Date.now()) / 1000);
+  if (diffSecs <= 0) { alert('과거 시점은 설정할 수 없어요.'); return; }
+  calModal.classList.remove('open');
+  // Set as goal directly (already-running style)
+  clearInterval(ticker); ticker = null;
+  totalSeconds = diffSecs;
+  goalEpoch = target.getTime();
+  pausedRemaining = null;
+  restoreBanner.style.display = 'none';
+  startTick();
+  render(); save();
+});
+
+$('calBtn').addEventListener('click', () => { if (!isRunning()) openCal(); });
 </script>
 </body>
 </html>
