@@ -64,13 +64,40 @@ body {
 
 .progress-bar {
   width: 100%; max-width: 360px; height: 2px;
-  background: var(--border); border-radius: 1px; margin-top: 16px; overflow: hidden;
+  background: var(--border); border-radius: 1px; margin-top: 16px;
+  position: relative; overflow: visible; padding-top: 20px;
 }
 .progress-fill {
   height: 100%; background: var(--accent); border-radius: 1px; width: 0%;
   transition: width 0.5s linear;
 }
 .progress-fill.emergency { background: var(--emg-a); }
+
+/* ── Goal flags on progress bar ── */
+.goal-flag {
+  position: absolute;
+  bottom: -1px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  pointer-events: auto;
+  cursor: default;
+}
+.goal-flag-pole {
+  width: 2px;
+  height: 14px;
+  background: currentColor;
+}
+.goal-flag-banner {
+  position: absolute;
+  top: 0;
+  left: 2px;
+  width: 10px;
+  height: 7px;
+  background: currentColor;
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
 
 .meta-row { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 6px; }
 .elapsed-label { font-size: 12px; color: var(--muted); }
@@ -93,6 +120,92 @@ body {
   -webkit-appearance: none;
 }
 .emg-btn.on { border-color: var(--emg-a); background: rgba(255,107,26,0.12); }
+
+/* Goal add button — fixed top-left of display area */
+.goal-btn {
+  position: absolute; top: 0; left: 0;
+  width: 32px; height: 32px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--surface);
+  font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: border-color 0.2s, background 0.2s;
+  -webkit-appearance: none;
+}
+.goal-btn:active { background: var(--border); }
+
+/* ── Goals section (between display and controls) ── */
+.goals-wrap {
+  flex-shrink: 0;
+  width: 100%; max-width: 360px;
+  max-height: 190px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 4px 0 8px;
+  align-self: center;
+}
+.goals-wrap:empty { display: none; }
+.goals-wrap-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px 6px;
+}
+.goals-wrap-title {
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.goal-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+}
+.goal-item:last-child { margin-bottom: 0; }
+.goal-flag-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+.goal-info {
+  flex: 1;
+  min-width: 0;
+}
+.goal-memo-text {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.goal-rem-text {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+  font-family: 'Space Mono', monospace;
+  letter-spacing: -0.5px;
+}
+.goal-del {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  line-height: 1;
+  -webkit-appearance: none;
+  transition: color 0.15s;
+}
+.goal-del:active { color: var(--danger); }
 
 /* ── Controls ── */
 .controls { flex-shrink: 0; display: flex; flex-direction: column; gap: 10px; padding-bottom: 8px; }
@@ -187,6 +300,55 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   font-family: 'Noto Sans KR', sans-serif; font-size: 15px; font-weight: 700; cursor: pointer;
 }
 .modal-confirm:active { opacity: 0.8; }
+
+/* ── Goal modal extras ── */
+.modal-field { display: flex; flex-direction: column; gap: 6px; }
+.modal-field-label {
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.goal-memo-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 15px;
+  padding: 12px;
+  outline: none;
+  transition: border-color 0.2s;
+  -webkit-appearance: none;
+}
+.goal-memo-input:focus { border-color: var(--accent); }
+.goal-memo-input::placeholder { color: var(--muted); }
+.color-swatches {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.color-swatch {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  outline: 2px solid transparent;
+  transition: transform 0.15s, outline-color 0.15s;
+  -webkit-appearance: none;
+  flex-shrink: 0;
+}
+.color-swatch.selected {
+  outline-color: var(--text);
+  outline-offset: 2px;
+  transform: scale(1.15);
+}
+.color-swatch:active { transform: scale(0.9); }
+.goal-duration-row { display: flex; gap: 6px; align-items: center; }
+.goal-duration-row .input-group input { font-size: 18px; padding: 8px 4px; }
+.goal-duration-row .colon { font-size: 16px; padding-bottom: 12px; }
 </style>
 </head>
 <body>
@@ -200,16 +362,20 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 </div>
 
 <div class="display-area">
+  <button class="goal-btn" id="goalBtn" title="목표 추가">🚩</button>
   <button class="emg-btn" id="emgBtn" title="비상 모드">⚠️</button>
   <div class="time-display" id="timeDisplay">00:00:00</div>
   <div class="time-label">시간 : 분 : 초</div>
-  <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+  <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
   <div class="meta-row">
     <div class="elapsed-label" id="elapsedLabel">—</div>
     <div class="end-label" id="endLabel"></div>
   </div>
   <div class="restore-banner" id="restoreBanner">세션 복원됨 — <b id="restoreInfo"></b></div>
 </div>
+
+<!-- Goals list -->
+<div class="goals-wrap" id="goalsWrap"></div>
 
 <div class="controls">
   <div class="presets">
@@ -293,14 +459,58 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </div>
 </div>
 
+<!-- Goal creation modal -->
+<div class="modal-overlay" id="goalModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">목표 추가</span>
+      <button class="modal-close" id="goalModalClose">✕</button>
+    </div>
+
+    <!-- Duration from now -->
+    <div class="modal-field">
+      <span class="modal-field-label">지금으로부터</span>
+      <div class="goal-duration-row">
+        <div class="input-group"><label>시간</label><input type="number" id="goalH" min="0" max="8760" placeholder="0" inputmode="numeric"></div>
+        <div class="colon">:</div>
+        <div class="input-group"><label>분</label><input type="number" id="goalM" min="0" max="59" placeholder="0" inputmode="numeric"></div>
+        <div class="colon">:</div>
+        <div class="input-group"><label>초</label><input type="number" id="goalS" min="0" max="59" placeholder="0" inputmode="numeric"></div>
+      </div>
+    </div>
+
+    <!-- Memo -->
+    <div class="modal-field">
+      <span class="modal-field-label">메모</span>
+      <input type="text" class="goal-memo-input" id="goalMemoInput" placeholder="목표 메모 (선택)" maxlength="40">
+    </div>
+
+    <!-- Color -->
+    <div class="modal-field">
+      <span class="modal-field-label">깃발 색</span>
+      <div class="color-swatches" id="colorSwatches"></div>
+    </div>
+
+    <button class="modal-confirm" id="goalConfirm">추가</button>
+  </div>
+</div>
+
 <script>
-const STORE_KEY = 'timer_v4';
+const STORE_KEY  = 'timer_v4';
+const GOALS_KEY  = 'timer_goals_v1';
 
-// goalEpoch:       ms timestamp when timer hits 0
-// startEpoch:      ms timestamp of timer start (for progress bar)
-// pausedRemaining: seconds remaining when paused
-// totalSeconds:    goalEpoch - startEpoch in seconds (full span)
+const GOAL_COLORS = [
+  '#ff4747', // 빨강
+  '#ff9000', // 주황
+  '#e8ff47', // 노랑 (accent)
+  '#47ff8a', // 초록
+  '#3a7fff', // 파랑
+  '#b47fff', // 보라
+  '#ff47c8', // 분홍
+  '#00e5ff', // 하늘
+];
 
+// ── Timer state ────────────────────────────────────────
 let goalEpoch       = null;
 let startEpoch      = null;
 let pausedRemaining = null;
@@ -309,11 +519,17 @@ let rafId           = null;
 let lastDisplayed   = -1;
 let emergency       = false;
 
+// ── Goals state ────────────────────────────────────────
+let goals = []; // [{id, memo, endEpoch, color}]
+let selectedColor   = GOAL_COLORS[0];
+let lastGoalSec     = -1;
+
 const $ = id => document.getElementById(id);
 const timeDisplay   = $('timeDisplay');
 const elapsedLabel  = $('elapsedLabel');
 const endLabel      = $('endLabel');
 const progressFill  = $('progressFill');
+const progressBar   = $('progressBar');
 const statusDot     = $('statusDot');
 const statusText    = $('statusText');
 const restoreBanner = $('restoreBanner');
@@ -325,6 +541,7 @@ const hInput        = $('hInput');
 const mInput        = $('mInput');
 const sInput        = $('sInput');
 const emgBtn        = $('emgBtn');
+const goalsWrap     = $('goalsWrap');
 
 // ── Helpers ───────────────────────────────────────────
 function fmt(secs) {
@@ -347,6 +564,16 @@ function fmtElapsed(secs) {
   if (s || !p.length) p.push(`${s}초`);
   return '경과 ' + p.join(' ');
 }
+function fmtGoalRem(endEpoch) {
+  const rem = Math.max(0, Math.floor((endEpoch - Date.now()) / 1000));
+  if (rem === 0) return '완료';
+  const h = Math.floor(rem / 3600);
+  const m = Math.floor((rem % 3600) / 60);
+  const s = rem % 60;
+  if (h > 0) return `${h}시간 ${String(m).padStart(2,'0')}분 후`;
+  if (m > 0) return `${m}분 ${String(s).padStart(2,'0')}초 후`;
+  return `${s}초 후`;
+}
 
 function getRem() {
   if (goalEpoch !== null) return Math.max(0, Math.floor((goalEpoch - Date.now()) / 1000));
@@ -362,6 +589,93 @@ function save() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify({ goalEpoch, startEpoch, pausedRemaining, totalSeconds, emergency })); } catch(e) {}
 }
 function clearSave() { try { localStorage.removeItem(STORE_KEY); } catch(e) {} }
+function saveGoals() { try { localStorage.setItem(GOALS_KEY, JSON.stringify(goals)); } catch(e) {} }
+function loadGoals() { try { goals = JSON.parse(localStorage.getItem(GOALS_KEY)) || []; } catch(e) { goals = []; } }
+
+// ── Goal flags on progress bar ────────────────────────
+function renderGoalFlags() {
+  document.querySelectorAll('.goal-flag').forEach(f => f.remove());
+
+  const refStart = startEpoch;
+  const refEnd   = goalEpoch || (pausedRemaining !== null && startEpoch ? startEpoch + totalSeconds * 1000 : null);
+
+  if (!refStart || !refEnd) return;
+
+  const span = refEnd - refStart;
+  if (span <= 0) return;
+
+  goals.forEach(g => {
+    const pos = ((g.endEpoch - refStart) / span) * 100;
+    if (pos < 0 || pos > 100) return;
+
+    const flag = document.createElement('div');
+    flag.className = 'goal-flag';
+    flag.style.left = pos.toFixed(2) + '%';
+    flag.style.color = g.color;
+    flag.title = g.memo || '목표';
+
+    flag.innerHTML = `<div class="goal-flag-banner"></div><div class="goal-flag-pole"></div>`;
+    progressBar.appendChild(flag);
+  });
+}
+
+// ── Goal list rendering ───────────────────────────────
+function renderGoals() {
+  if (goals.length === 0) {
+    goalsWrap.innerHTML = '';
+    return;
+  }
+
+  const header = `<div class="goals-wrap-header"><span class="goals-wrap-title">목표</span></div>`;
+  const items = goals.map(g => {
+    const rem = Math.max(0, Math.floor((g.endEpoch - Date.now()) / 1000));
+    const remText = fmtGoalRem(g.endEpoch);
+    const remColor = rem === 0 ? 'var(--danger)' : 'var(--muted)';
+    return `
+      <div class="goal-item" data-gid="${g.id}">
+        <div class="goal-flag-icon" style="color:${g.color}">
+          <svg width="14" height="16" viewBox="0 0 14 16" fill="none">
+            <line x1="2" y1="1" x2="2" y2="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <polygon points="2,1 14,6 2,11" fill="currentColor"/>
+          </svg>
+        </div>
+        <div class="goal-info">
+          <div class="goal-memo-text">${escHtml(g.memo || '목표')}</div>
+          <div class="goal-rem-text" style="color:${remColor}">${remText}</div>
+        </div>
+        <button class="goal-del" data-del="${g.id}" aria-label="삭제">✕</button>
+      </div>
+    `;
+  }).join('');
+
+  goalsWrap.innerHTML = header + items;
+
+  goalsWrap.querySelectorAll('.goal-del').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = parseInt(btn.dataset.del);
+      goals = goals.filter(g => g.id !== id);
+      saveGoals();
+      renderGoals();
+      renderGoalFlags();
+    });
+  });
+}
+
+function updateGoalTimes() {
+  goals.forEach(g => {
+    const item = goalsWrap.querySelector(`.goal-item[data-gid="${g.id}"]`);
+    if (!item) return;
+    const remEl = item.querySelector('.goal-rem-text');
+    if (!remEl) return;
+    const rem = Math.max(0, Math.floor((g.endEpoch - Date.now()) / 1000));
+    remEl.textContent = fmtGoalRem(g.endEpoch);
+    remEl.style.color = rem === 0 ? 'var(--danger)' : 'var(--muted)';
+  });
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 
 // ── Render ────────────────────────────────────────────
 function render() {
@@ -373,11 +687,9 @@ function render() {
     timeDisplay.textContent = fmt(rem);
   }
 
-  // Classes on time display
   timeDisplay.classList.toggle('done', done && !emergency);
   timeDisplay.classList.toggle('emergency', emergency && !done);
 
-  // Progress: (now - startEpoch) / (goalEpoch - startEpoch)
   if (startEpoch && goalEpoch) {
     const span    = goalEpoch - startEpoch;
     const elapsed = Date.now() - startEpoch;
@@ -427,6 +739,16 @@ function render() {
   });
 
   emgBtn.classList.toggle('on', emergency);
+
+  // Goal flags (cheap — only repositions DOM elements)
+  renderGoalFlags();
+
+  // Goal remaining times — update text once per second
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (nowSec !== lastGoalSec) {
+    lastGoalSec = nowSec;
+    updateGoalTimes();
+  }
 }
 
 // ── Tick (rAF) ────────────────────────────────────────
@@ -444,6 +766,14 @@ function startTick() {
   }
   rafId = requestAnimationFrame(loop);
 }
+
+// Separate interval for goal time updates when no main timer is ticking
+setInterval(() => {
+  if (goals.length > 0 && !rafId) {
+    updateGoalTimes();
+    renderGoalFlags();
+  }
+}, 1000);
 
 // ── Actions ───────────────────────────────────────────
 function doStart() {
@@ -492,7 +822,7 @@ resetBtn.addEventListener('click', doReset);
 document.querySelectorAll('.preset-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     if (isRunning()) return;
-    if (!btn.dataset.h) return; // calendar btn
+    if (!btn.dataset.h) return;
     hInput.value = btn.dataset.h; mInput.value = 0; sInput.value = 0;
     setDuration(parseInt(btn.dataset.h) * 3600);
   });
@@ -543,11 +873,10 @@ const calModal     = $('calModal');
 const calMonthLbl  = $('calMonthLabel');
 const calGridEl    = $('calGrid');
 
-// Selected dates
 let calYear, calMonth;
-let selStart = null; // Date object (date only)
-let selEnd   = null; // Date object (date only)
-let picking  = 'start'; // which date we're picking next on tap
+let selStart = null;
+let selEnd   = null;
+let picking  = 'start';
 
 const DAYS   = ['일','월','화','수','목','금','토'];
 const MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
@@ -559,11 +888,9 @@ function openCal() {
   selStart = null; selEnd = null;
   picking  = 'start';
 
-  // Default start = now
   $('sH').value = now.getHours();
   $('sM').value = now.getMinutes();
   $('sS').value = now.getSeconds();
-  // Default end = blank (user must pick)
   $('eH').value = ''; $('eM').value = ''; $('eS').value = '';
 
   renderCal();
@@ -609,7 +936,6 @@ function renderCal() {
       const clicked = new Date(calYear, calMonth, d);
       if (picking === 'start') {
         selStart = clicked;
-        // Auto-set start time to now if today
         if (sameDay(clicked, today)) {
           const now = new Date();
           $('sH').value = now.getHours();
@@ -619,7 +945,6 @@ function renderCal() {
         picking = 'end';
       } else {
         if (clicked < selStart) {
-          // Swap: clicked earlier than start → treat as new start
           selEnd   = selStart;
           selStart = clicked;
         } else {
@@ -649,7 +974,7 @@ $('calConfirm').addEventListener('click', () => {
 
   if (end <= start) { alert('종료 시각이 시작 시각보다 늦어야 해요.'); return; }
 
-  const span    = Math.floor((end - start) / 1000); // totalSeconds
+  const span    = Math.floor((end - start) / 1000);
   const nowMs   = Date.now();
   const remSecs = Math.floor((end - nowMs) / 1000);
 
@@ -664,10 +989,8 @@ $('calConfirm').addEventListener('click', () => {
   restoreBanner.style.display = 'none';
 
   if (remSecs > 0) {
-    // End is in the future → start ticking
     startTick();
   } else {
-    // End already passed → show as done
     goalEpoch = null;
     pausedRemaining = 0;
   }
@@ -676,11 +999,64 @@ $('calConfirm').addEventListener('click', () => {
 
 $('calBtn').addEventListener('click', () => { if (!isRunning()) openCal(); });
 
+// ── Goal modal ────────────────────────────────────────
+const goalModal = $('goalModal');
+
+function buildColorSwatches() {
+  const container = $('colorSwatches');
+  container.innerHTML = '';
+  GOAL_COLORS.forEach(color => {
+    const btn = document.createElement('button');
+    btn.className = 'color-swatch' + (color === selectedColor ? ' selected' : '');
+    btn.style.background = color;
+    btn.title = color;
+    btn.addEventListener('click', () => {
+      selectedColor = color;
+      container.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+      btn.classList.add('selected');
+    });
+    container.appendChild(btn);
+  });
+}
+
+$('goalBtn').addEventListener('click', () => {
+  $('goalH').value = '';
+  $('goalM').value = '';
+  $('goalS').value = '';
+  $('goalMemoInput').value = '';
+  buildColorSwatches();
+  goalModal.classList.add('open');
+});
+
+$('goalModalClose').addEventListener('click', () => goalModal.classList.remove('open'));
+goalModal.addEventListener('click', e => { if (e.target === goalModal) goalModal.classList.remove('open'); });
+
+$('goalConfirm').addEventListener('click', () => {
+  const h = parseInt($('goalH').value) || 0;
+  const m = parseInt($('goalM').value) || 0;
+  const s = parseInt($('goalS').value) || 0;
+  const totalSec = h * 3600 + m * 60 + s;
+
+  if (totalSec <= 0) { alert('시간을 입력해주세요.'); return; }
+
+  const memo     = $('goalMemoInput').value.trim();
+  const endEpoch = Date.now() + totalSec * 1000;
+
+  goals.push({ id: Date.now(), memo, endEpoch, color: selectedColor });
+  saveGoals();
+  renderGoals();
+  renderGoalFlags();
+
+  goalModal.classList.remove('open');
+});
+
 // ── Restore on load ───────────────────────────────────
+loadGoals();
+
 (function restore() {
   let saved;
   try { saved = JSON.parse(localStorage.getItem(STORE_KEY)); } catch(e) {}
-  if (!saved) { render(); return; }
+  if (!saved) { render(); renderGoals(); return; }
 
   totalSeconds = saved.totalSeconds || 0;
   startEpoch   = saved.startEpoch   || null;
@@ -705,6 +1081,7 @@ $('calBtn').addEventListener('click', () => { if (!isRunning()) openCal(); });
   }
 
   render();
+  renderGoals();
 })();
 </script>
 </body>
