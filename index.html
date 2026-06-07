@@ -152,12 +152,12 @@ body {
   padding-top carves out vertical space for flags above the bar.
   The actual bar (4 px) sits in normal flow right after the padding.
   Flag SVGs are position:absolute, top:0 → their y-coords map directly
-  to pixels from the track's top, so barY = padding-top = 24.
+  to pixels from the track's top, so barY = padding-top = 28.
 */
 .progress-track {
   width: 100%;
   max-width: 400px;
-  padding-top: 24px;          /* = barY in SVG coordinates */
+  padding-top: 28px;          /* = barY in SVG coordinates */
   position: relative;
   flex-shrink: 0;
   margin-top: 4px;
@@ -810,32 +810,29 @@ const GOAL_COLORS = [
 
 /*
   Flag SVG geometry — must match CSS:
-    barY    = padding-top of .progress-track = 24
+    barY    = padding-top of .progress-track = 28
     barH    = height of .progress-bar        = 4
-    bannerH = visible banner height          = 10
-    poleTop = banner bottom = bannerH        = 10
-    poleBot = barY + barH + 2               = 30  (2 px stake into bar)
-    stakeH  = visual tip below poleBot      = 5
-    svgH    = poleBot + stakeH              = 35
+    bannerH = visible banner height          = 14
+    poleTop = banner bottom = bannerH        = 14
+    poleBot = barY + barH + 2               = 34  (2 px below bar bottom)
+    svgH    = poleBot (no separate stake element)
 */
-const BAR_Y    = 24;
+const BAR_Y    = 28;
 const BAR_H    = 4;
-const BANNER_H = 10;
+const BANNER_H = 14;
 const POLE_TOP = BANNER_H;
-const POLE_BOT = BAR_Y + BAR_H + 2;
-const STAKE_H  = 5;
-const SVG_H    = POLE_BOT + STAKE_H;
+const POLE_BOT = BAR_Y + BAR_H + 2;   /* 2px below bar bottom */
+const SVG_H    = POLE_BOT;
 
 function makeFlagSVG(color) {
-  /* Swallowtail banner: starts at pole right-edge (x=2), extends right with
-     a triangular notch cut from the far right.
-     Pole: x=1..3, y=POLE_TOP..POLE_BOT (continuous rectangle).
-     Stake: triangle pointing down below bar. */
-  return `<svg width="20" height="${SVG_H}" viewBox="0 0 20 ${SVG_H}"
+  /* Forward-pointing banner: body from x=2..17, tip at x=22 midpoint.
+     Immediately recognisable as a flag/label at small sizes.
+     Pole: 2px wide, continuous from banner bottom through bar. */
+  const tip = Math.round(BANNER_H / 2);
+  return `<svg width="24" height="${SVG_H}" viewBox="0 0 24 ${SVG_H}"
     xmlns="http://www.w3.org/2000/svg" fill="${color}">
-    <path d="M2,0 H18 L13,5 L18,${BANNER_H} H2 Z"/>
+    <path d="M2,0 H17 L22,${tip} L17,${BANNER_H} H2 Z"/>
     <rect x="1" y="${POLE_TOP}" width="2" height="${POLE_BOT - POLE_TOP}" rx="1"/>
-    <polygon points="1,${POLE_BOT} 3,${POLE_BOT} 2,${POLE_BOT + STAKE_H}"/>
   </svg>`;
 }
 
