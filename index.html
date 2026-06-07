@@ -8,23 +8,23 @@
 <meta name="apple-mobile-web-app-title" content="타이머">
 <meta name="theme-color" content="#080808">
 <title>타이머</title>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Noto+Sans+KR:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg:       #080808;
-  --surface:  #111;
-  --surface2: #181818;
-  --border:   #222;
-  --border2:  #2e2e2e;
-  --accent:   #d6f530;
-  --text:     #eee;
-  --sub:      #888;
-  --dim:      #444;
-  --danger:   #f04040;
-  --emg-a:    #ff6b1a;
-  --emg-b:    #ff2d00;
+  --bg:      #080808;
+  --surface: #101010;
+  --surf2:   #191919;
+  --border:  #202020;
+  --bord2:   #2c2c2c;
+  --accent:  #cef231;
+  --text:    #efefef;
+  --sub:     #a0a0a0;
+  --dim:     #555;
+  --danger:  #f04444;
+  --emg-a:   #ff6b1a;
+  --emg-b:   #ff2d00;
 }
 
 html, body {
@@ -41,63 +41,57 @@ body {
   display: flex;
   flex-direction: column;
   height: 100dvh;
-  padding: env(safe-area-inset-top,18px) 22px env(safe-area-inset-bottom,18px);
-  gap: 0;
+  padding: env(safe-area-inset-top,18px) 22px env(safe-area-inset-bottom,16px);
 }
 
-/* ─────────────────────── Header ─────────────────────── */
+/* ═══════════════════════════ Header ══════════════════════════ */
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 0 14px;
+  padding: 10px 0 16px;
   flex-shrink: 0;
 }
 
 .header-title {
   font-size: 10px;
   font-weight: 400;
-  letter-spacing: 0.25em;
+  letter-spacing: 0.28em;
   text-transform: uppercase;
   color: var(--dim);
 }
 
-.status-row {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
+.status-row { display: flex; align-items: center; gap: 8px; }
 
 .status-text {
   font-size: 10px;
-  letter-spacing: 0.12em;
-  color: var(--sub);
+  letter-spacing: 0.14em;
   text-transform: uppercase;
+  color: var(--sub);
   transition: color 0.3s;
+  min-width: 4em;
+  text-align: right;
 }
 
 .dot {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--dim);
   transition: background 0.3s, box-shadow 0.3s;
   flex-shrink: 0;
 }
-.dot.active {
-  background: var(--accent);
-  box-shadow: 0 0 7px var(--accent);
-}
-.dot.done { background: var(--danger); }
+.dot.active { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+.dot.done   { background: var(--danger); }
 
-/* ─────────────────────── Display ─────────────────────── */
+/* ═════════════════════════ Display area ══════════════════════ */
 .display-area {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 4px;
   position: relative;
   min-height: 0;
 }
@@ -106,70 +100,75 @@ body {
 .corner-btn {
   position: absolute;
   top: 0;
-  width: 32px;
-  height: 32px;
-  border-radius: 7px;
-  border: 1px solid var(--border2);
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
   background: var(--surface);
   font-size: 15px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: border-color 0.2s, background 0.2s;
+  transition: background 0.15s, border-color 0.15s;
   -webkit-appearance: none;
-  color: var(--sub);
 }
-.corner-btn:active { background: var(--border); }
+.corner-btn:active { background: var(--surf2); }
 .corner-btn.left  { left: 0; }
 .corner-btn.right { right: 0; }
-.corner-btn.on { border-color: var(--emg-a); background: rgba(255,107,26,0.1); }
+.corner-btn.on    { border-color: var(--emg-a); background: rgba(255,107,26,0.1); }
 
-/* Time display */
+/* ───── Time display ───── */
 .time-display {
   font-family: 'Space Mono', monospace;
-  font-size: clamp(52px, 16vw, 92px);
+  font-size: clamp(54px, 16vw, 96px);
   font-weight: 700;
   letter-spacing: -3px;
   line-height: 1;
   color: var(--text);
   transition: color 0.5s;
   text-align: center;
-  margin-top: 8px;
+  margin-top: 10px;
 }
 .time-display.done      { color: var(--danger); animation: pulse 1.1s ease-in-out infinite; }
 .time-display.emergency { color: var(--emg-a);  animation: flicker 0.9s ease-in-out infinite; }
 
-@keyframes pulse   { 0%,100%{opacity:1} 50%{opacity:0.3} }
+@keyframes pulse   { 0%,100%{opacity:1} 50%{opacity:0.28} }
 @keyframes flicker { 0%{color:var(--emg-a)} 50%{color:var(--emg-b)} 100%{color:var(--emg-a)} }
 
 .time-sublabel {
   font-size: 10px;
-  letter-spacing: 0.3em;
+  letter-spacing: 0.32em;
   color: var(--dim);
   text-transform: uppercase;
   text-align: center;
-  margin-bottom: 4px;
+  margin-top: 2px;
+  margin-bottom: 6px;
 }
 
-/* ─────────────── Progress bar + flags ────────────────── */
+/* ═══════════════════════ Progress + Flags ═══════════════════ */
+/*
+  .progress-track: position:relative wrapper.
+  padding-top carves out vertical space for flags above the bar.
+  The actual bar (4 px) sits in normal flow right after the padding.
+  Flag SVGs are position:absolute, top:0 → their y-coords map directly
+  to pixels from the track's top, so barY = padding-top = 24.
+*/
 .progress-track {
   width: 100%;
-  max-width: 380px;
-  /* padding-top creates vertical space for flags above the bar */
-  padding-top: 28px;
+  max-width: 400px;
+  padding-top: 24px;          /* = barY in SVG coordinates */
   position: relative;
-  margin-top: 8px;
   flex-shrink: 0;
+  margin-top: 4px;
 }
 
 .progress-bar {
   width: 100%;
-  height: 3px;
-  background: var(--border2);
+  height: 4px;
+  background: var(--bord2);
   border-radius: 2px;
   overflow: hidden;
-  position: relative;
 }
 
 .progress-fill {
@@ -179,176 +178,142 @@ body {
   width: 0%;
   transition: width 0.5s linear;
 }
-.progress-fill.running {
-  box-shadow: 0 0 8px rgba(214,245,48,0.5);
-}
-.progress-fill.emergency { background: var(--emg-a); }
+.progress-fill.running   { box-shadow: 0 0 10px rgba(206,242,49,0.45); }
+.progress-fill.emergency { background: var(--emg-a); box-shadow: 0 0 10px rgba(255,107,26,0.45); }
 
-/* ── Flags ── */
+/* Flags: each is a tiny absolutely-positioned container whose left
+   matches the goal's position on the bar. The SVG child does the drawing. */
 .goal-flag {
   position: absolute;
-  /* bottom: -2px places flag so 2px of pole is below bar bottom (inserted look) */
-  bottom: -2px;
-  /* width:0 so the flag itself has no layout width; all parts are abs-positioned */
+  top: 0;
   width: 0;
   height: 0;
   pointer-events: auto;
+  cursor: default;
 }
-
-.goal-flag-pole {
+.goal-flag svg {
   position: absolute;
-  bottom: 0;
-  left: -1px;         /* center the 2px-wide pole */
-  width: 2px;
-  height: 22px;       /* extends from -2px (below bar) to 20px above bar */
-  background: currentColor;
-  border-radius: 1px 1px 0 0;
+  top: 0;
+  left: -2px;   /* shift so pole centre (SVG x=2) lands exactly on goal position */
+  overflow: visible;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.55));
 }
 
-/* pointed stake tip below bar */
-.goal-flag-pole::after {
-  content: '';
-  position: absolute;
-  bottom: -4px;
-  left: -2px;
-  width: 0;
-  height: 0;
-  border-left:  3px solid transparent;
-  border-right: 3px solid transparent;
-  border-top:   4px solid currentColor;
-}
-
-.goal-flag-banner {
-  position: absolute;
-  /* banner sits just above the pole top */
-  bottom: 22px;
-  left: 1px;          /* banner's left edge aligns with right side of pole */
-  width: 16px;
-  height: 11px;
-  background: currentColor;
-  /* swallowtail / pennant shape: rectangle with triangular notch on right */
-  clip-path: polygon(0 0, 100% 0, 68% 50%, 100% 100%, 0 100%);
-  filter: brightness(1.05);
-}
-
-/* Meta info row */
+/* ───── Meta row ───── */
 .meta-row {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 3px;
-  margin-top: 4px;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 8px;
 }
 
 .elapsed-label {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--sub);
-  letter-spacing: 0.05em;
+  letter-spacing: 0.02em;
+}
+
+.meta-sep {
+  width: 1px;
+  height: 11px;
+  background: var(--border);
+  flex-shrink: 0;
 }
 
 .end-label {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--dim);
-  letter-spacing: 0.05em;
 }
 
 /* Restore banner */
 .restore-banner {
   display: none;
   background: var(--surface);
-  border: 1px solid var(--border2);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 7px 14px;
   font-size: 11px;
   color: var(--sub);
   text-align: center;
-  margin-top: 8px;
+  margin-top: 10px;
 }
-.restore-banner b { color: var(--accent); font-weight: 500; }
+.restore-banner b { color: var(--accent); font-weight: 600; }
 
-/* ─────────────────────── Goals list ─────────────────── */
+/* ═══════════════════════════ Goals list ══════════════════════ */
 .goals-wrap {
   flex-shrink: 0;
   width: 100%;
-  max-height: 170px;
+  max-height: 180px;
   overflow-y: auto;
+  padding: 12px 0 6px;
   display: flex;
   flex-direction: column;
-  padding: 10px 0 4px;
-  gap: 5px;
+  gap: 6px;
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
 .goals-wrap::-webkit-scrollbar { display: none; }
+.goals-wrap:empty { padding: 0; }
 
-.goals-label {
+.goals-section-label {
   font-size: 9px;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--dim);
-  padding: 0 1px 4px;
+  margin-bottom: 2px;
 }
 
 .goal-item {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 8px 11px;
+  gap: 10px;
+  padding: 10px 12px;
   background: var(--surface);
-  border-radius: 9px;
   border: 1px solid var(--border);
+  border-radius: 10px;
   overflow: hidden;
-  position: relative;
 }
 
-/* left accent bar in goal color */
-.goal-item::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: var(--goal-color, var(--dim));
-  border-radius: 9px 0 0 9px;
-}
-
-.goal-icon {
+/* Thin colored accent stripe */
+.goal-stripe {
+  width: 2px;
+  height: 26px;
+  border-radius: 1px;
   flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  opacity: 0.9;
+  background: var(--goal-c, var(--dim));
 }
 
-.goal-info {
+/* Main content: name + remaining side by side */
+.goal-body {
   flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 0;
 }
 
-.goal-memo-text {
+.goal-name {
   flex: 1;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  min-width: 0;
 }
 
-.goal-rem-text {
-  font-size: 11px;
-  color: var(--sub);
+.goal-rem {
+  flex-shrink: 0;
+  font-size: 13px;
   font-family: 'Space Mono', monospace;
+  font-weight: 700;
+  color: var(--text);
   letter-spacing: -0.5px;
   white-space: nowrap;
-  flex-shrink: 0;
-  padding-left: 8px;
 }
-.goal-rem-text.done-rem { color: var(--danger); }
+.goal-rem.done-c { color: var(--danger); }
 
 .goal-del {
   flex-shrink: 0;
@@ -357,16 +322,14 @@ body {
   color: var(--dim);
   font-size: 13px;
   cursor: pointer;
-  padding: 0 0 0 6px;
+  padding: 2px 0 2px 6px;
   line-height: 1;
   -webkit-appearance: none;
   transition: color 0.15s;
-  display: flex;
-  align-items: center;
 }
 .goal-del:active { color: var(--danger); }
 
-/* ─────────────────────── Controls ───────────────────── */
+/* ═══════════════════════════ Controls ════════════════════════ */
 .controls {
   flex-shrink: 0;
   display: flex;
@@ -375,7 +338,6 @@ body {
   padding-bottom: 4px;
 }
 
-/* Preset row */
 .presets {
   display: flex;
   gap: 5px;
@@ -389,7 +351,7 @@ body {
   border-radius: 7px;
   border: 1px solid var(--border);
   background: transparent;
-  color: var(--dim);
+  color: var(--sub);
   font-family: 'Space Mono', monospace;
   font-size: 11px;
   cursor: pointer;
@@ -400,10 +362,9 @@ body {
 .preset-btn:active {
   color: var(--accent);
   border-color: var(--accent);
-  background: rgba(214,245,48,0.06);
+  background: rgba(206,242,49,0.06);
 }
 
-/* Input row */
 .input-row {
   display: flex;
   gap: 6px;
@@ -419,7 +380,7 @@ body {
 
 .input-group label {
   font-size: 9px;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.2em;
   color: var(--dim);
   text-align: center;
   text-transform: uppercase;
@@ -428,7 +389,7 @@ body {
 .input-group input {
   width: 100%;
   background: var(--surface);
-  border: 1px solid var(--border2);
+  border: 1px solid var(--bord2);
   border-radius: 9px;
   color: var(--text);
   font-family: 'Space Mono', monospace;
@@ -442,6 +403,7 @@ body {
   appearance: none;
 }
 .input-group input:focus { border-color: var(--accent); }
+
 input[type=number]::-webkit-inner-spin-button,
 input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 
@@ -454,51 +416,51 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   flex-shrink: 0;
 }
 
-/* Button row */
 .btn-row { display: flex; gap: 7px; }
 
 .btn {
   flex: 1;
   padding: 13px 8px;
   border-radius: 10px;
-  border: 1px solid var(--border2);
+  border: 1px solid var(--bord2);
   background: var(--surface);
   color: var(--text);
   font-family: 'Noto Sans KR', sans-serif;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  transition: background 0.15s, transform 0.1s;
   -webkit-appearance: none;
   letter-spacing: -0.3px;
 }
-.btn:active { transform: scale(0.96); background: var(--surface2); }
+.btn:active { transform: scale(0.96); background: var(--surf2); }
 .btn.primary {
   background: var(--accent);
   border-color: var(--accent);
   color: #0a0a0a;
   font-weight: 700;
 }
-.btn.primary:active { background: #c4e020; border-color: #c4e020; }
-.btn:disabled { opacity: 0.28; pointer-events: none; }
+.btn.primary:active { background: #b8d92a; border-color: #b8d92a; }
+.btn:disabled { opacity: 0.26; pointer-events: none; }
 
-/* ──────────────────────── Modals ────────────────────── */
+/* ═══════════════════════════ Modals ══════════════════════════ */
 .modal-overlay {
   display: none;
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.82);
+  background: rgba(0,0,0,0.85);
   z-index: 100;
   align-items: flex-end;
   justify-content: center;
-  backdrop-filter: blur(2px);
+  backdrop-filter: blur(3px);
 }
 .modal-overlay.open { display: flex; }
 
 .modal {
   background: var(--surface);
-  border: 1px solid var(--border2);
-  border-radius: 18px 18px 0 0;
+  border: 1px solid var(--bord2);
+  border-top: 1px solid #333;
+  border-radius: 20px 20px 0 0;
   width: 100%;
   max-width: 480px;
   padding: 22px 22px 36px;
@@ -513,11 +475,12 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding-bottom: 2px;
 }
 
 .modal-title {
   font-size: 12px;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--sub);
 }
@@ -526,15 +489,16 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   background: none;
   border: none;
   color: var(--dim);
-  font-size: 19px;
+  font-size: 18px;
   cursor: pointer;
-  padding: 0 4px;
+  padding: 2px 4px;
   line-height: 1;
   transition: color 0.15s;
+  -webkit-appearance: none;
 }
 .modal-close:active { color: var(--text); }
 
-/* ── Calendar ── */
+/* Calendar */
 .cal-nav {
   display: flex;
   align-items: center;
@@ -550,7 +514,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 
 .cal-arrow {
   background: none;
-  border: 1px solid var(--border2);
+  border: 1px solid var(--bord2);
   border-radius: 7px;
   color: var(--text);
   font-size: 15px;
@@ -561,8 +525,9 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   align-items: center;
   justify-content: center;
   -webkit-appearance: none;
+  transition: background 0.12s;
 }
-.cal-arrow:active { background: var(--border); }
+.cal-arrow:active { background: var(--surf2); }
 
 .cal-grid {
   display: grid;
@@ -592,30 +557,36 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   transition: background 0.1s;
   -webkit-appearance: none;
 }
-.cal-day.today    { border-color: var(--dim); }
+.cal-day.today     { border-color: var(--dim); }
 .cal-day.sel-start { background: #3a7fff; color: #fff; font-weight: 700; border-color: #3a7fff; }
 .cal-day.sel-end   { background: var(--accent); color: #0a0a0a; font-weight: 700; border-color: var(--accent); }
-.cal-day.in-range  { background: rgba(214,245,48,0.1); }
-.cal-day:not(:empty):hover { background: var(--border); }
+.cal-day.in-range  { background: rgba(206,242,49,0.1); }
+.cal-day:not(:empty):hover { background: var(--surf2); }
 
-/* Time section inside modal */
+.cal-legend {
+  font-size: 10px;
+  color: var(--dim);
+  text-align: center;
+  margin-top: -6px;
+}
+
 .time-section { display: flex; flex-direction: column; gap: 8px; }
 
 .time-section-label {
   font-size: 9px;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--dim);
   display: flex;
   align-items: center;
   gap: 7px;
 }
-.time-section-label .dot-s { width: 7px; height: 7px; border-radius: 50%; background: #3a7fff; display: inline-block; flex-shrink: 0; }
-.time-section-label .dot-e { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); display: inline-block; flex-shrink: 0; }
+.dot-s { width: 7px; height: 7px; border-radius: 50%; background: #3a7fff; display: inline-block; flex-shrink: 0; }
+.dot-e { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); display: inline-block; flex-shrink: 0; }
 
 .time-row { display: flex; gap: 6px; align-items: center; }
 .time-row .input-group input { font-size: 17px; padding: 9px 4px; }
-.time-row .colon { font-size: 15px; padding-bottom: 14px; }
+.time-row .colon { font-size: 16px; padding-bottom: 14px; }
 
 .modal-confirm {
   width: 100%;
@@ -631,26 +602,26 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   transition: opacity 0.15s;
   letter-spacing: -0.3px;
 }
-.modal-confirm:active { opacity: 0.82; }
+.modal-confirm:active { opacity: 0.8; }
 
-/* ── Goal modal extras ── */
+/* Goal modal */
 .modal-field { display: flex; flex-direction: column; gap: 8px; }
 
 .modal-field-label {
   font-size: 9px;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--dim);
 }
 
-.goal-duration-row { display: flex; gap: 6px; align-items: center; }
-.goal-duration-row .input-group input { font-size: 17px; padding: 9px 4px; }
-.goal-duration-row .colon { font-size: 15px; padding-bottom: 14px; }
+.goal-dur-row { display: flex; gap: 6px; align-items: center; }
+.goal-dur-row .input-group input { font-size: 17px; padding: 9px 4px; }
+.goal-dur-row .colon { font-size: 16px; padding-bottom: 14px; }
 
 .goal-memo-input {
   width: 100%;
   background: var(--bg);
-  border: 1px solid var(--border2);
+  border: 1px solid var(--bord2);
   border-radius: 9px;
   color: var(--text);
   font-family: 'Noto Sans KR', sans-serif;
@@ -664,38 +635,22 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 .goal-memo-input::placeholder { color: var(--dim); }
 
 /* Color swatches */
-.color-swatches {
-  display: flex;
-  gap: 9px;
-  flex-wrap: wrap;
-}
+.color-swatches { display: flex; gap: 10px; flex-wrap: wrap; }
 
 .color-swatch {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   cursor: pointer;
   border: 2px solid transparent;
-  outline: 2px solid transparent;
+  outline: 2.5px solid transparent;
   outline-offset: 2px;
   transition: transform 0.15s, outline-color 0.15s;
   -webkit-appearance: none;
   flex-shrink: 0;
 }
-.color-swatch.selected {
-  outline-color: var(--text);
-  transform: scale(1.18);
-}
-.color-swatch:active { transform: scale(0.9); }
-
-/* ─────────────── Calendar legend (inline) ────────────── */
-.cal-legend {
-  font-size: 10px;
-  color: var(--dim);
-  text-align: center;
-  margin-top: -8px;
-  letter-spacing: 0.05em;
-}
+.color-swatch.selected { outline-color: var(--text); transform: scale(1.2); }
+.color-swatch:active   { transform: scale(0.88); }
 </style>
 </head>
 <body>
@@ -717,7 +672,10 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   <div class="time-display" id="timeDisplay">00:00:00</div>
   <div class="time-sublabel">시간 : 분 : 초</div>
 
-  <!-- Progress track: padding-top reserves space for flags -->
+  <!--
+    .progress-track: padding-top=24px → that value equals barY in SVG space.
+    Flags are absolute children with top:0; their SVG y=24 coincides with the bar top.
+  -->
   <div class="progress-track" id="progressTrack">
     <div class="progress-bar">
       <div class="progress-fill" id="progressFill"></div>
@@ -726,7 +684,8 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 
   <div class="meta-row">
     <div class="elapsed-label" id="elapsedLabel">—</div>
-    <div class="end-label"     id="endLabel"></div>
+    <div class="meta-sep" id="metaSep" style="display:none"></div>
+    <div class="end-label" id="endLabel"></div>
   </div>
 
   <div class="restore-banner" id="restoreBanner">
@@ -734,7 +693,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </div>
 </div>
 
-<!-- Goals list (between display and controls) -->
+<!-- Goals list -->
 <div class="goals-wrap" id="goalsWrap"></div>
 
 <!-- Controls -->
@@ -779,17 +738,13 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
       <span class="modal-title">시작 / 종료 설정</span>
       <button class="modal-close" id="calClose">✕</button>
     </div>
-
     <div class="cal-nav">
       <button class="cal-arrow" id="calPrev">‹</button>
       <span class="cal-month-label" id="calMonthLabel"></span>
       <button class="cal-arrow" id="calNext">›</button>
     </div>
-
     <div class="cal-legend">🔵 시작일 &nbsp;|&nbsp; 🟡 종료일</div>
-
     <div class="cal-grid" id="calGrid"></div>
-
     <div class="time-section">
       <div class="time-section-label"><span class="dot-s"></span>시작 시각</div>
       <div class="time-row">
@@ -800,7 +755,6 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
         <div class="input-group"><label>초</label><input type="number" id="sS" min="0" max="59" inputmode="numeric"></div>
       </div>
     </div>
-
     <div class="time-section">
       <div class="time-section-label"><span class="dot-e"></span>종료 시각</div>
       <div class="time-row">
@@ -811,7 +765,6 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
         <div class="input-group"><label>초</label><input type="number" id="eS" min="0" max="59" inputmode="numeric"></div>
       </div>
     </div>
-
     <button class="modal-confirm" id="calConfirm">설정</button>
   </div>
 </div>
@@ -823,10 +776,9 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
       <span class="modal-title">목표 추가</span>
       <button class="modal-close" id="goalModalClose">✕</button>
     </div>
-
     <div class="modal-field">
       <span class="modal-field-label">지금으로부터</span>
-      <div class="goal-duration-row">
+      <div class="goal-dur-row">
         <div class="input-group"><label>시간</label><input type="number" id="goalH" min="0" max="8760" placeholder="0" inputmode="numeric"></div>
         <div class="colon">:</div>
         <div class="input-group"><label>분</label><input type="number" id="goalM" min="0" max="59" placeholder="0" inputmode="numeric"></div>
@@ -834,17 +786,14 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
         <div class="input-group"><label>초</label><input type="number" id="goalS" min="0" max="59" placeholder="0" inputmode="numeric"></div>
       </div>
     </div>
-
     <div class="modal-field">
       <span class="modal-field-label">메모</span>
       <input type="text" class="goal-memo-input" id="goalMemoInput" placeholder="목표 메모 (선택)" maxlength="40">
     </div>
-
     <div class="modal-field">
       <span class="modal-field-label">깃발 색</span>
       <div class="color-swatches" id="colorSwatches"></div>
     </div>
-
     <button class="modal-confirm" id="goalConfirm">추가</button>
   </div>
 </div>
@@ -854,17 +803,43 @@ const STORE_KEY = 'timer_v4';
 const GOALS_KEY = 'timer_goals_v1';
 
 const GOAL_COLORS = [
-  '#ff4040',
-  '#ff8800',
-  '#d6f530',
-  '#30f58a',
-  '#3a8fff',
-  '#a855f7',
-  '#f542c8',
-  '#00d4ff',
+  '#f03c3c', '#ff8800', '#cef231',
+  '#2edf7a', '#3a8fff', '#a855f7',
+  '#f542c8', '#00cfff',
 ];
 
-// ── Timer state ────────────────────────────────────────
+/*
+  Flag SVG geometry — must match CSS:
+    barY    = padding-top of .progress-track = 24
+    barH    = height of .progress-bar        = 4
+    bannerH = visible banner height          = 10
+    poleTop = banner bottom = bannerH        = 10
+    poleBot = barY + barH + 2               = 30  (2 px stake into bar)
+    stakeH  = visual tip below poleBot      = 5
+    svgH    = poleBot + stakeH              = 35
+*/
+const BAR_Y    = 24;
+const BAR_H    = 4;
+const BANNER_H = 10;
+const POLE_TOP = BANNER_H;
+const POLE_BOT = BAR_Y + BAR_H + 2;
+const STAKE_H  = 5;
+const SVG_H    = POLE_BOT + STAKE_H;
+
+function makeFlagSVG(color) {
+  /* Swallowtail banner: starts at pole right-edge (x=2), extends right with
+     a triangular notch cut from the far right.
+     Pole: x=1..3, y=POLE_TOP..POLE_BOT (continuous rectangle).
+     Stake: triangle pointing down below bar. */
+  return `<svg width="20" height="${SVG_H}" viewBox="0 0 20 ${SVG_H}"
+    xmlns="http://www.w3.org/2000/svg" fill="${color}">
+    <path d="M2,0 H18 L13,5 L18,${BANNER_H} H2 Z"/>
+    <rect x="1" y="${POLE_TOP}" width="2" height="${POLE_BOT - POLE_TOP}" rx="1"/>
+    <polygon points="1,${POLE_BOT} 3,${POLE_BOT} 2,${POLE_BOT + STAKE_H}"/>
+  </svg>`;
+}
+
+// ── Timer state ────────────────────────────────────────────────
 let goalEpoch       = null;
 let startEpoch      = null;
 let pausedRemaining = null;
@@ -873,17 +848,18 @@ let rafId           = null;
 let lastDisplayed   = -1;
 let emergency       = false;
 
-// ── Goals state ────────────────────────────────────────
+// ── Goals state ────────────────────────────────────────────────
 let goals         = [];
 let selectedColor = GOAL_COLORS[0];
 let lastGoalSec   = -1;
 
-// ── DOM refs ───────────────────────────────────────────
+// ── DOM ────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
 
 const timeDisplay   = $('timeDisplay');
 const elapsedLabel  = $('elapsedLabel');
 const endLabel      = $('endLabel');
+const metaSep       = $('metaSep');
 const progressFill  = $('progressFill');
 const progressTrack = $('progressTrack');
 const statusDot     = $('statusDot');
@@ -899,12 +875,10 @@ const sInput        = $('sInput');
 const emgBtn        = $('emgBtn');
 const goalsWrap     = $('goalsWrap');
 
-// ── Formatters ─────────────────────────────────────────
+// ── Formatters ─────────────────────────────────────────────────
 function fmt(secs) {
   secs = Math.max(0, secs);
-  const h = Math.floor(secs / 3600);
-  const m = Math.floor((secs % 3600) / 60);
-  const s = secs % 60;
+  const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), s = secs % 60;
   return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
 
@@ -927,23 +901,17 @@ function fmtElapsed(secs) {
 function fmtGoalRem(endEpoch) {
   const rem = Math.max(0, Math.floor((endEpoch - Date.now()) / 1000));
   if (rem === 0) return '완료';
-  const h = Math.floor(rem / 3600);
-  const m = Math.floor((rem % 3600) / 60);
-  const s = rem % 60;
-  if (h > 0) return `${h}h ${String(m).padStart(2,'0')}m`;
-  if (m > 0) return `${m}m ${String(s).padStart(2,'0')}s`;
+  const h = Math.floor(rem / 3600), m = Math.floor((rem % 3600) / 60), s = rem % 60;
+  if (h >= 1) return `${h}h ${String(m).padStart(2,'0')}m`;
+  if (m >= 1) return `${m}m ${String(s).padStart(2,'0')}s`;
   return `${s}s`;
 }
 
-function escHtml(str) {
-  return str
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;');
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ── Timer state helpers ────────────────────────────────
+// ── Timer helpers ──────────────────────────────────────────────
 function getRem() {
   if (goalEpoch !== null) return Math.max(0, Math.floor((goalEpoch - Date.now()) / 1000));
   if (pausedRemaining !== null) return pausedRemaining;
@@ -953,90 +921,63 @@ function isRunning() { return goalEpoch !== null; }
 function isPaused()  { return goalEpoch === null && pausedRemaining !== null; }
 function isIdle()    { return goalEpoch === null && pausedRemaining === null; }
 
-// ── Persistence ────────────────────────────────────────
+// ── Persistence ────────────────────────────────────────────────
 function save() {
-  try {
-    localStorage.setItem(STORE_KEY, JSON.stringify(
-      { goalEpoch, startEpoch, pausedRemaining, totalSeconds, emergency }
-    ));
-  } catch(e) {}
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ goalEpoch, startEpoch, pausedRemaining, totalSeconds, emergency })); } catch(e) {}
 }
 function clearSave() { try { localStorage.removeItem(STORE_KEY); } catch(e) {} }
 function saveGoals() { try { localStorage.setItem(GOALS_KEY, JSON.stringify(goals)); } catch(e) {} }
 function loadGoals() { try { goals = JSON.parse(localStorage.getItem(GOALS_KEY)) || []; } catch(e) { goals = []; } }
 
-// ── Flag rendering ─────────────────────────────────────
+// ── Flag rendering (SVG-based, one element per flag) ──────────
 function renderGoalFlags() {
-  // Remove old flags
   progressTrack.querySelectorAll('.goal-flag').forEach(f => f.remove());
 
-  // Determine reference span for positioning
   const refStart = startEpoch;
   const refEnd   = goalEpoch
     ?? (startEpoch && totalSeconds > 0 ? startEpoch + totalSeconds * 1000 : null);
-
   if (!refStart || !refEnd) return;
+
   const span = refEnd - refStart;
   if (span <= 0) return;
-
-  const barWidth = progressTrack.offsetWidth;
 
   goals.forEach(g => {
     const pct = ((g.endEpoch - refStart) / span) * 100;
     if (pct < 0 || pct > 100) return;
 
-    const flag = document.createElement('div');
-    flag.className = 'goal-flag';
-    flag.style.color = g.color;
-    // Position relative to the track's width; flags are siblings of progress-bar inside track
-    flag.style.left = pct.toFixed(3) + '%';
-    flag.title = g.memo || '목표';
-
-    flag.innerHTML =
-      `<div class="goal-flag-pole"></div>` +
-      `<div class="goal-flag-banner"></div>`;
-
-    progressTrack.appendChild(flag);
+    const wrap = document.createElement('div');
+    wrap.className = 'goal-flag';
+    wrap.style.left  = pct.toFixed(3) + '%';
+    wrap.title = g.memo || '목표';
+    wrap.innerHTML   = makeFlagSVG(g.color);
+    progressTrack.appendChild(wrap);
   });
 }
 
-// ── Goals list rendering ───────────────────────────────
+// ── Goals list ─────────────────────────────────────────────────
 function renderGoals() {
-  if (goals.length === 0) {
-    goalsWrap.innerHTML = '';
-    return;
-  }
+  if (goals.length === 0) { goalsWrap.innerHTML = ''; return; }
 
-  const header = `<div class="goals-label">목표</div>`;
-  const items = goals.map(g => {
-    const rem = Math.max(0, Math.floor((g.endEpoch - Date.now()) / 1000));
-    const remText  = fmtGoalRem(g.endEpoch);
-    const remClass = rem === 0 ? 'goal-rem-text done-rem' : 'goal-rem-text';
-    return `
-      <div class="goal-item" data-gid="${g.id}" style="--goal-color:${g.color}">
-        <div class="goal-icon">
-          <svg width="13" height="15" viewBox="0 0 13 15" fill="none" style="color:${g.color}">
-            <line x1="1.5" y1="0" x2="1.5" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            <path d="M1.5 0.5 L13 5.5 L1.5 10.5 Z" fill="currentColor"/>
-          </svg>
-        </div>
-        <div class="goal-info">
-          <span class="goal-memo-text">${escHtml(g.memo || '목표')}</span>
+  goalsWrap.innerHTML =
+    `<div class="goals-section-label">목표</div>` +
+    goals.map(g => {
+      const rem      = Math.max(0, Math.floor((g.endEpoch - Date.now()) / 1000));
+      const remText  = fmtGoalRem(g.endEpoch);
+      const remClass = rem === 0 ? 'goal-rem done-c' : 'goal-rem';
+      return `<div class="goal-item" data-gid="${g.id}">
+        <div class="goal-stripe" style="--goal-c:${g.color}"></div>
+        <div class="goal-body">
+          <span class="goal-name">${escHtml(g.memo || '목표')}</span>
           <span class="${remClass}" data-rem="${g.id}">${remText}</span>
         </div>
         <button class="goal-del" data-del="${g.id}">✕</button>
       </div>`;
-  }).join('');
-
-  goalsWrap.innerHTML = header + items;
+    }).join('');
 
   goalsWrap.querySelectorAll('.goal-del').forEach(btn => {
     btn.addEventListener('click', () => {
-      const id = parseInt(btn.dataset.del);
-      goals = goals.filter(g => g.id !== id);
-      saveGoals();
-      renderGoals();
-      renderGoalFlags();
+      goals = goals.filter(g => g.id !== parseInt(btn.dataset.del));
+      saveGoals(); renderGoals(); renderGoalFlags();
     });
   });
 }
@@ -1047,11 +988,11 @@ function updateGoalTimes() {
     if (!el) return;
     const rem = Math.max(0, Math.floor((g.endEpoch - Date.now()) / 1000));
     el.textContent = fmtGoalRem(g.endEpoch);
-    el.className = rem === 0 ? 'goal-rem-text done-rem' : 'goal-rem-text';
+    el.className   = rem === 0 ? 'goal-rem done-c' : 'goal-rem';
   });
 }
 
-// ── Core render ────────────────────────────────────────
+// ── Core render ────────────────────────────────────────────────
 function render() {
   const rem  = getRem();
   const done = rem === 0 && totalSeconds > 0;
@@ -1064,72 +1005,57 @@ function render() {
   timeDisplay.classList.toggle('done',      done && !emergency);
   timeDisplay.classList.toggle('emergency', emergency && !done);
 
-  // Progress fill
   let pct = 0;
   if (startEpoch && goalEpoch) {
-    const span    = goalEpoch - startEpoch;
-    const elapsed = Date.now() - startEpoch;
-    pct = Math.min(100, Math.max(0, (elapsed / span) * 100));
+    const span = goalEpoch - startEpoch, elapsed = Date.now() - startEpoch;
+    pct = Math.min(100, Math.max(0, elapsed / span * 100));
     elapsedLabel.textContent = fmtElapsed(Math.floor(elapsed / 1000));
   } else if (totalSeconds > 0) {
     const elapsed = totalSeconds - rem;
-    pct = Math.min(100, (elapsed / totalSeconds) * 100);
+    pct = Math.min(100, elapsed / totalSeconds * 100);
     elapsedLabel.textContent = fmtElapsed(elapsed);
   } else {
     elapsedLabel.textContent = '—';
   }
+
   progressFill.style.width = pct.toFixed(3) + '%';
   progressFill.classList.toggle('running',   isRunning() && !emergency);
   progressFill.classList.toggle('emergency', emergency);
 
-  endLabel.textContent = goalEpoch ? fmtDate(goalEpoch) : '';
+  const hasEnd = !!goalEpoch;
+  endLabel.textContent     = hasEnd ? fmtDate(goalEpoch) : '';
+  metaSep.style.display    = hasEnd ? '' : 'none';
 
-  // Status
   if (done) {
-    statusDot.className = 'dot done';
-    statusText.textContent = '완료';
+    statusDot.className = 'dot done'; statusText.textContent = '완료';
   } else if (isRunning()) {
-    statusDot.className = 'dot active';
-    statusText.textContent = '진행중';
+    statusDot.className = 'dot active'; statusText.textContent = '진행중';
   } else if (isPaused()) {
-    statusDot.className = 'dot';
-    statusText.textContent = '일시정지';
+    statusDot.className = 'dot'; statusText.textContent = '일시정지';
   } else {
-    statusDot.className = 'dot';
-    statusText.textContent = '';
+    statusDot.className = 'dot'; statusText.textContent = '';
   }
 
-  // Buttons
-  startBtn.disabled   = isRunning() || done;
-  startBtn.textContent = isRunning() ? '실행중' : (isPaused() ? '계속' : '시작');
-  pauseBtn.disabled   = isIdle() || done;
+  startBtn.disabled    = isRunning() || done;
+  startBtn.textContent = isRunning() ? '실행중' : isPaused() ? '계속' : '시작';
+  pauseBtn.disabled    = isIdle() || done;
   pauseBtn.textContent = isPaused() ? '계속' : '일시정지';
 
   const locked = isRunning();
-  [hInput, mInput, sInput].forEach(inp => {
-    inp.disabled     = locked;
-    inp.style.opacity = locked ? '0.25' : '1';
-  });
+  [hInput, mInput, sInput].forEach(inp => { inp.disabled = locked; inp.style.opacity = locked ? '0.25' : '1'; });
   document.querySelectorAll('.preset-btn').forEach(b => {
-    b.disabled = locked;
-    b.style.opacity      = locked ? '0.25' : '1';
-    b.style.pointerEvents = locked ? 'none' : '';
+    b.disabled = locked; b.style.opacity = locked ? '0.25' : '1'; b.style.pointerEvents = locked ? 'none' : '';
   });
 
   emgBtn.classList.toggle('on', emergency);
 
-  // Goal flags (fast DOM update)
   renderGoalFlags();
 
-  // Goal remaining time — once per second
   const nowSec = Math.floor(Date.now() / 1000);
-  if (nowSec !== lastGoalSec) {
-    lastGoalSec = nowSec;
-    updateGoalTimes();
-  }
+  if (nowSec !== lastGoalSec) { lastGoalSec = nowSec; updateGoalTimes(); }
 }
 
-// ── Animation loop ─────────────────────────────────────
+// ── Animation loop ─────────────────────────────────────────────
 function startTick() {
   if (rafId) cancelAnimationFrame(rafId);
   function loop() {
@@ -1139,71 +1065,49 @@ function startTick() {
       if ('vibrate' in navigator) navigator.vibrate([400,200,400,200,400]);
       render(); save(); rafId = null; return;
     }
-    save();
-    rafId = requestAnimationFrame(loop);
+    save(); rafId = requestAnimationFrame(loop);
   }
   rafId = requestAnimationFrame(loop);
 }
 
-// Keep goal times fresh even when no main timer is running
-setInterval(() => {
-  if (goals.length > 0 && !rafId) {
-    updateGoalTimes();
-    renderGoalFlags();
-  }
-}, 1000);
+setInterval(() => { if (goals.length > 0 && !rafId) { updateGoalTimes(); renderGoalFlags(); } }, 1000);
 
-// ── Timer actions ──────────────────────────────────────
+// ── Timer actions ──────────────────────────────────────────────
 function doStart() {
   const rem = getRem();
   if (rem <= 0) return;
   if (!startEpoch) startEpoch = Date.now();
-  goalEpoch       = Date.now() + rem * 1000;
-  pausedRemaining = null;
-  lastDisplayed   = -1;
+  goalEpoch = Date.now() + rem * 1000;
+  pausedRemaining = null; lastDisplayed = -1;
   startTick(); render(); save();
 }
-
 function doPause() {
   if (!isRunning()) return;
-  pausedRemaining = getRem();
-  goalEpoch = null;
+  pausedRemaining = getRem(); goalEpoch = null;
   if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
   render(); save();
 }
-
 function doReset() {
   if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
   goalEpoch = null; startEpoch = null; pausedRemaining = null;
   totalSeconds = 0; lastDisplayed = -1;
-  render(); clearSave();
-  restoreBanner.style.display = 'none';
+  render(); clearSave(); restoreBanner.style.display = 'none';
 }
-
 function setDuration(secs) {
-  doReset();
-  totalSeconds    = secs;
-  pausedRemaining = secs;
-  render(); save();
+  doReset(); totalSeconds = secs; pausedRemaining = secs; render(); save();
 }
 
-// ── Control events ─────────────────────────────────────
+// ── Button events ──────────────────────────────────────────────
 startBtn.addEventListener('click', () => {
   if (isPaused()) { doStart(); return; }
   if (isIdle()) {
     const h = parseInt(hInput.value)||0, m = parseInt(mInput.value)||0, s = parseInt(sInput.value)||0;
-    const t = h*3600 + m*60 + s;
-    if (!t) return;
+    const t = h*3600+m*60+s; if (!t) return;
     totalSeconds = t; pausedRemaining = t;
   }
   doStart();
 });
-
-pauseBtn.addEventListener('click', () => {
-  if (isRunning()) doPause();
-  else if (isPaused()) doStart();
-});
-
+pauseBtn.addEventListener('click', () => { if (isRunning()) doPause(); else if (isPaused()) doStart(); });
 resetBtn.addEventListener('click', doReset);
 
 document.querySelectorAll('.preset-btn').forEach(btn => {
@@ -1218,26 +1122,18 @@ document.querySelectorAll('.preset-btn').forEach(btn => {
   inp.addEventListener('change', () => {
     if (isRunning()) return;
     const h = parseInt(hInput.value)||0, m = parseInt(mInput.value)||0, s = parseInt(sInput.value)||0;
-    const t = h*3600 + m*60 + s;
-    if (t) setDuration(t);
+    const t = h*3600+m*60+s; if (t) setDuration(t);
   });
 });
 
-// ── Emergency ──────────────────────────────────────────
 emgBtn.addEventListener('click', () => { emergency = !emergency; render(); save(); });
 
-// ── Fullscreen ─────────────────────────────────────────
+// ── Fullscreen ─────────────────────────────────────────────────
 const fsBtn = $('fsBtn');
 fsBtn.addEventListener('click', () => {
-  const el  = document.documentElement;
-  const isFs = document.fullscreenElement || document.webkitFullscreenElement;
-  if (!isFs) {
-    const req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen;
-    if (req) req.call(el);
-  } else {
-    const ex = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen;
-    if (ex) ex.call(document);
-  }
+  const el = document.documentElement, isFs = document.fullscreenElement || document.webkitFullscreenElement;
+  if (!isFs) { const req = el.requestFullscreen || el.webkitRequestFullscreen; if (req) req.call(el); }
+  else       { const ex  = document.exitFullscreen || document.webkitExitFullscreen; if (ex) ex.call(document); }
 });
 ['fullscreenchange','webkitfullscreenchange'].forEach(ev => {
   document.addEventListener(ev, () => {
@@ -1245,37 +1141,30 @@ fsBtn.addEventListener('click', () => {
   });
 });
 
-// ── Wake lock ──────────────────────────────────────────
+// ── Wake lock ──────────────────────────────────────────────────
 async function reqWakeLock() {
   if ('wakeLock' in navigator) try { await navigator.wakeLock.request('screen'); } catch(e) {}
 }
 reqWakeLock();
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') reqWakeLock();
-});
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reqWakeLock(); });
 
-// ── Calendar modal ─────────────────────────────────────
-const calModal    = $('calModal');
-const calMonthLbl = $('calMonthLabel');
-const calGridEl   = $('calGrid');
-
+// ── Calendar modal ─────────────────────────────────────────────
+const calModal = $('calModal'), calMonthLbl = $('calMonthLabel'), calGridEl = $('calGrid');
 let calYear, calMonth, selStart = null, selEnd = null, picking = 'start';
-
 const DAYS   = ['일','월','화','수','목','금','토'];
 const MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
 
 function openCal() {
   const now = new Date();
-  calYear = now.getFullYear(); calMonth = now.getMonth();
-  selStart = null; selEnd = null; picking = 'start';
+  calYear = now.getFullYear(); calMonth = now.getMonth(); selStart = null; selEnd = null; picking = 'start';
   $('sH').value = now.getHours(); $('sM').value = now.getMinutes(); $('sS').value = now.getSeconds();
   $('eH').value = ''; $('eM').value = ''; $('eS').value = '';
   renderCal(); calModal.classList.add('open');
 }
 
 function dateKey(d) { return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; }
-function sameDay(a, b) { return a && b && dateKey(a) === dateKey(b); }
-function between(d, a, b) {
+function sameDay(a,b) { return a && b && dateKey(a) === dateKey(b); }
+function between(d,a,b) {
   if (!a || !b) return false;
   const t = d.getTime(), ta = a.getTime(), tb = b.getTime();
   return t > Math.min(ta,tb) && t < Math.max(ta,tb);
@@ -1284,36 +1173,26 @@ function between(d, a, b) {
 function renderCal() {
   calMonthLbl.textContent = `${calYear}년 ${MONTHS[calMonth]}`;
   calGridEl.innerHTML = '';
-  DAYS.forEach(d => {
-    const el = document.createElement('div');
-    el.className = 'cal-dow'; el.textContent = d;
-    calGridEl.appendChild(el);
-  });
-  const firstDay    = new Date(calYear, calMonth, 1).getDay();
-  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
-  const today       = new Date(); today.setHours(0,0,0,0);
-  for (let i = 0; i < firstDay; i++) calGridEl.appendChild(document.createElement('div'));
-  for (let d = 1; d <= daysInMonth; d++) {
-    const btn     = document.createElement('button');
-    const thisDay = new Date(calYear, calMonth, d);
-    btn.className = 'cal-day';
-    btn.textContent = d;
-    if (thisDay.toDateString() === today.toDateString()) btn.classList.add('today');
-    if (sameDay(thisDay, selStart)) btn.classList.add('sel-start');
-    else if (sameDay(thisDay, selEnd)) btn.classList.add('sel-end');
-    else if (selStart && selEnd && between(thisDay, selStart, selEnd)) btn.classList.add('in-range');
+  DAYS.forEach(d => { const el = document.createElement('div'); el.className='cal-dow'; el.textContent=d; calGridEl.appendChild(el); });
+  const first = new Date(calYear, calMonth, 1).getDay();
+  const days  = new Date(calYear, calMonth+1, 0).getDate();
+  const today = new Date(); today.setHours(0,0,0,0);
+  for (let i=0; i<first; i++) calGridEl.appendChild(document.createElement('div'));
+  for (let d=1; d<=days; d++) {
+    const btn = document.createElement('button'), day = new Date(calYear, calMonth, d);
+    btn.className = 'cal-day'; btn.textContent = d;
+    if (day.toDateString()===today.toDateString()) btn.classList.add('today');
+    if (sameDay(day,selStart)) btn.classList.add('sel-start');
+    else if (sameDay(day,selEnd)) btn.classList.add('sel-end');
+    else if (selStart && selEnd && between(day,selStart,selEnd)) btn.classList.add('in-range');
     btn.addEventListener('click', () => {
       const clicked = new Date(calYear, calMonth, d);
-      if (picking === 'start') {
+      if (picking==='start') {
         selStart = clicked;
-        if (sameDay(clicked, today)) {
-          const now = new Date();
-          $('sH').value = now.getHours(); $('sM').value = now.getMinutes(); $('sS').value = now.getSeconds();
-        }
+        if (sameDay(clicked,today)) { const n=new Date(); $('sH').value=n.getHours(); $('sM').value=n.getMinutes(); $('sS').value=n.getSeconds(); }
         picking = 'end';
       } else {
-        if (clicked < selStart) { selEnd = selStart; selStart = clicked; }
-        else selEnd = clicked;
+        if (clicked < selStart) { selEnd=selStart; selStart=clicked; } else selEnd=clicked;
         picking = 'start';
       }
       renderCal();
@@ -1322,77 +1201,66 @@ function renderCal() {
   }
 }
 
-$('calPrev').addEventListener('click', () => { calMonth--; if (calMonth<0){calMonth=11;calYear--;} renderCal(); });
-$('calNext').addEventListener('click', () => { calMonth++; if (calMonth>11){calMonth=0;calYear++;} renderCal(); });
+$('calPrev').addEventListener('click', () => { calMonth--; if(calMonth<0){calMonth=11;calYear--;} renderCal(); });
+$('calNext').addEventListener('click', () => { calMonth++; if(calMonth>11){calMonth=0;calYear++;} renderCal(); });
 $('calClose').addEventListener('click', () => calModal.classList.remove('open'));
-calModal.addEventListener('click', e => { if (e.target === calModal) calModal.classList.remove('open'); });
+calModal.addEventListener('click', e => { if(e.target===calModal) calModal.classList.remove('open'); });
 
 $('calConfirm').addEventListener('click', () => {
-  if (!selStart || !selEnd) { alert('시작일과 종료일을 모두 선택해주세요.'); return; }
-  const sh = parseInt($('sH').value)||0, sm = parseInt($('sM').value)||0, ss = parseInt($('sS').value)||0;
-  const eh = parseInt($('eH').value)||0, em = parseInt($('eM').value)||0, es = parseInt($('eS').value)||0;
-  const start = new Date(selStart); start.setHours(sh, sm, ss, 0);
-  const end   = new Date(selEnd);   end.setHours(eh, em, es, 0);
-  if (end <= start) { alert('종료 시각이 시작 시각보다 늦어야 해요.'); return; }
-  const span    = Math.floor((end - start) / 1000);
-  const remSecs = Math.floor((end - Date.now()) / 1000);
+  if (!selStart||!selEnd) { alert('시작일과 종료일을 모두 선택해주세요.'); return; }
+  const sh=parseInt($('sH').value)||0, sm=parseInt($('sM').value)||0, ss=parseInt($('sS').value)||0;
+  const eh=parseInt($('eH').value)||0, em=parseInt($('eM').value)||0, es=parseInt($('eS').value)||0;
+  const start=new Date(selStart); start.setHours(sh,sm,ss,0);
+  const end  =new Date(selEnd);   end.setHours(eh,em,es,0);
+  if (end<=start) { alert('종료 시각이 시작 시각보다 늦어야 해요.'); return; }
+  const span=Math.floor((end-start)/1000), remSecs=Math.floor((end-Date.now())/1000);
   calModal.classList.remove('open');
-  if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
-  startEpoch = start.getTime(); goalEpoch = end.getTime();
-  totalSeconds = span; pausedRemaining = null; lastDisplayed = -1;
-  restoreBanner.style.display = 'none';
-  if (remSecs > 0) startTick();
-  else { goalEpoch = null; pausedRemaining = 0; }
+  if (rafId) { cancelAnimationFrame(rafId); rafId=null; }
+  startEpoch=start.getTime(); goalEpoch=end.getTime();
+  totalSeconds=span; pausedRemaining=null; lastDisplayed=-1;
+  restoreBanner.style.display='none';
+  if (remSecs>0) startTick(); else { goalEpoch=null; pausedRemaining=0; }
   render(); save();
 });
 
 $('calBtn').addEventListener('click', () => { if (!isRunning()) openCal(); });
 
-// ── Goal modal ─────────────────────────────────────────
+// ── Goal modal ─────────────────────────────────────────────────
 const goalModal = $('goalModal');
 
 function buildColorSwatches() {
-  const container = $('colorSwatches');
-  container.innerHTML = '';
+  const c = $('colorSwatches'); c.innerHTML = '';
   GOAL_COLORS.forEach(color => {
     const btn = document.createElement('button');
-    btn.className = 'color-swatch' + (color === selectedColor ? ' selected' : '');
+    btn.className = 'color-swatch' + (color===selectedColor ? ' selected' : '');
     btn.style.background = color;
-    btn.title = color;
     btn.addEventListener('click', () => {
       selectedColor = color;
-      container.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+      c.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
       btn.classList.add('selected');
     });
-    container.appendChild(btn);
+    c.appendChild(btn);
   });
 }
 
 $('goalBtn').addEventListener('click', () => {
-  $('goalH').value = ''; $('goalM').value = ''; $('goalS').value = '';
-  $('goalMemoInput').value = '';
-  buildColorSwatches();
-  goalModal.classList.add('open');
+  $('goalH').value=''; $('goalM').value=''; $('goalS').value=''; $('goalMemoInput').value='';
+  buildColorSwatches(); goalModal.classList.add('open');
 });
-
 $('goalModalClose').addEventListener('click', () => goalModal.classList.remove('open'));
-goalModal.addEventListener('click', e => { if (e.target === goalModal) goalModal.classList.remove('open'); });
+goalModal.addEventListener('click', e => { if(e.target===goalModal) goalModal.classList.remove('open'); });
 
 $('goalConfirm').addEventListener('click', () => {
-  const h = parseInt($('goalH').value)||0;
-  const m = parseInt($('goalM').value)||0;
-  const s = parseInt($('goalS').value)||0;
-  const totalSec = h*3600 + m*60 + s;
-  if (totalSec <= 0) { alert('시간을 입력해주세요.'); return; }
+  const h=parseInt($('goalH').value)||0, m=parseInt($('goalM').value)||0, s=parseInt($('goalS').value)||0;
+  const total = h*3600+m*60+s;
+  if (!total) { alert('시간을 입력해주세요.'); return; }
   const memo = $('goalMemoInput').value.trim();
-  goals.push({ id: Date.now(), memo, endEpoch: Date.now() + totalSec * 1000, color: selectedColor });
-  saveGoals();
-  renderGoals();
-  renderGoalFlags();
+  goals.push({ id: Date.now(), memo, endEpoch: Date.now()+total*1000, color: selectedColor });
+  saveGoals(); renderGoals(); renderGoalFlags();
   goalModal.classList.remove('open');
 });
 
-// ── Restore ────────────────────────────────────────────
+// ── Restore ────────────────────────────────────────────────────
 loadGoals();
 
 (function restore() {
@@ -1422,8 +1290,7 @@ loadGoals();
     restoreBanner.style.display = 'block';
   }
 
-  render();
-  renderGoals();
+  render(); renderGoals();
 })();
 </script>
 </body>
