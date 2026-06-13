@@ -1691,10 +1691,13 @@ dashModal.addEventListener('click', e => { if(e.target===dashModal) dashModal.cl
 // app config below. Firestore rule (per-user access):
 //   match /users/{uid} { allow read, write: if request.auth.uid == uid; }
 const FIREBASE_CONFIG = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  appId: "",
+  apiKey: "AIzaSyBXiXFrwbR5QAv741MibNUFGD-fVu1NlHQ",
+  authDomain: "houronly-timer.firebaseapp.com",
+  projectId: "houronly-timer",
+  storageBucket: "houronly-timer.firebasestorage.app",
+  messagingSenderId: "680066324066",
+  appId: "1:680066324066:web:a28d618323cde9c7f9233b",
+  measurementId: "G-GDN5TL9DCR"
 };
 const META_KEY    = 'timer_sync_meta_v1';
 const PUSH_DELAY  = 8000;
