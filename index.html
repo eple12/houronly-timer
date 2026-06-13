@@ -691,7 +691,42 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   box-shadow: 0 8px 24px rgba(0,0,0,0.5);
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* Account / sync */
+.acct-btn {
+  background: var(--surf2);
+  border: 1px solid var(--bord2);
+  border-radius: 8px;
+  color: var(--dim);
+  font-size: 14px;
+  width: 30px; height: 26px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  -webkit-appearance: none;
+  transition: color 0.15s, border-color 0.15s;
+}
+.acct-btn.on { color: var(--accent); border-color: var(--accent); }
+.acct-row { display: flex; flex-direction: column; gap: 6px; }
+.acct-email { font-size: 14px; color: var(--text); word-break: break-all; }
+.acct-meta { font-size: 11px; color: var(--dim); }
+.acct-note { font-size: 12px; color: var(--sub); line-height: 1.6; }
+.acct-note code {
+  font-family: 'Space Mono', monospace; font-size: 11px;
+  background: var(--surf2); padding: 1px 5px; border-radius: 4px; color: var(--text);
+}
+.acct-secondary {
+  width: 100%; padding: 12px; border-radius: 11px;
+  background: var(--surf2); border: 1px solid var(--bord2);
+  color: var(--text); font-family: 'Noto Sans KR', sans-serif;
+  font-size: 14px; font-weight: 500; cursor: pointer;
+  transition: background 0.15s; -webkit-appearance: none;
+}
+.acct-secondary:active { background: var(--border); }
 </style>
+<!-- Firebase SDK (compat) for optional account sync -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 </head>
 <body>
 
@@ -699,6 +734,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 <div class="header">
   <span class="header-title">타이머</span>
   <div class="status-row">
+    <button class="acct-btn" id="acctBtn" title="계정 / 동기화">☁</button>
     <span class="status-text" id="statusText"></span>
     <div class="dot" id="statusDot"></div>
   </div>
@@ -856,6 +892,17 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </div>
 </div>
 
+<!-- Account / sync -->
+<div class="modal-overlay" id="acctModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">계정 / 동기화</span>
+      <button class="modal-close" id="acctClose">✕</button>
+    </div>
+    <div id="acctBody"></div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
@@ -1001,11 +1048,12 @@ function dDayNum() {
 // ── Persistence ────────────────────────────────────────────────
 function save() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify({ goalEpoch, startEpoch, pausedRemaining, totalSeconds, emergency })); } catch(e) {}
+  syncTouch();
 }
-function clearSave() { try { localStorage.removeItem(STORE_KEY); } catch(e) {} }
-function saveGoals() { try { localStorage.setItem(GOALS_KEY, JSON.stringify(goals)); } catch(e) {} }
+function clearSave() { try { localStorage.removeItem(STORE_KEY); } catch(e) {} syncTouch(); }
+function saveGoals() { try { localStorage.setItem(GOALS_KEY, JSON.stringify(goals)); } catch(e) {} syncTouch(); }
 function loadGoals() { try { goals = JSON.parse(localStorage.getItem(GOALS_KEY)) || []; } catch(e) { goals = []; } }
-function saveStudy() { try { localStorage.setItem(STUDY_KEY, JSON.stringify(study)); } catch(e) {} }
+function saveStudy() { try { localStorage.setItem(STUDY_KEY, JSON.stringify(study)); } catch(e) {} syncTouch(); }
 function loadStudy() {
   try {
     const s = JSON.parse(localStorage.getItem(STUDY_KEY));
@@ -1636,6 +1684,171 @@ function bindResetHour() {
 $('dashBtn').addEventListener('click', () => { requestNotifyPermission(); renderDashboard(); dashModal.classList.add('open'); });
 $('dashClose').addEventListener('click', () => dashModal.classList.remove('open'));
 dashModal.addEventListener('click', e => { if(e.target===dashModal) dashModal.classList.remove('open'); });
+
+// ── Account sync (Firebase, optional) ─────────────────────────
+// To enable: create a Firebase project, enable Authentication →
+// Google sign-in, create a Firestore database, then paste your web
+// app config below. Firestore rule (per-user access):
+//   match /users/{uid} { allow read, write: if request.auth.uid == uid; }
+const FIREBASE_CONFIG = {
+  apiKey: "",
+  authDomain: "",
+  projectId: "",
+  appId: "",
+};
+const META_KEY    = 'timer_sync_meta_v1';
+const PUSH_DELAY  = 8000;
+let fbAuth = null, db = null, cloudUid = null, cloudUnsub = null;
+let syncReady = false, pushTimer = null, lastPushedJson = null;
+
+const fbReady = !!(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.projectId
+                   && window.firebase);
+
+function syncMeta() { try { return JSON.parse(localStorage.getItem(META_KEY)) || {}; } catch(e) { return {}; } }
+function syncTouch() {
+  try { localStorage.setItem(META_KEY, JSON.stringify({ updatedAt: Date.now() })); } catch(e) {}
+  if (cloudUid && syncReady) schedulePush();
+}
+function schedulePush() { clearTimeout(pushTimer); pushTimer = setTimeout(pushCloud, PUSH_DELAY); }
+
+function localBundle() {
+  const j = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch(e) { return d; } };
+  return { timer: j(STORE_KEY, null), goals: j(GOALS_KEY, []), study: j(STUDY_KEY, null) };
+}
+
+// Merge study so no recorded time is lost (take the larger value per day).
+function mergeStudy(local, remote) {
+  if (!remote) return local;
+  if (!local)  return remote;
+  const out = Object.assign({}, remote, local); // local scalar fields win
+  out.records = {};
+  const keys = new Set([...Object.keys(local.records || {}), ...Object.keys(remote.records || {})]);
+  keys.forEach(k => out.records[k] = Math.max(local.records?.[k] || 0, remote.records?.[k] || 0));
+  return out;
+}
+// Union goals by id, preserving local order.
+function mergeGoals(local, remote) {
+  local = local || []; remote = remote || [];
+  const ids = new Set(local.map(g => g.id));
+  return local.concat(remote.filter(g => !ids.has(g.id)));
+}
+
+function pushCloud() {
+  if (!cloudUid || !syncReady || !db) return;
+  const b = localBundle();
+  const payload = { timer: b.timer ?? null, goals: b.goals || [], study: b.study ?? null,
+                    updatedAt: syncMeta().updatedAt || Date.now() };
+  const json = JSON.stringify(payload);
+  if (json === lastPushedJson) return;
+  lastPushedJson = json;
+  db.collection('users').doc(cloudUid).set(payload).catch(e => console.warn('sync push failed', e));
+}
+
+// Apply a cloud snapshot: merge into localStorage, and reload if the
+// remote brought changes so the live UI reflects the merged state.
+function onCloud(doc) {
+  const remote = doc.exists ? doc.data() : null;
+  const local  = localBundle();
+  const lm = syncMeta().updatedAt || 0;
+  const rm = remote?.updatedAt || 0;
+
+  const mergedTimer = (rm > lm) ? (remote?.timer ?? local.timer) : local.timer;
+  const mergedGoals = mergeGoals(local.goals, remote?.goals);
+  const mergedStudy = mergeStudy(local.study, remote?.study);
+
+  const before = JSON.stringify(local);
+  const after  = JSON.stringify({ timer: mergedTimer, goals: mergedGoals, study: mergedStudy });
+
+  try {
+    if (mergedTimer) localStorage.setItem(STORE_KEY, JSON.stringify(mergedTimer));
+    else             localStorage.removeItem(STORE_KEY);
+    localStorage.setItem(GOALS_KEY, JSON.stringify(mergedGoals));
+    if (mergedStudy) localStorage.setItem(STUDY_KEY, JSON.stringify(mergedStudy));
+  } catch(e) {}
+
+  syncReady = true;
+  if (after !== before) {
+    // Remote data differed — bump our clock so this device wins next
+    // compare, push the merged union, then reload to reflect it live.
+    try { localStorage.setItem(META_KEY, JSON.stringify({ updatedAt: Date.now() })); } catch(e) {}
+    schedulePush();
+    location.reload();
+  } else {
+    schedulePush(); // ensure cloud holds our data
+    renderAcct();
+  }
+}
+
+function onAuthChange(user) {
+  if (cloudUnsub) { cloudUnsub(); cloudUnsub = null; }
+  cloudUid = user ? user.uid : null;
+  syncReady = false; lastPushedJson = null;
+  if (user && db) {
+    cloudUnsub = db.collection('users').doc(user.uid)
+      .onSnapshot(onCloud, e => console.warn('sync listen failed', e));
+  }
+  $('acctBtn').classList.toggle('on', !!user);
+  renderAcct();
+}
+
+function signIn() {
+  if (!fbAuth) return;
+  const provider = new firebase.auth.GoogleAuthProvider();
+  fbAuth.signInWithPopup(provider).catch(err => {
+    if (err && (err.code === 'auth/popup-blocked' || err.code === 'auth/operation-not-supported-in-this-environment')) {
+      fbAuth.signInWithRedirect(provider);
+    } else {
+      showToast('로그인 실패: ' + (err?.code || err));
+    }
+  });
+}
+function signOut() {
+  pushCloud();
+  if (fbAuth) fbAuth.signOut();
+}
+
+function renderAcct() {
+  const body = $('acctBody');
+  if (!body) return;
+  if (!fbReady) {
+    body.innerHTML =
+      '<div class="acct-note">계정 동기화를 켜려면 Firebase 설정이 필요합니다.<br><br>' +
+      'Firebase 프로젝트를 만들고 <b>Authentication → Google 로그인</b>과 <b>Firestore</b>를 활성화한 뒤, ' +
+      '<code>index.html</code>의 <code>FIREBASE_CONFIG</code> 값을 채워 주세요.</div>';
+    return;
+  }
+  const user = fbAuth && fbAuth.currentUser;
+  if (!user) {
+    body.innerHTML =
+      '<div class="acct-note">로그인하면 목표·공부 기록·타이머가 기기 간에 자동으로 동기화됩니다.</div>' +
+      '<button class="modal-confirm" id="acctSignIn">Google로 로그인</button>';
+    $('acctSignIn').addEventListener('click', signIn);
+  } else {
+    const when = syncMeta().updatedAt ? new Date(syncMeta().updatedAt).toLocaleString('ko-KR') : '—';
+    body.innerHTML =
+      '<div class="acct-row"><div class="acct-email">' + (user.email || user.displayName || user.uid) + '</div>' +
+      '<div class="acct-meta">동기화됨 · 마지막 변경 ' + when + '</div></div>' +
+      '<button class="modal-confirm" id="acctSyncNow">지금 동기화</button>' +
+      '<button class="acct-secondary" id="acctSignOut">로그아웃</button>';
+    $('acctSyncNow').addEventListener('click', () => { pushCloud(); showToast('동기화 완료'); });
+    $('acctSignOut').addEventListener('click', signOut);
+  }
+}
+
+if (fbReady) {
+  try {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    fbAuth = firebase.auth();
+    db = firebase.firestore();
+    fbAuth.onAuthStateChanged(onAuthChange);
+  } catch(e) { console.warn('Firebase init failed', e); }
+}
+window.addEventListener('beforeunload', () => { clearTimeout(pushTimer); pushCloud(); });
+
+const acctModal = $('acctModal');
+$('acctBtn').addEventListener('click', () => { renderAcct(); acctModal.classList.add('open'); });
+$('acctClose').addEventListener('click', () => acctModal.classList.remove('open'));
+acctModal.addEventListener('click', e => { if (e.target === acctModal) acctModal.classList.remove('open'); });
 
 // ── Restore ────────────────────────────────────────────────────
 loadGoals();
