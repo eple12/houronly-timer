@@ -2002,10 +2002,12 @@ const FIREBASE_CONFIG = {
   appId: "1:680066324066:web:a28d618323cde9c7f9233b",
   measurementId: "G-GDN5TL9DCR"
 };
-const META_KEY    = 'timer_sync_meta_v1';
-const PUSH_DELAY  = 8000;
+const META_KEY     = 'timer_sync_meta_v1';
+const PUSH_DELAY    = 2000;    // settle time after the last change
+const MAX_PUSH_WAIT = 15000;   // force a flush at least this often during
+                               // continuous activity (e.g. a running stopwatch)
 let fbAuth = null, db = null, cloudUid = null, cloudUnsub = null;
-let syncReady = false, pushTimer = null, lastPushedJson = null;
+let syncReady = false, pushTimer = null, lastPushedJson = null, firstDirtyAt = 0;
 let syncStatus = '';   // human-readable status shown in the account sheet
 let syncError  = '';   // last error code, if any
 let lastUploadToast = 0;
@@ -2024,7 +2026,14 @@ function syncTouch() {
   try { localStorage.setItem(META_KEY, JSON.stringify({ updatedAt: Date.now() })); } catch(e) {}
   if (cloudUid && syncReady) schedulePush();
 }
-function schedulePush() { clearTimeout(pushTimer); pushTimer = setTimeout(pushCloud, PUSH_DELAY); }
+function schedulePush() {
+  if (!firstDirtyAt) firstDirtyAt = Date.now();
+  clearTimeout(pushTimer);
+  // Debounce after the last change, but never wait longer than MAX_PUSH_WAIT
+  // so continuous per-second changes still upload periodically.
+  const delay = Math.min(PUSH_DELAY, Math.max(0, MAX_PUSH_WAIT - (Date.now() - firstDirtyAt)));
+  pushTimer = setTimeout(pushCloud, delay);
+}
 
 function localBundle() {
   const j = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch(e) { return d; } };
@@ -2065,6 +2074,7 @@ function mergeGoals(local, remote) {
 }
 
 function pushCloud() {
+  clearTimeout(pushTimer); pushTimer = null; firstDirtyAt = 0;
   if (!cloudUid || !syncReady || !db) return;
   const b = localBundle();
   const payload = { timer: b.timer ?? null, goals: b.goals || [], study: b.study ?? null,
@@ -2075,7 +2085,10 @@ function pushCloud() {
   db.collection('users').doc(cloudUid).set(payload)
     .then(() => {
       setSyncStatus('동기화됨', '');
-      if (Date.now() - lastUploadToast > 4000) { lastUploadToast = Date.now(); showToast('☁ 동기화 완료'); }
+      // Skip the toast for the periodic flushes while the stopwatch runs.
+      if (!study.swRunning && Date.now() - lastUploadToast > 4000) {
+        lastUploadToast = Date.now(); showToast('☁ 동기화 완료');
+      }
     })
     .catch(e => {
       lastPushedJson = null;   // allow retry
