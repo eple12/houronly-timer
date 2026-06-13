@@ -764,6 +764,88 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 }
 .acct-secondary:active { background: var(--border); }
 
+/* ═══════════════════════ Notes / memo ════════════════════════ */
+.memo-widget { width: 100%; flex-shrink: 0; }
+.memo-widget.collapsed { display: flex; justify-content: flex-end; margin-bottom: -2px; }
+.memo-fab {
+  position: relative;
+  width: 42px; height: 42px; border-radius: 10px;
+  border: 1px solid var(--bord2); background: var(--surf2);
+  color: var(--text); font-size: 17px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  -webkit-appearance: none; transition: background 0.15s;
+}
+.memo-fab:active { background: var(--border); }
+.memo-dot {
+  position: absolute; top: -3px; right: -3px;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--danger); border: 2px solid var(--bg);
+}
+.memo-card {
+  width: 100%;
+  background: var(--surface); border: 1px solid var(--bord2);
+  border-radius: 12px; padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.memo-card-head { display: flex; align-items: center; gap: 8px; }
+.memo-card-title {
+  flex: 1; font-size: 14px; font-weight: 600; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.memo-card-actions { display: flex; gap: 2px; flex-shrink: 0; }
+.memo-mini-btn { background: none; border: none; color: var(--dim); font-size: 15px;
+  cursor: pointer; padding: 2px 5px; line-height: 1; -webkit-appearance: none; }
+.memo-mini-btn:active { color: var(--text); }
+.memo-text { font-size: 13px; color: var(--sub); line-height: 1.55; white-space: pre-wrap;
+  max-height: 26vh; overflow-y: auto; word-break: break-word; }
+.memo-checks { display: flex; flex-direction: column; gap: 7px; max-height: 30vh; overflow-y: auto; }
+.memo-check { display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--text); cursor: pointer; }
+.memo-check input { width: 17px; height: 17px; accent-color: var(--accent); flex-shrink: 0; }
+.memo-check span { min-width: 0; word-break: break-word; }
+.memo-check.done span { color: var(--dim); text-decoration: line-through; }
+.memo-empty { font-size: 12px; color: var(--dim); }
+
+.notes-actions { display: flex; gap: 8px; }
+.notes-actions .acct-secondary { flex: 1; }
+#notesList { display: flex; flex-direction: column; gap: 8px; max-height: 58vh; overflow-y: auto; }
+.note-row { display: flex; align-items: center; gap: 10px; padding: 12px 14px;
+  background: var(--surf2); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; }
+.note-row:active { background: var(--border); }
+.note-row-body { flex: 1; min-width: 0; }
+.note-row-title { font-size: 14px; color: var(--text); font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 6px; }
+.note-row-sub { font-size: 11px; color: var(--dim); margin-top: 3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.note-row-del { background: none; border: none; color: var(--dim); font-size: 14px;
+  cursor: pointer; padding: 4px 2px; flex-shrink: 0; -webkit-appearance: none; }
+.note-row-del:active { color: var(--danger); }
+.notes-empty { font-size: 13px; color: var(--dim); text-align: center; padding: 22px 0; }
+
+.note-pin-row { display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--sub); cursor: pointer; }
+.note-pin-row input { width: 17px; height: 17px; accent-color: var(--accent); }
+.note-delete { color: var(--danger); }
+#noteEditBody textarea {
+  width: 100%; min-height: 140px; resize: vertical;
+  background: var(--surface); border: 1px solid var(--bord2); border-radius: 10px;
+  color: var(--text); font-family: 'Noto Sans KR', sans-serif; font-size: 14px;
+  padding: 12px; outline: none; line-height: 1.6; -webkit-appearance: none;
+}
+#noteEditBody textarea:focus { border-color: var(--accent); }
+.note-items { display: flex; flex-direction: column; gap: 8px; max-height: 40vh; overflow-y: auto; }
+.note-item-edit { display: flex; align-items: center; gap: 8px; }
+.note-item-edit input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); flex-shrink: 0; }
+.note-item-edit input[type=text] {
+  flex: 1; min-width: 0; background: var(--surface); border: 1px solid var(--bord2); border-radius: 8px;
+  color: var(--text); font-family: 'Noto Sans KR', sans-serif; font-size: 14px; padding: 9px 10px;
+  outline: none; -webkit-appearance: none;
+}
+.note-item-edit input[type=text]:focus { border-color: var(--accent); }
+.note-item-del { background: none; border: none; color: var(--dim); font-size: 16px;
+  cursor: pointer; padding: 2px 6px; flex-shrink: 0; -webkit-appearance: none; }
+.note-add-item { align-self: flex-start; background: none; border: 1px dashed var(--bord2);
+  color: var(--sub); border-radius: 8px; padding: 8px 12px; font-size: 13px; cursor: pointer; -webkit-appearance: none; }
+.note-add-item:active { background: var(--surf2); }
+
 /* ═══════════════════════ Responsive layouts ══════════════════════ */
 
 /* ── Tablet portrait & large phones: roomier single column ── */
@@ -914,16 +996,15 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
     <div class="end-label" id="endLabel"></div>
   </div>
   <div class="meta-row2" id="metaRow2"></div>
-
-  <div class="restore-banner" id="restoreBanner">
-    세션 복원됨 — <b id="restoreInfo"></b>
-  </div>
 </div>
 
 <!-- Interactive panel: stopwatch + goals + controls.
      display:contents by default (stacks like normal flow); becomes its own
      column in the two-column landscape / desktop layouts. -->
 <div class="side-panel">
+
+<!-- Pinned / recent memo preview (expands on load, then auto-collapses) -->
+<div class="memo-widget collapsed" id="memoWidget"></div>
 
 <!-- Study stopwatch -->
 <div class="study-row">
@@ -932,6 +1013,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
     <div class="sw-label">오늘 공부</div>
     <div class="sw-time" id="swTime">00:00:00</div>
   </div>
+  <button class="dash-btn" id="notesBtn" title="메모장">📝</button>
   <button class="dash-btn" id="dashBtn" title="공부 대시보드">📊</button>
 </div>
 
@@ -1045,6 +1127,41 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </div>
 </div>
 
+<!-- Notes manager modal -->
+<div class="modal-overlay" id="notesModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">메모장</span>
+      <button class="modal-close" id="notesClose">✕</button>
+    </div>
+    <div class="notes-actions">
+      <button class="acct-secondary" id="newTextNote">+ 메모</button>
+      <button class="acct-secondary" id="newListNote">+ 체크리스트</button>
+    </div>
+    <div id="notesList"></div>
+  </div>
+</div>
+
+<!-- Note editor modal -->
+<div class="modal-overlay" id="noteEditModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="noteEditTitle">메모 편집</span>
+      <button class="modal-close" id="noteEditClose">✕</button>
+    </div>
+    <div class="modal-field">
+      <span class="modal-field-label">제목</span>
+      <input type="text" class="goal-memo-input" id="noteTitleInput" placeholder="제목" maxlength="60">
+    </div>
+    <div id="noteEditBody"></div>
+    <label class="note-pin-row">
+      <input type="checkbox" id="notePinInput"> <span>메인 화면에 고정</span>
+    </label>
+    <button class="modal-confirm" id="noteSave">저장</button>
+    <button class="acct-secondary note-delete" id="noteDelete">삭제</button>
+  </div>
+</div>
+
 <!-- Dashboard modal -->
 <div class="modal-overlay" id="dashModal">
   <div class="modal">
@@ -1074,6 +1191,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 const STORE_KEY = 'timer_v4';
 const GOALS_KEY = 'timer_goals_v1';
 const STUDY_KEY = 'timer_study_v1';
+const NOTES_KEY = 'timer_notes_v1';
 
 const GOAL_COLORS = [
   '#f03c3c', '#ff8800', '#cef231',
@@ -1129,6 +1247,11 @@ let study = {
 };
 let lastSeenStudyDay = null;
 
+// ── Notes / memos state ────────────────────────────────────────
+// note: { id, title, type:'text'|'list', text, items:[{t,done}], pinned, updatedAt }
+let notes = [];
+let editingNoteId = null;
+
 // ── DOM ────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
 const timeDisplay   = $('timeDisplay');
@@ -1140,8 +1263,6 @@ const progressFill  = $('progressFill');
 const progressTrack = $('progressTrack');
 const statusDot     = $('statusDot');
 const statusText    = $('statusText');
-const restoreBanner = $('restoreBanner');
-const restoreInfo   = $('restoreInfo');
 const startBtn      = $('startBtn');
 const pauseBtn      = $('pauseBtn');
 const resetBtn      = $('resetBtn');
@@ -1218,6 +1339,8 @@ function clearSave() { try { localStorage.removeItem(STORE_KEY); } catch(e) {} s
 function saveGoals() { try { localStorage.setItem(GOALS_KEY, JSON.stringify(goals)); } catch(e) {} syncTouch(); }
 function loadGoals() { try { goals = JSON.parse(localStorage.getItem(GOALS_KEY)) || []; } catch(e) { goals = []; } }
 function saveStudy() { try { localStorage.setItem(STUDY_KEY, JSON.stringify(study)); } catch(e) {} syncTouch(); }
+function saveNotes() { try { localStorage.setItem(NOTES_KEY, JSON.stringify(notes)); } catch(e) {} syncTouch(); }
+function loadNotes() { try { notes = JSON.parse(localStorage.getItem(NOTES_KEY)) || []; } catch(e) { notes = []; } if (!Array.isArray(notes)) notes = []; }
 function loadStudy() {
   try {
     const s = JSON.parse(localStorage.getItem(STUDY_KEY));
@@ -1550,7 +1673,6 @@ function doReset() {
   goalEpoch = null; startEpoch = null; pausedRemaining = null;
   totalSeconds = 0; lastDisplayed = -1;
   render(); clearSave();
-  restoreBanner.style.display = 'none';
   renderDayTicks();
 }
 function setDuration(secs) {
@@ -1673,7 +1795,6 @@ $('calConfirm').addEventListener('click', () => {
   if (rafId) { cancelAnimationFrame(rafId); rafId=null; }
   startEpoch=start.getTime(); goalEpoch=end.getTime();
   totalSeconds=span; pausedRemaining=null; lastDisplayed=-1;
-  restoreBanner.style.display='none';
   if (remSecs>0) startTick(); else { goalEpoch=null; pausedRemaining=0; }
   render(); save(); renderDayTicks();
 });
@@ -1855,13 +1976,10 @@ dashModal.addEventListener('click', e => { if(e.target===dashModal) dashModal.cl
 // app config below. Firestore rule (per-user access):
 //   match /users/{uid} { allow read, write: if request.auth.uid == uid; }
 const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyBXiXFrwbR5QAv741MibNUFGD-fVu1NlHQ",
-  authDomain: "houronly-timer.firebaseapp.com",
-  projectId: "houronly-timer",
-  storageBucket: "houronly-timer.firebasestorage.app",
-  messagingSenderId: "680066324066",
-  appId: "1:680066324066:web:a28d618323cde9c7f9233b",
-  measurementId: "G-GDN5TL9DCR"
+  apiKey: "",
+  authDomain: "",
+  projectId: "",
+  appId: "",
 };
 const META_KEY    = 'timer_sync_meta_v1';
 const PUSH_DELAY  = 8000;
@@ -1869,6 +1987,7 @@ let fbAuth = null, db = null, cloudUid = null, cloudUnsub = null;
 let syncReady = false, pushTimer = null, lastPushedJson = null;
 let syncStatus = '';   // human-readable status shown in the account sheet
 let syncError  = '';   // last error code, if any
+let lastUploadToast = 0;
 
 function setSyncStatus(s, err) {
   syncStatus = s || '';
@@ -1888,7 +2007,18 @@ function schedulePush() { clearTimeout(pushTimer); pushTimer = setTimeout(pushCl
 
 function localBundle() {
   const j = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch(e) { return d; } };
-  return { timer: j(STORE_KEY, null), goals: j(GOALS_KEY, []), study: j(STUDY_KEY, null) };
+  return { timer: j(STORE_KEY, null), goals: j(GOALS_KEY, []), study: j(STUDY_KEY, null), notes: j(NOTES_KEY, []) };
+}
+// Union notes by id; for the same id keep the more recently edited one.
+function mergeNotes(local, remote) {
+  local = local || []; remote = remote || [];
+  const map = new Map();
+  remote.forEach(n => map.set(n.id, n));
+  local.forEach(n => {
+    const ex = map.get(n.id);
+    if (!ex || (n.updatedAt || 0) >= (ex.updatedAt || 0)) map.set(n.id, n);
+  });
+  return [...map.values()].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 }
 
 // Merge study: recorded time never lost (max per day), settings follow
@@ -1917,12 +2047,15 @@ function pushCloud() {
   if (!cloudUid || !syncReady || !db) return;
   const b = localBundle();
   const payload = { timer: b.timer ?? null, goals: b.goals || [], study: b.study ?? null,
-                    updatedAt: syncMeta().updatedAt || Date.now() };
+                    notes: b.notes || [], updatedAt: syncMeta().updatedAt || Date.now() };
   const json = JSON.stringify(payload);
   if (json === lastPushedJson) return;
   lastPushedJson = json;
   db.collection('users').doc(cloudUid).set(payload)
-    .then(() => setSyncStatus('동기화됨', ''))
+    .then(() => {
+      setSyncStatus('동기화됨', '');
+      if (Date.now() - lastUploadToast > 4000) { lastUploadToast = Date.now(); showToast('☁ 동기화 완료'); }
+    })
     .catch(e => {
       lastPushedJson = null;   // allow retry
       const code = e?.code || String(e);
@@ -1947,6 +2080,11 @@ function canonStudy(s) {
   Object.keys(s.records || {}).forEach(k => { const v = Math.floor(s.records[k] || 0); if (v > 0) rec[k] = v; });
   return stableStr({ resetHour: s.resetHour || 0, records: rec });   // volatile run-state excluded
 }
+function canonNotes(n) {
+  return stableStr([...(n || [])].sort((a, b) => (a.id || 0) - (b.id || 0))
+    .map(x => ({ id: x.id, title: x.title || '', type: x.type || 'text',
+                 text: x.text || '', items: x.items || [], pinned: !!x.pinned })));
+}
 
 function setMeta(v) { try { localStorage.setItem(META_KEY, JSON.stringify({ updatedAt: v })); } catch(e) {} }
 function writeBundle(b) {
@@ -1955,18 +2093,22 @@ function writeBundle(b) {
     else         localStorage.removeItem(STORE_KEY);
     localStorage.setItem(GOALS_KEY, JSON.stringify(b.goals || []));
     if (b.study) localStorage.setItem(STUDY_KEY, JSON.stringify(b.study));
+    localStorage.setItem(NOTES_KEY, JSON.stringify(b.notes || []));
   } catch(e) {}
 }
-// Refresh goals + study in the live UI without a full page reload.
+// Refresh goals + study + notes in the live UI without a full page reload.
 function applyGoalsStudyLive() {
   loadGoals();
   loadStudy();
+  loadNotes();
   if (study.swRunning && study.swLastTick == null) study.swLastTick = Date.now();
   lastSeenStudyDay = studyDayKey(Date.now());
   renderGoals();
   renderDayTicks();
   updateStudyUI();
+  renderMemoWidget();
   if (dashModal.classList.contains('open')) renderDashboard();
+  if (notesModal.classList.contains('open')) renderNotesList();
 }
 
 // Reconcile a cloud snapshot with local data. Loop-free: the merged version
@@ -1985,14 +2127,15 @@ function onCloud(doc) {
     timer: remoteNewer ? (remote?.timer ?? local.timer ?? null) : (local.timer ?? null),
     goals: mergeGoals(local.goals, remote?.goals),
     study: mergeStudy(local.study, remote?.study, remoteNewer),
+    notes: mergeNotes(local.notes, remote?.notes),
   };
   const mergedVer = Math.max(lm, rm);
 
   // Canonical signatures for change detection.
-  const sig = b => canonTimer(b.timer) + '|' + canonGoals(b.goals) + '|' + canonStudy(b.study);
+  const sig = b => canonTimer(b.timer) + '|' + canonGoals(b.goals) + '|' + canonStudy(b.study) + '|' + canonNotes(b.notes);
   const localSig  = sig(local);
   const mergedSig = sig(merged);
-  const remoteSig = remote ? sig({ timer: remote.timer, goals: remote.goals, study: remote.study }) : '';
+  const remoteSig = remote ? sig({ timer: remote.timer, goals: remote.goals, study: remote.study, notes: remote.notes }) : '';
 
   const localChanged = mergedSig !== localSig;     // our stored data needs updating
   const cloudStale   = mergedSig !== remoteSig;    // cloud is missing some of our data
@@ -2119,9 +2262,186 @@ $('acctBtn').addEventListener('click', () => { renderAcct(); acctModal.classList
 $('acctClose').addEventListener('click', () => acctModal.classList.remove('open'));
 acctModal.addEventListener('click', e => { if (e.target === acctModal) acctModal.classList.remove('open'); });
 
+// ── Notes / memo UI ────────────────────────────────────────────
+const notesModal    = $('notesModal');
+const noteEditModal = $('noteEditModal');
+const memoWidget    = $('memoWidget');
+let memoCollapseTimer = null;
+let editDraftItems = [];
+let editDraftType  = 'text';
+
+function pinnedOrRecentNote() {
+  if (!notes.length) return null;
+  return notes.find(n => n.pinned)
+      || notes.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0];
+}
+function notePreviewText(n) {
+  if (n.type === 'list') {
+    const items = n.items || [];
+    return `체크리스트 · ${items.filter(i => i.done).length}/${items.length} 완료`;
+  }
+  return (n.text || '').replace(/\s+/g, ' ').trim().slice(0, 60) || '내용 없음';
+}
+
+// Main-screen memo widget: collapsed icon (with red dot) ↔ expanded card.
+function renderMemoWidget() {
+  const n = pinnedOrRecentNote();
+  if (!n) { memoWidget.style.display = 'none'; memoWidget.innerHTML = ''; return; }
+  memoWidget.style.display = '';
+  if (memoWidget.classList.contains('collapsed')) {
+    memoWidget.innerHTML =
+      `<button class="memo-fab" id="memoFab" title="메모"><span class="memo-fab-ic">📝</span><span class="memo-dot"></span></button>`;
+    $('memoFab').addEventListener('click', expandMemo);
+    return;
+  }
+  const body = n.type === 'list'
+    ? `<div class="memo-checks">${(n.items || []).map((it, i) =>
+        `<label class="memo-check ${it.done ? 'done' : ''}"><input type="checkbox" data-i="${i}" ${it.done ? 'checked' : ''}><span>${escHtml(it.t || '')}</span></label>`
+      ).join('') || '<div class="memo-empty">항목 없음</div>'}</div>`
+    : `<div class="memo-text">${n.text ? escHtml(n.text) : '<span class="memo-empty">내용 없음</span>'}</div>`;
+  memoWidget.innerHTML =
+    `<div class="memo-card">
+       <div class="memo-card-head">
+         ${n.pinned ? '<span class="memo-pin-ic">📌</span>' : ''}
+         <span class="memo-card-title">${escHtml(n.title || '메모')}</span>
+         <div class="memo-card-actions">
+           <button class="memo-mini-btn" id="memoEdit" title="편집">✎</button>
+           <button class="memo-mini-btn" id="memoOpen" title="메모장">📋</button>
+           <button class="memo-mini-btn" id="memoCollapse" title="접기">✕</button>
+         </div>
+       </div>
+       ${body}
+     </div>`;
+  memoWidget.querySelectorAll('.memo-check input').forEach(cb => {
+    cb.addEventListener('change', () => {
+      cancelMemoAutoCollapse();
+      n.items[+cb.dataset.i].done = cb.checked;
+      n.updatedAt = Date.now();
+      saveNotes();
+      renderMemoWidget();
+    });
+  });
+  $('memoEdit').addEventListener('click', () => { collapseMemo(); openNoteEditor(n.id); });
+  $('memoOpen').addEventListener('click', () => { collapseMemo(); openNotes(); });
+  $('memoCollapse').addEventListener('click', collapseMemo);
+  memoWidget.querySelector('.memo-card').addEventListener('pointerdown', cancelMemoAutoCollapse, { once: true });
+}
+function expandMemo() { memoWidget.classList.remove('collapsed'); renderMemoWidget(); scheduleMemoAutoCollapse(); }
+function collapseMemo() { cancelMemoAutoCollapse(); memoWidget.classList.add('collapsed'); renderMemoWidget(); }
+function scheduleMemoAutoCollapse() { cancelMemoAutoCollapse(); memoCollapseTimer = setTimeout(collapseMemo, 2000); }
+function cancelMemoAutoCollapse() { clearTimeout(memoCollapseTimer); memoCollapseTimer = null; }
+
+// Notes manager
+function openNotes() { renderNotesList(); notesModal.classList.add('open'); }
+function renderNotesList() {
+  const list = $('notesList');
+  if (!notes.length) {
+    list.innerHTML = '<div class="notes-empty">아직 메모가 없습니다.<br>위 버튼으로 새 메모를 추가하세요.</div>';
+    return;
+  }
+  const sorted = notes.slice().sort((a, b) =>
+    (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (b.updatedAt || 0) - (a.updatedAt || 0));
+  list.innerHTML = sorted.map(n =>
+    `<div class="note-row" data-id="${n.id}">
+       <div class="note-row-body">
+         <div class="note-row-title">${n.pinned ? '📌 ' : ''}${n.type === 'list' ? '☑ ' : ''}${escHtml(n.title || '메모')}</div>
+         <div class="note-row-sub">${escHtml(notePreviewText(n))}</div>
+       </div>
+       <button class="note-row-del" data-del="${n.id}">🗑</button>
+     </div>`).join('');
+  list.querySelectorAll('.note-row').forEach(r => {
+    r.addEventListener('click', e => { if (!e.target.closest('.note-row-del')) openNoteEditor(parseInt(r.dataset.id)); });
+  });
+  list.querySelectorAll('.note-row-del').forEach(b => {
+    b.addEventListener('click', () => {
+      notes = notes.filter(n => n.id !== parseInt(b.dataset.del));
+      saveNotes(); renderNotesList(); renderMemoWidget();
+    });
+  });
+}
+
+// Note editor
+function openNoteEditor(id, newType) {
+  editingNoteId = (id != null) ? id : null;
+  const n = (id != null) ? notes.find(x => x.id === id)
+                         : { title: '', type: newType || 'text', text: '', items: [], pinned: false };
+  if (!n) return;
+  $('noteEditTitle').textContent = (id != null) ? '메모 편집' : (n.type === 'list' ? '새 체크리스트' : '새 메모');
+  $('noteTitleInput').value = n.title || '';
+  $('notePinInput').checked = !!n.pinned;
+  $('noteDelete').style.display = (id != null) ? '' : 'none';
+  editDraftType = n.type === 'list' ? 'list' : 'text';
+  if (editDraftType === 'text') {
+    $('noteEditBody').innerHTML = `<textarea id="noteTextInput" placeholder="내용">${escHtml(n.text || '')}</textarea>`;
+  } else {
+    editDraftItems = (n.items || []).map(i => ({ t: i.t || '', done: !!i.done }));
+    renderEditItems();
+  }
+  noteEditModal.classList.add('open');
+}
+function renderEditItems() {
+  const body = $('noteEditBody');
+  body.innerHTML =
+    `<div class="note-items">` +
+    editDraftItems.map((it, i) =>
+      `<div class="note-item-edit">
+         <input type="checkbox" data-i="${i}" ${it.done ? 'checked' : ''}>
+         <input type="text" data-i="${i}" value="${escHtml(it.t)}" placeholder="할 일">
+         <button class="note-item-del" data-i="${i}">✕</button>
+       </div>`).join('') +
+    `</div><button class="note-add-item" id="noteAddItem">+ 항목 추가</button>`;
+  body.querySelectorAll('.note-item-edit input[type=checkbox]').forEach(cb =>
+    cb.addEventListener('change', () => { editDraftItems[+cb.dataset.i].done = cb.checked; }));
+  body.querySelectorAll('.note-item-edit input[type=text]').forEach(tx =>
+    tx.addEventListener('input', () => { editDraftItems[+tx.dataset.i].t = tx.value; }));
+  body.querySelectorAll('.note-item-del').forEach(b =>
+    b.addEventListener('click', () => { editDraftItems.splice(+b.dataset.i, 1); renderEditItems(); }));
+  $('noteAddItem').addEventListener('click', () => {
+    editDraftItems.push({ t: '', done: false });
+    renderEditItems();
+    const inputs = body.querySelectorAll('.note-item-edit input[type=text]');
+    if (inputs.length) inputs[inputs.length - 1].focus();
+  });
+}
+function saveNoteFromEditor() {
+  let n = (editingNoteId != null) ? notes.find(x => x.id === editingNoteId) : null;
+  if (!n) { n = { id: Date.now(), type: editDraftType }; notes.push(n); }
+  n.title = $('noteTitleInput').value.trim();
+  n.type  = editDraftType;
+  if (editDraftType === 'text') { n.text = $('noteTextInput') ? $('noteTextInput').value : ''; n.items = []; }
+  else { n.items = editDraftItems.filter(i => i.t.trim() !== '' || i.done).map(i => ({ t: i.t, done: i.done })); n.text = ''; }
+  if ($('notePinInput').checked) notes.forEach(x => x.pinned = (x.id === n.id));
+  else n.pinned = false;
+  n.updatedAt = Date.now();
+  saveNotes();
+  noteEditModal.classList.remove('open');
+  renderNotesList();
+  renderMemoWidget();
+}
+function deleteEditingNote() {
+  if (editingNoteId != null) {
+    notes = notes.filter(n => n.id !== editingNoteId);
+    saveNotes();
+  }
+  noteEditModal.classList.remove('open');
+  renderNotesList();
+  renderMemoWidget();
+}
+
+$('notesBtn').addEventListener('click', openNotes);
+$('notesClose').addEventListener('click', () => notesModal.classList.remove('open'));
+notesModal.addEventListener('click', e => { if (e.target === notesModal) notesModal.classList.remove('open'); });
+$('newTextNote').addEventListener('click', () => openNoteEditor(null, 'text'));
+$('newListNote').addEventListener('click', () => openNoteEditor(null, 'list'));
+$('noteEditClose').addEventListener('click', () => noteEditModal.classList.remove('open'));
+noteEditModal.addEventListener('click', e => { if (e.target === noteEditModal) noteEditModal.classList.remove('open'); });
+$('noteSave').addEventListener('click', saveNoteFromEditor);
+$('noteDelete').addEventListener('click', deleteEditingNote);
+
 // ── Restore ────────────────────────────────────────────────────
 loadGoals();
 loadStudy();
+loadNotes();
 lastSeenStudyDay = studyDayKey(Date.now());
 // On restore, do not count time the page was closed.
 if (study.swRunning) study.swLastTick = Date.now();
@@ -2135,26 +2455,33 @@ if (study.swRunning) study.swLastTick = Date.now();
   startEpoch   = saved.startEpoch   || null;
   emergency    = saved.emergency    || false;
 
+  let restoreMsg = '';
   if (saved.goalEpoch) {
     const rem = Math.floor((saved.goalEpoch - Date.now()) / 1000);
     if (rem > 0) {
       goalEpoch = saved.goalEpoch;
-      restoreInfo.textContent = fmt(rem) + ' 남음';
-      restoreBanner.style.display = 'block';
+      restoreMsg = '세션 복원됨 — ' + fmt(rem) + ' 남음';
       startTick();
     } else {
       goalEpoch = null; pausedRemaining = 0;
-      restoreInfo.textContent = '타이머가 종료되었습니다';
-      restoreBanner.style.display = 'block';
+      restoreMsg = '세션 복원됨 — 타이머가 종료되었습니다';
     }
   } else if (saved.pausedRemaining > 0) {
     pausedRemaining = saved.pausedRemaining;
-    restoreInfo.textContent = fmt(pausedRemaining) + ' (일시정지 상태)';
-    restoreBanner.style.display = 'block';
+    restoreMsg = '세션 복원됨 — ' + fmt(pausedRemaining) + ' (일시정지 상태)';
   }
 
   render(); renderGoals(); renderDayTicks(); updateStudyUI();
+  if (restoreMsg) setTimeout(() => showToast(restoreMsg), 300);
 })();
+
+// Memo widget: show expanded on entry (if a memo exists), then auto-collapse.
+renderMemoWidget();
+if (pinnedOrRecentNote()) {
+  memoWidget.classList.remove('collapsed');
+  renderMemoWidget();
+  scheduleMemoAutoCollapse();
+}
 </script>
 </body>
 </html>
