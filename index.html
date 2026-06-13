@@ -123,16 +123,17 @@ svg.ico-sm { width: 1em; height: 1em; display: inline-block; vertical-align: -0.
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--surface);
+  color: var(--sub);
   font-size: 15px;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
   -webkit-appearance: none;
 }
 .corner-btn:active { background: var(--surf2); }
 .corner-btn.left  { left: 0; }
 .corner-btn.right { right: 0; }
-.corner-btn.on    { border-color: var(--emg-a); background: rgba(255,107,26,0.1); }
+.corner-btn.on    { border-color: var(--emg-a); background: rgba(255,107,26,0.1); color: var(--emg-a); }
 
 .time-display {
   font-family: 'Space Mono', monospace;
@@ -327,6 +328,7 @@ svg.ico-sm { width: 1em; height: 1em; display: inline-block; vertical-align: -0.
   border-radius: 10px;
   border: 1px solid var(--bord2);
   background: var(--surf2);
+  color: var(--sub);
   font-size: 17px;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
