@@ -12,6 +12,11 @@
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Hide scrollbars everywhere (keep scrolling) so desktop looks as clean as
+   mobile — no chunky white system scrollbars. */
+* { scrollbar-width: none; -ms-overflow-style: none; }
+*::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
 :root {
   --bg:      #080808;
   --surface: #101010;
@@ -131,7 +136,7 @@ svg.ico-sm { width: 1em; height: 1em; display: inline-block; vertical-align: -0.
   -webkit-appearance: none;
 }
 .corner-btn:active { background: var(--surf2); }
-.corner-btn.left  { left: 0; }
+.corner-btn.left  { left: 0; color: #ef7d7d; }   /* flag = soft red accent */
 .corner-btn.right { right: 0; }
 .corner-btn.on    { border-color: var(--emg-a); background: rgba(255,107,26,0.1); color: var(--emg-a); }
 
@@ -494,6 +499,8 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 .btn:active { transform: scale(0.96); background: var(--surf2); }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #0a0a0a; font-weight: 700; }
 .btn.primary:active { background: #b8d92a; border-color: #b8d92a; }
+/* While running, the primary button is "일시정지" — show it neutral, not go-green */
+.btn.primary.running { background: var(--surf2); border-color: var(--bord2); color: var(--text); }
 .btn:disabled {
   opacity: 1;                      /* keep text legible */
   color: var(--dim);
@@ -1098,7 +1105,6 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
     <button class="btn" id="fsBtn" title="전체화면"></button>
     <button class="btn" id="resetBtn">초기화</button>
     <button class="btn primary" id="startBtn">시작</button>
-    <button class="btn" id="pauseBtn" disabled>일시정지</button>
   </div>
 </div>
 <!-- /side-panel -->
@@ -1347,7 +1353,6 @@ const progressTrack = $('progressTrack');
 const statusDot     = $('statusDot');
 const statusText    = $('statusText');
 const startBtn      = $('startBtn');
-const pauseBtn      = $('pauseBtn');
 const resetBtn      = $('resetBtn');
 const hInput        = $('hInput');
 const mInput        = $('mInput');
@@ -1689,10 +1694,10 @@ function render() {
   else if (isPaused()) { statusDot.className = 'dot';        statusText.textContent = '일시정지'; }
   else                 { statusDot.className = 'dot';        statusText.textContent = ''; }
 
-  startBtn.disabled    = isRunning() || done;
-  startBtn.textContent = isRunning() ? '실행중' : isPaused() ? '계속' : '시작';
-  pauseBtn.disabled    = isIdle() || done;
-  pauseBtn.textContent = isPaused() ? '계속' : '일시정지';
+  // Single toggle: 시작 (idle) → 일시정지 (running) → 계속 (paused)
+  startBtn.disabled    = done;
+  startBtn.textContent = isRunning() ? '일시정지' : isPaused() ? '계속' : '시작';
+  startBtn.classList.toggle('running', isRunning());
 
   const locked = isRunning();
   [hInput, mInput, sInput].forEach(inp => { inp.disabled = locked; inp.style.opacity = locked ? '0.5' : '1'; });
@@ -1770,15 +1775,14 @@ function setDuration(secs) {
 
 // ── Button events ──────────────────────────────────────────────
 startBtn.addEventListener('click', () => {
-  if (isPaused()) { doStart(); return; }
-  if (isIdle()) {
-    const h = parseInt(hInput.value)||0, m = parseInt(mInput.value)||0, s = parseInt(sInput.value)||0;
-    const t = h*3600+m*60+s; if (!t) return;
-    totalSeconds = t; pausedRemaining = t;
-  }
+  if (isRunning()) { doPause(); return; }
+  if (isPaused())  { doStart(); return; }
+  // idle → read inputs and start
+  const h = parseInt(hInput.value)||0, m = parseInt(mInput.value)||0, s = parseInt(sInput.value)||0;
+  const t = h*3600+m*60+s; if (!t) return;
+  totalSeconds = t; pausedRemaining = t;
   doStart();
 });
-pauseBtn.addEventListener('click', () => { if (isRunning()) doPause(); else if (isPaused()) doStart(); });
 resetBtn.addEventListener('click', doReset);
 
 document.querySelectorAll('.preset-btn').forEach(btn => {
