@@ -97,7 +97,7 @@ svg.ico-sm { width: 1em; height: 1em; display: inline-block; vertical-align: -0.
   text-transform: uppercase;
   color: var(--sub);
   transition: color 0.3s;
-  min-width: 4em;
+  width: 5em;              /* fixed so the sync button never shifts */
   text-align: right;
 }
 .dot {
@@ -341,6 +341,10 @@ svg.ico-sm { width: 1em; height: 1em; display: inline-block; vertical-align: -0.
   -webkit-appearance: none;
 }
 .dash-btn:active { background: var(--border); }
+/* These buttons have no active state, so give each a soft colour point. */
+#notesBtn { color: #7aa2f7; }   /* memo  → soft blue  */
+#dashBtn  { color: #5ed3a8; }   /* chart → soft teal  */
+.memo-pin-ic, .note-pin-ic { color: var(--accent); display: inline-flex; }   /* pinned → accent */
 
 /* ═══════════════════════════ Goals list ══════════════════════ */
 .goals-wrap {
@@ -804,7 +808,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   position: relative;
   width: 42px; height: 42px; border-radius: 10px;
   border: 1px solid var(--bord2); background: var(--surf2);
-  color: var(--text); font-size: 17px; cursor: pointer;
+  color: #7aa2f7; font-size: 17px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   -webkit-appearance: none; transition: background 0.15s;
 }
@@ -841,6 +845,8 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 .memo-mini-btn { background: none; border: none; color: var(--dim); font-size: 15px;
   cursor: pointer; padding: 2px 5px; line-height: 1; -webkit-appearance: none; }
 .memo-mini-btn:active { color: var(--text); }
+.memo-nav { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 2px; padding-top: 8px; border-top: 1px solid var(--border); }
+.memo-nav-count { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--dim); min-width: 3.5em; text-align: center; }
 .memo-text { font-size: 13px; color: var(--sub); line-height: 1.55; white-space: pre-wrap;
   max-height: 26vh; overflow-y: auto; word-break: break-word; }
 .memo-checks { display: flex; flex-direction: column; gap: 7px; max-height: 30vh; overflow-y: auto; }
@@ -1335,6 +1341,8 @@ const ICONS = {
   cloud:  '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 18.5a4 4 0 0 1-.3-8 5 5 0 0 1 9.6-1.2 3.6 3.6 0 0 1 .2 7.2z"/></svg>',
   expand: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V5a1 1 0 0 1 1-1h4"/><path d="M20 9V5a1 1 0 0 0-1-1h-4"/><path d="M4 15v4a1 1 0 0 0 1 1h4"/><path d="M20 15v4a1 1 0 0 1-1 1h-4"/></svg>',
   close:  '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>',
+  chevL:  '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
+  chevR:  '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>',
   trash:  '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14"/><path d="M9.5 7V5h5v2"/><path d="M7 7l.8 12.2a1 1 0 0 0 1 .8h6.4a1 1 0 0 0 1-.8L18 7"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>',
   pin:    '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6l-1 6 3 2.5V14H8v-1.5L11 10z"/><line x1="12" y1="14" x2="12" y2="20"/></svg>',
   check:  '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 12.5l2.5 2.5 5-5"/></svg>',
@@ -2425,13 +2433,18 @@ const notesModal    = $('notesModal');
 const noteEditModal = $('noteEditModal');
 const memoWidget    = $('memoWidget');
 let memoCollapseTimer = null;
+let memoIndex = 0;     // which note the widget is showing
 let editDraftItems = [];
 let editDraftType  = 'text';
 
+// Notes ordered for the main widget: pinned first, then most-recent.
+function memoOrderedNotes() {
+  return notes.slice().sort((a, b) =>
+    (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (b.updatedAt || 0) - (a.updatedAt || 0));
+}
 function pinnedOrRecentNote() {
-  if (!notes.length) return null;
-  return notes.find(n => n.pinned)
-      || notes.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0];
+  const list = memoOrderedNotes();
+  return list.length ? list[0] : null;
 }
 function notePreviewText(n) {
   if (n.type === 'list') {
@@ -2444,9 +2457,11 @@ function notePreviewText(n) {
 // Main-screen memo widget. The fab is always in flow (fixed slot); the card is
 // an absolute overlay so opening/closing never moves the UI below it.
 function renderMemoWidget() {
-  const n = pinnedOrRecentNote();
-  if (!n) { memoWidget.style.display = 'none'; memoWidget.innerHTML = ''; memoWidget.classList.remove('open'); return; }
+  const list = memoOrderedNotes();
+  if (!list.length) { memoWidget.style.display = 'none'; memoWidget.innerHTML = ''; memoWidget.classList.remove('open'); return; }
   memoWidget.style.display = '';
+  memoIndex = Math.max(0, Math.min(memoIndex, list.length - 1));
+  const n = list[memoIndex];
   const open = memoWidget.classList.contains('open');
   let html = `<button class="memo-fab" id="memoFab" title="메모">${ICONS.note}<span class="memo-dot"></span></button>`;
   if (open) {
@@ -2455,6 +2470,13 @@ function renderMemoWidget() {
           `<label class="memo-check ${it.done ? 'done' : ''}"><input type="checkbox" data-i="${i}" ${it.done ? 'checked' : ''}><span>${escHtml(it.t || '')}</span></label>`
         ).join('') || '<div class="memo-empty">항목 없음</div>'}</div>`
       : `<div class="memo-text">${n.text ? escHtml(n.text) : '<span class="memo-empty">내용 없음</span>'}</div>`;
+    const nav = list.length > 1
+      ? `<div class="memo-nav">
+           <button class="memo-mini-btn" id="memoPrev" title="이전">${ICONS.chevL}</button>
+           <span class="memo-nav-count">${memoIndex + 1} / ${list.length}</span>
+           <button class="memo-mini-btn" id="memoNext" title="다음">${ICONS.chevR}</button>
+         </div>`
+      : '';
     html +=
       `<div class="memo-card">
          <div class="memo-card-head">
@@ -2467,6 +2489,7 @@ function renderMemoWidget() {
            </div>
          </div>
          ${body}
+         ${nav}
        </div>`;
   }
   memoWidget.innerHTML = html;
@@ -2478,16 +2501,20 @@ function renderMemoWidget() {
       n.items[+cb.dataset.i].done = cb.checked;
       n.updatedAt = Date.now();
       saveNotes();
+      memoIndex = memoOrderedNotes().findIndex(x => x.id === n.id);  // keep showing this note
       renderMemoWidget();
     });
   });
+  const nav = d => () => { cancelMemoAutoCollapse(); memoIndex = (memoIndex + d + list.length) % list.length; renderMemoWidget(); };
+  if ($('memoPrev')) $('memoPrev').addEventListener('click', nav(-1));
+  if ($('memoNext')) $('memoNext').addEventListener('click', nav(1));
   $('memoEdit').addEventListener('click', () => { collapseMemo(); openNoteEditor(n.id); });
   $('memoOpen').addEventListener('click', () => { collapseMemo(); openNotes(); });
   $('memoCollapse').addEventListener('click', collapseMemo);
   memoWidget.querySelector('.memo-card').addEventListener('pointerdown', cancelMemoAutoCollapse, { once: true });
 }
 // User-initiated expand: stays open until the user closes it (no auto-collapse).
-function expandMemo() { cancelMemoAutoCollapse(); memoWidget.classList.add('open'); renderMemoWidget(); }
+function expandMemo() { cancelMemoAutoCollapse(); memoIndex = 0; memoWidget.classList.add('open'); renderMemoWidget(); }
 function collapseMemo() {
   cancelMemoAutoCollapse();
   const card = memoWidget.querySelector('.memo-card');
@@ -2518,7 +2545,7 @@ function renderNotesList() {
   list.innerHTML = sorted.map(n =>
     `<div class="note-row" data-id="${n.id}">
        <div class="note-row-body">
-         <div class="note-row-title">${n.pinned ? icoSm('pin')+' ' : ''}${n.type === 'list' ? icoSm('check')+' ' : ''}${escHtml(n.title || '메모')}</div>
+         <div class="note-row-title">${n.pinned ? '<span class="note-pin-ic">'+icoSm('pin')+'</span> ' : ''}${n.type === 'list' ? icoSm('check')+' ' : ''}${escHtml(n.title || '메모')}</div>
          <div class="note-row-sub">${escHtml(notePreviewText(n))}</div>
        </div>
        <button class="note-row-del" data-del="${n.id}">${ICONS.trash}</button>
@@ -2551,6 +2578,7 @@ function openNoteEditor(id, newType) {
     $('noteEditBody').innerHTML = `<textarea id="noteTextInput" placeholder="내용">${escHtml(n.text || '')}</textarea>`;
   } else {
     editDraftItems = (n.items || []).map(i => ({ t: i.t || '', done: !!i.done }));
+    if (!editDraftItems.length) editDraftItems.push({ t: '', done: false });  // start ready to type
     renderEditItems();
   }
   noteEditModal.classList.add('open');
@@ -2568,8 +2596,19 @@ function renderEditItems() {
     `</div><button class="note-add-item" id="noteAddItem">+ 항목 추가</button>`;
   body.querySelectorAll('.note-item-edit input[type=checkbox]').forEach(cb =>
     cb.addEventListener('change', () => { editDraftItems[+cb.dataset.i].done = cb.checked; }));
-  body.querySelectorAll('.note-item-edit input[type=text]').forEach(tx =>
-    tx.addEventListener('input', () => { editDraftItems[+tx.dataset.i].t = tx.value; }));
+  body.querySelectorAll('.note-item-edit input[type=text]').forEach(tx => {
+    tx.addEventListener('input', () => { editDraftItems[+tx.dataset.i].t = tx.value; });
+    // Enter adds a new item right below and focuses it.
+    tx.addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const i = +tx.dataset.i;
+      editDraftItems.splice(i + 1, 0, { t: '', done: false });
+      renderEditItems();
+      const inputs = body.querySelectorAll('.note-item-edit input[type=text]');
+      if (inputs[i + 1]) inputs[i + 1].focus();
+    });
+  });
   body.querySelectorAll('.note-item-del').forEach(b =>
     b.addEventListener('click', () => { editDraftItems.splice(+b.dataset.i, 1); renderEditItems(); }));
   $('noteAddItem').addEventListener('click', () => {
