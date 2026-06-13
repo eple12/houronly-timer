@@ -1857,6 +1857,14 @@ const META_KEY    = 'timer_sync_meta_v1';
 const PUSH_DELAY  = 8000;
 let fbAuth = null, db = null, cloudUid = null, cloudUnsub = null;
 let syncReady = false, pushTimer = null, lastPushedJson = null;
+let syncStatus = '';   // human-readable status shown in the account sheet
+let syncError  = '';   // last error code, if any
+
+function setSyncStatus(s, err) {
+  syncStatus = s || '';
+  syncError  = err || '';
+  renderAcct();
+}
 
 const fbReady = !!(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.projectId
                    && window.firebase);
@@ -1903,13 +1911,25 @@ function pushCloud() {
   const json = JSON.stringify(payload);
   if (json === lastPushedJson) return;
   lastPushedJson = json;
-  db.collection('users').doc(cloudUid).set(payload).catch(e => console.warn('sync push failed', e));
+  db.collection('users').doc(cloudUid).set(payload)
+    .then(() => setSyncStatus('동기화됨', ''))
+    .catch(e => {
+      lastPushedJson = null;   // allow retry
+      const code = e?.code || String(e);
+      setSyncStatus('업로드 실패', code);
+      showToast('동기화 업로드 실패: ' + code);
+    });
 }
 
 // Apply a cloud snapshot: merge into localStorage, and reload if the
 // remote brought changes so the live UI reflects the merged state.
 function onCloud(doc) {
   const remote = doc.exists ? doc.data() : null;
+  if (!remote) {
+    setSyncStatus('클라우드에 저장된 데이터 없음 — 이 기기 데이터를 업로드합니다', '');
+  } else {
+    setSyncStatus('클라우드 연결됨', '');
+  }
   const local  = localBundle();
   const lm = syncMeta().updatedAt || 0;
   const rm = remote?.updatedAt || 0;
@@ -1945,9 +1965,15 @@ function onAuthChange(user) {
   if (cloudUnsub) { cloudUnsub(); cloudUnsub = null; }
   cloudUid = user ? user.uid : null;
   syncReady = false; lastPushedJson = null;
+  syncStatus = ''; syncError = '';
   if (user && db) {
+    setSyncStatus('연결 중…', '');
     cloudUnsub = db.collection('users').doc(user.uid)
-      .onSnapshot(onCloud, e => console.warn('sync listen failed', e));
+      .onSnapshot(onCloud, e => {
+        const code = e?.code || String(e);
+        setSyncStatus('데이터 받기 실패', code);
+        showToast('동기화 연결 실패: ' + code);
+      });
   }
   $('acctBtn').classList.toggle('on', !!user);
   renderAcct();
@@ -1987,14 +2013,38 @@ function renderAcct() {
     $('acctSignIn').addEventListener('click', signIn);
   } else {
     const when = syncMeta().updatedAt ? new Date(syncMeta().updatedAt).toLocaleString('ko-KR') : '—';
+    const esc = s => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+    const statusLine = syncError
+      ? '<div class="acct-meta" style="color:var(--danger)">⚠ ' + esc(syncStatus) + ' (' + esc(syncError) + ')</div>'
+      : '<div class="acct-meta">' + esc(syncStatus || '동기화됨') + ' · 마지막 변경 ' + when + '</div>';
     body.innerHTML =
-      '<div class="acct-row"><div class="acct-email">' + (user.email || user.displayName || user.uid) + '</div>' +
-      '<div class="acct-meta">동기화됨 · 마지막 변경 ' + when + '</div></div>' +
-      '<button class="modal-confirm" id="acctSyncNow">지금 동기화</button>' +
+      '<div class="acct-row"><div class="acct-email">' + esc(user.email || user.displayName || user.uid) + '</div>' +
+      statusLine + '</div>' +
+      '<button class="modal-confirm" id="acctSyncNow">지금 업로드</button>' +
+      '<button class="acct-secondary" id="acctPull">클라우드에서 다시 불러오기</button>' +
       '<button class="acct-secondary" id="acctSignOut">로그아웃</button>';
-    $('acctSyncNow').addEventListener('click', () => { pushCloud(); showToast('동기화 완료'); });
+    $('acctSyncNow').addEventListener('click', () => { lastPushedJson = null; pushCloud(); showToast('업로드 중…'); });
+    $('acctPull').addEventListener('click', pullNow);
     $('acctSignOut').addEventListener('click', signOut);
   }
+}
+
+// Force a one-time read from the cloud and merge it in (useful if the live
+// listener was blocked or the user wants to re-pull on demand).
+function pullNow() {
+  if (!cloudUid || !db) { showToast('로그인이 필요합니다'); return; }
+  showToast('불러오는 중…');
+  db.collection('users').doc(cloudUid).get()
+    .then(doc => {
+      if (!doc.exists) { showToast('클라우드에 데이터가 없습니다'); setSyncStatus('클라우드에 데이터 없음', ''); return; }
+      onCloud(doc);   // merges + reloads if there are changes
+      showToast('불러오기 완료');
+    })
+    .catch(e => {
+      const code = e?.code || String(e);
+      setSyncStatus('불러오기 실패', code);
+      showToast('불러오기 실패: ' + code);
+    });
 }
 
 if (fbReady) {
