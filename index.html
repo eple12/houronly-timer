@@ -31,6 +31,20 @@
   --good:    #2edf7a;
   --emg-a:   #ff6b1a;
   --emg-b:   #ff2d00;
+  --on-accent: #0a0a0a;   /* text/icon colour that sits on top of --accent */
+}
+
+/* Light theme — toggled via <html data-theme="light">. Only the neutral
+   surface/text ramp changes; --accent is user-set and applied inline. */
+:root[data-theme="light"] {
+  --bg:      #f3f4f6;
+  --surface: #ffffff;
+  --surf2:   #eceef1;
+  --border:  #e2e5ea;
+  --bord2:   #d3d7de;
+  --text:    #16181d;
+  --sub:     #4b5160;
+  --dim:     #8b909c;
 }
 
 html, body {
@@ -907,6 +921,133 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   max-height: 100dvh;
 }
 
+/* ═══════════════════ Mode switch + Pomodoro ═════════════════ */
+.seg {
+  display: flex; gap: 4px;
+  background: var(--surf2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 3px;
+}
+.seg-btn {
+  flex: 1; padding: 8px 4px;
+  border: none; background: transparent;
+  color: var(--sub);
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 12px; font-weight: 600;
+  letter-spacing: -0.2px;
+  border-radius: 7px; cursor: pointer;
+  -webkit-appearance: none;
+  transition: background 0.15s, color 0.15s;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+}
+.seg-btn.active { background: var(--accent); color: var(--on-accent); font-weight: 700; }
+.seg-btn svg { width: 0.95em; height: 0.95em; }
+
+.pomo-panel { display: flex; flex-direction: column; gap: 11px; padding: 4px 0 2px; }
+.pomo-phase-row { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.pomo-phase {
+  font-size: 13px; font-weight: 700; letter-spacing: -0.3px;
+  color: var(--accent); text-transform: uppercase;
+}
+.pomo-phase.brk { color: var(--good); }
+.pomo-dots { display: flex; gap: 6px; }
+.pomo-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--bord2); transition: background 0.2s, box-shadow 0.2s; }
+.pomo-dot.done { background: var(--accent); }
+.pomo-dot.cur  { background: transparent; box-shadow: inset 0 0 0 2px var(--accent); }
+.pomo-hint { font-size: 11px; color: var(--dim); text-align: center; letter-spacing: -0.2px; min-height: 14px; }
+
+/* ═══════════════════ Subject picker + chips ═════════════════ */
+.sw-subject {
+  background: none; border: none; padding: 0; margin: 0;
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--dim); cursor: pointer; -webkit-appearance: none;
+  display: inline-flex; align-items: center; gap: 5px; max-width: 100%;
+}
+.sw-subject .subj-name {
+  letter-spacing: 0; text-transform: none; font-size: 11px; font-weight: 600;
+  color: var(--accent); max-width: 9em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sw-subject .subj-caret { color: var(--dim); }
+.sw-goalbar { height: 3px; border-radius: 2px; background: var(--bord2); margin-top: 6px; overflow: hidden; }
+.sw-goalbar > i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 2px; transition: width 0.5s, background 0.3s; }
+.sw-goalbar.hit > i { background: var(--good); }
+
+.subj-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.subj-chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 9px 14px; border-radius: 999px;
+  border: 1px solid var(--bord2); background: var(--surf2);
+  color: var(--text); font-size: 13px; cursor: pointer; -webkit-appearance: none;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.subj-chip.active { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 700; }
+.subj-chip .subj-x { color: var(--dim); font-size: 14px; line-height: 1; padding: 0 2px; }
+.subj-chip.active .subj-x { color: var(--on-accent); }
+.subj-add-row { display: flex; gap: 8px; }
+.subj-add-row input { flex: 1; min-width: 0; }
+.subj-add-row .modal-confirm { width: auto; flex-shrink: 0; padding: 12px 18px; }
+
+/* ═══════════════════ Settings (theme/goal/focus/pomo) ═══════ */
+.setting-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.setting-row .sr-text { min-width: 0; }
+.setting-row .sr-label { font-size: 14px; color: var(--text); }
+.setting-row .sr-sub { font-size: 11px; color: var(--dim); margin-top: 3px; line-height: 1.4; }
+.set-section { display: flex; flex-direction: column; gap: 10px; }
+.set-section + .set-section { border-top: 1px solid var(--border); padding-top: 16px; }
+
+.switch { position: relative; width: 46px; height: 27px; flex-shrink: 0; }
+.switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; z-index: 2; }
+.switch .track { position: absolute; inset: 0; background: var(--bord2); border-radius: 999px; transition: background 0.18s; }
+.switch .track::before {
+  content: ''; position: absolute; top: 3px; left: 3px;
+  width: 21px; height: 21px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.4); transition: transform 0.18s;
+}
+.switch input:checked + .track { background: var(--accent); }
+.switch input:checked + .track::before { transform: translateX(19px); }
+
+.pomo-config { display: flex; gap: 6px; align-items: flex-end; }
+.pomo-config .input-group input { font-size: 18px; padding: 9px 4px; }
+.pomo-config .input-group label { white-space: nowrap; }
+
+.goal-hours-input {
+  width: 84px; background: var(--bg);
+  border: 1px solid var(--bord2); border-radius: 9px; color: var(--text);
+  font-family: 'Space Mono', monospace; font-size: 18px; font-weight: 700;
+  text-align: center; padding: 9px 4px; outline: none; -webkit-appearance: none; flex-shrink: 0;
+}
+.goal-hours-input:focus { border-color: var(--accent); }
+
+/* ═══════════════════ Dashboard: goal gauge, subjects, heatmap ═══════ */
+.goal-gauge { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 13px 14px; }
+.goal-gauge .gg-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.goal-gauge .gg-pct { font-family: 'Space Mono', monospace; font-size: 20px; font-weight: 700; color: var(--accent); }
+.goal-gauge.hit .gg-pct { color: var(--good); }
+.goal-gauge .gg-sub { font-size: 11px; color: var(--sub); }
+.goal-gauge .gg-bar { height: 8px; border-radius: 4px; background: var(--bord2); margin-top: 9px; overflow: hidden; }
+.goal-gauge .gg-bar > i { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
+.goal-gauge.hit .gg-bar > i { background: var(--good); }
+
+.subj-break { display: flex; flex-direction: column; gap: 9px; }
+.subj-line { display: flex; flex-direction: column; gap: 4px; }
+.subj-line-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; }
+.subj-line-top .sl-name { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.subj-line-top .sl-val { color: var(--sub); font-family: 'Space Mono', monospace; flex-shrink: 0; }
+.subj-line-bar { height: 6px; border-radius: 3px; background: var(--bord2); overflow: hidden; }
+.subj-line-bar > i { display: block; height: 100%; border-radius: 3px; }
+
+.heat-wrap { overflow-x: auto; padding-bottom: 4px; }
+.heat {
+  display: grid; grid-auto-flow: column;
+  grid-template-rows: repeat(7, 1fr); gap: 3px; width: max-content;
+}
+.heat-cell { width: 12px; height: 12px; border-radius: 3px; background: var(--surf2); }
+.heat-legend { display: flex; align-items: center; gap: 5px; justify-content: flex-end; font-size: 9px; color: var(--dim); margin-top: 6px; }
+.heat-legend .hl-cell { width: 11px; height: 11px; border-radius: 3px; }
+
 /* ═══════════════════════ Responsive layouts ══════════════════════ */
 
 /* ── Tablet portrait & large phones: roomier single column ── */
@@ -982,6 +1123,9 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   .colon { font-size: 18px; padding-bottom: 12px; }
   .btn { padding: 11px 6px; font-size: 13.5px; }
   .preset-btn { padding: 8px 3px; font-size: 11px; }
+  .seg-btn { padding: 6px 4px; font-size: 11.5px; }
+  .pomo-panel { gap: 8px; }
+  .study-row .sw-goalbar { margin-top: 4px; }
 }
 
 /* ── Laptop / desktop / large tablet landscape: roomy two-column ── */
@@ -1031,6 +1175,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 <div class="header">
   <span class="header-title">타이머</span>
   <div class="status-row">
+    <button class="acct-btn" id="setBtn" title="설정"></button>
     <button class="acct-btn" id="acctBtn" title="계정 / 동기화"></button>
     <span class="status-text" id="statusText"></span>
     <div class="dot" id="statusDot"></div>
@@ -1071,8 +1216,9 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 <div class="study-row">
   <button class="sw-toggle" id="swToggle">▶</button>
   <div class="sw-info">
-    <div class="sw-label">오늘 공부</div>
+    <button class="sw-subject" id="swSubjectBtn" title="과목 선택">오늘 공부</button>
     <div class="sw-time" id="swTime">00:00:00</div>
+    <div class="sw-goalbar" id="swGoalBar" style="display:none"><i></i></div>
   </div>
   <button class="dash-btn" id="notesBtn" title="메모장"></button>
   <button class="dash-btn" id="dashBtn" title="공부 대시보드"></button>
@@ -1083,31 +1229,49 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 
 <!-- Controls -->
 <div class="controls">
-  <div class="presets">
-    <button class="preset-btn" data-h="24">24h</button>
-    <button class="preset-btn" data-h="48">48h</button>
-    <button class="preset-btn" data-h="72">72h</button>
-    <button class="preset-btn" data-h="168">1주</button>
-    <button class="preset-btn" data-h="336">2주</button>
-    <button class="preset-btn" data-h="720">1달</button>
-    <button class="preset-btn" id="calBtn" title="날짜로 설정" style="border-color:var(--accent);color:var(--accent);font-size:14px;"></button>
+  <div class="seg" id="modeSeg">
+    <button class="seg-btn active" data-mode="general" id="modeGeneral">일반 타이머</button>
+    <button class="seg-btn" data-mode="pomodoro" id="modePomodoro">뽀모도로</button>
   </div>
-  <div class="input-row">
-    <div class="input-group">
-      <label>시간</label>
-      <input type="number" id="hInput" min="0" max="8760" placeholder="0" inputmode="numeric">
+
+  <!-- General countdown controls -->
+  <div id="generalControls" style="display:flex;flex-direction:column;gap:9px;">
+    <div class="presets">
+      <button class="preset-btn" data-h="24">24h</button>
+      <button class="preset-btn" data-h="48">48h</button>
+      <button class="preset-btn" data-h="72">72h</button>
+      <button class="preset-btn" data-h="168">1주</button>
+      <button class="preset-btn" data-h="336">2주</button>
+      <button class="preset-btn" data-h="720">1달</button>
+      <button class="preset-btn" id="calBtn" title="날짜로 설정" style="border-color:var(--accent);color:var(--accent);font-size:14px;"></button>
     </div>
-    <div class="colon">:</div>
-    <div class="input-group">
-      <label>분</label>
-      <input type="number" id="mInput" min="0" max="59" placeholder="0" inputmode="numeric">
-    </div>
-    <div class="colon">:</div>
-    <div class="input-group">
-      <label>초</label>
-      <input type="number" id="sInput" min="0" max="59" placeholder="0" inputmode="numeric">
+    <div class="input-row">
+      <div class="input-group">
+        <label>시간</label>
+        <input type="number" id="hInput" min="0" max="8760" placeholder="0" inputmode="numeric">
+      </div>
+      <div class="colon">:</div>
+      <div class="input-group">
+        <label>분</label>
+        <input type="number" id="mInput" min="0" max="59" placeholder="0" inputmode="numeric">
+      </div>
+      <div class="colon">:</div>
+      <div class="input-group">
+        <label>초</label>
+        <input type="number" id="sInput" min="0" max="59" placeholder="0" inputmode="numeric">
+      </div>
     </div>
   </div>
+
+  <!-- Pomodoro panel -->
+  <div id="pomoPanel" class="pomo-panel" style="display:none">
+    <div class="pomo-phase-row">
+      <span class="pomo-phase" id="pomoPhaseLabel">집중</span>
+      <span class="pomo-dots" id="pomoDots"></span>
+    </div>
+    <div class="pomo-hint" id="pomoHint"></div>
+  </div>
+
   <div class="btn-row">
     <button class="btn" id="fsBtn" title="전체화면"></button>
     <button class="btn" id="resetBtn">초기화</button>
@@ -1255,6 +1419,38 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </div>
 </div>
 
+<!-- Subject picker modal -->
+<div class="modal-overlay" id="subjModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">과목 선택</span>
+      <button class="modal-close" id="subjClose">✕</button>
+    </div>
+    <div class="modal-field">
+      <span class="modal-field-label">공부 중인 과목</span>
+      <div class="subj-chips" id="subjChips"></div>
+    </div>
+    <div class="modal-field">
+      <span class="modal-field-label">새 과목 추가</span>
+      <div class="subj-add-row">
+        <input type="text" class="goal-memo-input" id="subjAddInput" placeholder="예: 수학" maxlength="16">
+        <button class="modal-confirm" id="subjAddBtn">추가</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Settings modal -->
+<div class="modal-overlay" id="setModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">설정</span>
+      <button class="modal-close" id="setClose">✕</button>
+    </div>
+    <div id="setBody"></div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
@@ -1348,10 +1544,12 @@ const ICONS = {
   trash:  '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14"/><path d="M9.5 7V5h5v2"/><path d="M7 7l.8 12.2a1 1 0 0 0 1 .8h6.4a1 1 0 0 0 1-.8L18 7"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>',
   pin:    '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6l-1 6 3 2.5V14H8v-1.5L11 10z"/><line x1="12" y1="14" x2="12" y2="20"/></svg>',
   check:  '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 12.5l2.5 2.5 5-5"/></svg>',
+  gear:   '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 13.5a7.8 7.8 0 0 0 0-3l1.8-1.4-1.8-3.1-2.2.9a7.6 7.6 0 0 0-2.6-1.5L12 2h-3.6L8 4.9a7.6 7.6 0 0 0-2.6 1.5l-2.2-.9-1.8 3.1L3.2 10a7.8 7.8 0 0 0 0 3l-1.8 1.4 1.8 3.1 2.2-.9a7.6 7.6 0 0 0 2.6 1.5L8.4 22H12l.4-2.9a7.6 7.6 0 0 0 2.6-1.5l2.2.9 1.8-3.1z"/></svg>',
+  tomato: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7c-3.5 0-6 2.6-6 6.5S8.5 21 12 21s6-3.6 6-7.5S15.5 7 12 7z"/><path d="M9 6c1-1.5 5-1.5 6 0"/><path d="M12 7V4"/></svg>',
 };
 const icoSm = n => ICONS[n].replace('class="ico"', 'class="ico ico-sm"');
 // Swap the static button glyphs for the monochrome icons.
-['acctBtn:cloud','goalBtn:flag','emgBtn:warn','notesBtn:note','dashBtn:chart','calBtn:calendar','fsBtn:expand']
+['acctBtn:cloud','setBtn:gear','goalBtn:flag','emgBtn:warn','notesBtn:note','dashBtn:chart','calBtn:calendar','fsBtn:expand']
   .forEach(p => { const [id, name] = p.split(':'); const el = $(id); if (el) el.innerHTML = ICONS[name]; });
 const timeDisplay   = $('timeDisplay');
 const elapsedLabel  = $('elapsedLabel');
@@ -1449,6 +1647,30 @@ function loadStudy() {
     if (s) study = Object.assign(study, s);
   } catch(e) {}
   if (!study.records) study.records = {};
+  ensureSettings();
+}
+
+// ── Settings / extended study state defaults ───────────────────
+const DEFAULT_POMO = { focus: 25, short: 5, long: 15, sets: 4 };
+const ACCENTS = ['#cef231','#5ed3a8','#7aa2f7','#f7a23a','#f76b6b','#c47cff','#36d1dc'];
+function ensureSettings() {
+  if (!study.subjects     || typeof study.subjects !== 'object')     study.subjects = {};
+  if (!study.distractions || typeof study.distractions !== 'object') study.distractions = {};
+  if (!Array.isArray(study.subjectList)) study.subjectList = [];
+  if (typeof study.curSubject !== 'string')   study.curSubject = '';
+  if (typeof study.dailyGoalSec !== 'number') study.dailyGoalSec = 0;
+  if (study.theme !== 'light' && study.theme !== 'dark') study.theme = 'dark';
+  if (typeof study.accent !== 'string')  study.accent = '#cef231';
+  if (typeof study.focusMode !== 'boolean') study.focusMode = false;
+  study.pomo = Object.assign({}, DEFAULT_POMO, (study.pomo && typeof study.pomo === 'object') ? study.pomo : {});
+}
+
+// Apply the chosen theme + accent colour to the document.
+function applyTheme() {
+  document.documentElement.setAttribute('data-theme', study.theme === 'light' ? 'light' : 'dark');
+  document.documentElement.style.setProperty('--accent', study.accent || '#cef231');
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', study.theme === 'light' ? '#f3f4f6' : '#080808');
 }
 
 // ── Study day keying (respects configurable resetHour) ─────────
@@ -1474,7 +1696,18 @@ function accountStopwatch() {
   if (dt <= 0) return;
   const key = studyDayKey(now);
   study.records[key] = (study.records[key] || 0) + dt;
+  // Attribute to the currently selected subject (untagged time stays implicit).
+  if (study.curSubject) {
+    if (!study.subjects[key]) study.subjects[key] = {};
+    study.subjects[key][study.curSubject] = (study.subjects[key][study.curSubject] || 0) + dt;
+  }
   saveStudy();
+}
+
+// Seconds studied today for one subject ('' = total of all tagged).
+function todaySubjectSec(name) {
+  const day = study.subjects[studyDayKey(Date.now())] || {};
+  return Math.floor(day[name] || 0);
 }
 
 function toggleStopwatch() {
@@ -1597,6 +1830,7 @@ function studyStats() {
 // ── Projection line on main screen ─────────────────────────────
 function updateProjection() {
   metaRow2.innerHTML = '';
+  if (pomoPhase) return;   // pomodoro phase end isn't a meaningful D-day
   const dd = dDayNum();
   if (dd === null) return;
 
@@ -1624,7 +1858,28 @@ function updateStudyUI() {
   swTimeEl.classList.toggle('running', study.swRunning);
   swToggle.innerHTML = study.swRunning ? ICONS.pause : ICONS.play;
   swToggle.classList.toggle('running', study.swRunning);
+  updateSubjectLabel();
+  updateGoalBar(sec);
   updateProjection();
+}
+
+function updateSubjectLabel() {
+  const btn = $('swSubjectBtn');
+  if (!btn) return;
+  btn.innerHTML = study.curSubject
+    ? `오늘 공부 · <span class="subj-name">${escHtml(study.curSubject)}</span><span class="subj-caret">▾</span>`
+    : `오늘 공부 <span class="subj-caret">▾</span>`;
+}
+
+function updateGoalBar(sec) {
+  const bar = $('swGoalBar');
+  if (!bar) return;
+  const goal = study.dailyGoalSec;
+  if (!goal || goal <= 0) { bar.style.display = 'none'; return; }
+  bar.style.display = '';
+  const pct = Math.min(100, (sec / goal) * 100);
+  bar.querySelector('i').style.width = pct.toFixed(1) + '%';
+  bar.classList.toggle('hit', sec >= goal);
 }
 
 // ── Day rollover detection + notification ──────────────────────
@@ -1735,7 +1990,9 @@ function startTick() {
     if (getRem() === 0 && goalEpoch !== null) {
       goalEpoch = null;
       if ('vibrate' in navigator) navigator.vibrate([400,200,400,200,400]);
-      render(); save(); rafId = null; return;
+      render(); save(); rafId = null;
+      if (pomoPhase) pomoComplete();
+      return;
     }
     save(); rafId = requestAnimationFrame(loop);
   }
@@ -1770,12 +2027,18 @@ function doPause() {
   if (!isRunning()) return;
   pausedRemaining = getRem(); goalEpoch = null;
   if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+  // In a pomodoro focus phase, pause the auto-running study stopwatch too.
+  if (pomoPhase === 'focus' && study.swRunning) {
+    accountStopwatch(); study.swRunning = false; study.swLastTick = null;
+    saveStudy(); updateStudyUI();
+  }
   render(); save();
 }
 function doReset() {
   if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
   goalEpoch = null; startEpoch = null; pausedRemaining = null;
   totalSeconds = 0; lastDisplayed = -1;
+  if (pomoPhase) pomoStop();   // ending a pomodoro session
   render(); clearSave();
   renderDayTicks();
 }
@@ -1783,8 +2046,106 @@ function setDuration(secs) {
   doReset(); totalSeconds = secs; pausedRemaining = secs; render(); save();
 }
 
+// ── Pomodoro ───────────────────────────────────────────────────
+let mode      = 'general';   // 'general' | 'pomodoro'  (UI mode, device-local)
+let pomoPhase = null;        // 'focus' | 'short' | 'long' while a session runs
+let pomoSet   = 0;           // completed focus blocks in the current cycle
+
+function phaseSec(p) {
+  const m = p === 'focus' ? study.pomo.focus : p === 'short' ? study.pomo.short : study.pomo.long;
+  return Math.max(1, Math.round((parseFloat(m) || 0) * 60));
+}
+function phaseName(p) { return p === 'focus' ? '집중' : p === 'short' ? '짧은 휴식' : '긴 휴식'; }
+
+function pomoBegin(phase) {
+  pomoPhase = phase;
+  totalSeconds = phaseSec(phase);
+  pausedRemaining = totalSeconds;
+  goalEpoch = null; startEpoch = null; lastDisplayed = -1;
+  // Focus → auto-run the study stopwatch; break → pause it.
+  if (phase === 'focus') {
+    if (!study.swRunning) { study.swRunning = true; study.swLastTick = Date.now(); saveStudy(); }
+  } else if (study.swRunning) {
+    accountStopwatch(); study.swRunning = false; study.swLastTick = null; saveStudy();
+  }
+  doStart();
+  updateStudyUI(); renderPomo();
+}
+function pomoComplete() {
+  if (pomoPhase === 'focus') {
+    pomoSet++;
+    const isLong = study.pomo.sets > 0 && pomoSet % study.pomo.sets === 0;
+    notify('집중 완료', isLong ? '긴 휴식 시간이에요' : '잠깐 휴식하세요');
+    pomoBegin(isLong ? 'long' : 'short');
+  } else {
+    notify('휴식 끝', '다시 집중해 볼까요');
+    pomoBegin('focus');
+  }
+}
+// Stop the pomodoro session (called from reset / mode switch).
+function pomoStop() {
+  pomoPhase = null; pomoSet = 0;
+  if (study.swRunning) {
+    accountStopwatch(); study.swRunning = false; study.swLastTick = null;
+    saveStudy(); updateStudyUI();
+  }
+  renderPomo();
+}
+
+function renderPomo() {
+  const label = $('pomoPhaseLabel'), dots = $('pomoDots'), hint = $('pomoHint');
+  if (!label) return;
+  const phase = pomoPhase || 'focus';
+  label.textContent = phaseName(phase);
+  label.classList.toggle('brk', phase !== 'focus');
+  const sets = Math.max(1, study.pomo.sets || 4);
+  const doneInCycle = pomoSet % sets;
+  let d = '';
+  for (let i = 0; i < sets; i++) {
+    const cls = (pomoPhase === 'focus' && i === doneInCycle) ? 'pomo-dot cur'
+              : (i < doneInCycle ? 'pomo-dot done' : 'pomo-dot');
+    d += `<span class="${cls}"></span>`;
+  }
+  dots.innerHTML = d;
+  if (!pomoPhase) {
+    hint.textContent = `집중 ${study.pomo.focus}분 · 휴식 ${study.pomo.short}분 · ${sets}회마다 긴 휴식 ${study.pomo.long}분`;
+  } else if (pomoPhase === 'focus') {
+    hint.textContent = `${pomoSet}회 완료 · 집중하세요`;
+  } else {
+    hint.textContent = '휴식 중 — 잠시 쉬어가세요';
+  }
+}
+
+function setMode(m) {
+  if (m === mode) return;
+  doReset();            // clear any active timer / pomodoro state
+  mode = m;
+  $('modeGeneral').classList.toggle('active', m === 'general');
+  $('modePomodoro').classList.toggle('active', m === 'pomodoro');
+  $('generalControls').style.display = m === 'general' ? 'flex' : 'none';
+  $('pomoPanel').style.display       = m === 'pomodoro' ? 'flex' : 'none';
+  if (m === 'pomodoro') renderPomo();
+  render();
+}
+$('modeGeneral').addEventListener('click', () => setMode('general'));
+$('modePomodoro').addEventListener('click', () => setMode('pomodoro'));
+
 // ── Button events ──────────────────────────────────────────────
 startBtn.addEventListener('click', () => {
+  if (mode === 'pomodoro') {
+    if (isRunning()) { doPause(); return; }
+    if (isPaused()) {
+      doStart();
+      // resume the focus stopwatch when un-pausing a focus phase
+      if (pomoPhase === 'focus' && !study.swRunning) {
+        study.swRunning = true; study.swLastTick = Date.now(); saveStudy(); updateStudyUI();
+      }
+      return;
+    }
+    requestNotifyPermission();
+    pomoBegin('focus');
+    return;
+  }
   if (isRunning()) { doPause(); return; }
   if (isPaused())  { doStart(); return; }
   // idle → read inputs and start
@@ -1968,6 +2329,87 @@ $('goalConfirm').addEventListener('click', () => {
 // ── Dashboard ──────────────────────────────────────────────────
 const dashModal = $('dashModal');
 
+// ── Dashboard helpers (period sums, subjects, heatmap) ─────────
+function sumLastDays(n) {
+  let t = 0;
+  for (let i = 0; i < n; i++) t += study.records[studyDayKeyOffset(i)] || 0;
+  return t;
+}
+function todayDistractions() { return study.distractions[studyDayKey(Date.now())] || 0; }
+
+function goalGaugeHTML(today) {
+  if (!study.dailyGoalSec) return '';
+  const pct = Math.min(100, today / study.dailyGoalSec * 100);
+  const hit = today >= study.dailyGoalSec;
+  return `
+    <div class="chart-block">
+      <div class="chart-title"><span>오늘 목표 달성률</span></div>
+      <div class="goal-gauge ${hit ? 'hit' : ''}">
+        <div class="gg-top">
+          <span class="gg-pct">${Math.round(pct)}%</span>
+          <span class="gg-sub">${fmt(today).slice(0,5)} / ${fmtHrs(study.dailyGoalSec)}${hit ? ' · 달성 🎉' : ''}</span>
+        </div>
+        <div class="gg-bar"><i style="width:${pct.toFixed(1)}%"></i></div>
+      </div>
+    </div>`;
+}
+
+function subjectBreakHTML() {
+  const day = study.subjects[studyDayKey(Date.now())] || {};
+  const total = todayStudySec();
+  const entries = Object.entries(day).filter(([,v]) => v > 0.5).sort((a,b) => b[1]-a[1]);
+  const tagged = entries.reduce((a,[,v]) => a+v, 0);
+  const untag = Math.max(0, total - tagged);
+  if (!entries.length && untag < 1) return '';
+  const line = (name, sec, color) => {
+    const pct = total > 0 ? Math.min(100, sec/total*100) : 0;
+    return `<div class="subj-line">
+      <div class="subj-line-top"><span class="sl-name">${name}</span><span class="sl-val">${fmt(sec).slice(0,5)}</span></div>
+      <div class="subj-line-bar"><i style="width:${pct.toFixed(1)}%;background:${color}"></i></div>
+    </div>`;
+  };
+  const rows = entries.map(([name,sec],i) => line(escHtml(name), sec, ACCENTS[i % ACCENTS.length]));
+  if (untag >= 1) rows.push(line('기타', untag, 'var(--dim)'));
+  return `<div class="chart-block"><div class="chart-title"><span>오늘 과목별</span></div>
+    <div class="subj-break">${rows.join('')}</div></div>`;
+}
+
+function heatmapHTML() {
+  const WEEKS = 18;
+  const base = new Date(Date.now() - study.resetHour * 3600 * 1000);
+  base.setHours(0,0,0,0);
+  const todayDow = base.getDay();
+  const start = new Date(base);
+  start.setDate(start.getDate() - (WEEKS - 1) * 7 - todayDow);
+  const cells = [];
+  let max = 1;
+  const cur = new Date(start);
+  for (let i = 0; i < WEEKS * 7; i++) {
+    const key = `${cur.getFullYear()}-${pad(cur.getMonth()+1)}-${pad(cur.getDate())}`;
+    const future = cur.getTime() > base.getTime();
+    const sec = future ? -1 : (study.records[key] || 0);
+    if (sec > max) max = sec;
+    cells.push({ sec, future, label: `${cur.getMonth()+1}/${cur.getDate()}` });
+    cur.setDate(cur.getDate() + 1);
+  }
+  const body = cells.map(c => {
+    if (c.future) return `<div class="heat-cell" style="visibility:hidden"></div>`;
+    let bg = 'var(--surf2)';
+    if (c.sec > 0.5) {
+      const t = Math.min(1, c.sec / max);
+      bg = `color-mix(in srgb, var(--accent) ${Math.round((0.22 + 0.78*t)*100)}%, var(--surf2))`;
+    }
+    return `<div class="heat-cell" style="background:${bg}" title="${c.label} · ${fmtHrs(Math.max(0,c.sec))}"></div>`;
+  }).join('');
+  const lg = ['var(--surf2)','color-mix(in srgb, var(--accent) 35%, var(--surf2))','color-mix(in srgb, var(--accent) 70%, var(--surf2))','var(--accent)']
+    .map(c => `<span class="hl-cell" style="background:${c}"></span>`).join('');
+  return `<div class="chart-block">
+    <div class="chart-title"><span>최근 18주</span></div>
+    <div class="heat-wrap"><div class="heat">${body}</div></div>
+    <div class="heat-legend">적음 ${lg} 많음</div>
+  </div>`;
+}
+
 function renderDashboard() {
   const body = $('dashBody');
   const st   = studyStats();
@@ -2042,6 +2484,11 @@ function renderDashboard() {
       </div>`;
   }
 
+  const distToday = todayDistractions();
+  const focusCard = (study.focusMode || distToday > 0)
+    ? `<div class="stat-card"><div class="stat-label">오늘 이탈</div><div class="stat-value">${distToday}<small> 회</small></div></div>`
+    : '';
+
   body.innerHTML = `
     <div class="stat-grid">
       <div class="stat-card"><div class="stat-label">오늘</div><div class="stat-value">${fmtHrs(today)}<small> ${fmt(today).slice(0,5)}</small></div></div>
@@ -2050,7 +2497,16 @@ function renderDashboard() {
       <div class="stat-card"><div class="stat-label">연속 일수</div><div class="stat-value">${st.streak}<small> 일</small></div></div>
     </div>
 
+    ${goalGaugeHTML(today)}
+
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-label">최근 7일</div><div class="stat-value">${fmtHrs(sumLastDays(7))}</div></div>
+      <div class="stat-card"><div class="stat-label">최근 30일</div><div class="stat-value">${fmtHrs(sumLastDays(30))}</div></div>
+    </div>
+
     ${projHTML}
+
+    ${subjectBreakHTML()}
 
     <div class="chart-block">
       <div class="chart-title">
@@ -2062,9 +2518,11 @@ function renderDashboard() {
       </svg>
     </div>
 
-    <div class="chart-block">
-      <div class="chart-title"><span>최고 기록</span></div>
-      <div class="stat-card"><div class="stat-value">${fmtHrs(st.best)}<small> 하루 최대</small></div></div>
+    ${heatmapHTML()}
+
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-label">하루 최대</div><div class="stat-value">${fmtHrs(st.best)}</div></div>
+      ${focusCard}
     </div>
 
     ${resetHourBlock(hourOpts)}
@@ -2102,6 +2560,145 @@ function bindResetHour() {
 $('dashBtn').addEventListener('click', () => { requestNotifyPermission(); renderDashboard(); dashModal.classList.add('open'); });
 $('dashClose').addEventListener('click', () => dashModal.classList.remove('open'));
 dashModal.addEventListener('click', e => { if(e.target===dashModal) dashModal.classList.remove('open'); });
+
+// ── Subject picker ─────────────────────────────────────────────
+const subjModal = $('subjModal');
+function renderSubjChips() {
+  const wrap = $('subjChips');
+  const chips = [`<button class="subj-chip ${study.curSubject==='' ? 'active' : ''}" data-subj="">전체</button>`];
+  study.subjectList.forEach(name => {
+    chips.push(
+      `<button class="subj-chip ${study.curSubject===name ? 'active' : ''}" data-subj="${escHtml(name)}">
+         ${escHtml(name)}<span class="subj-x" data-del="${escHtml(name)}" title="삭제">✕</span>
+       </button>`);
+  });
+  wrap.innerHTML = chips.join('');
+  wrap.querySelectorAll('.subj-chip').forEach(btn => {
+    btn.addEventListener('click', e => {
+      if (e.target.closest('.subj-x')) return;
+      study.curSubject = btn.dataset.subj || '';
+      saveStudy(); updateStudyUI();
+      subjModal.classList.remove('open');
+    });
+  });
+  wrap.querySelectorAll('.subj-x').forEach(x => {
+    x.addEventListener('click', e => {
+      e.stopPropagation();
+      const name = x.dataset.del;
+      study.subjectList = study.subjectList.filter(s => s !== name);
+      if (study.curSubject === name) study.curSubject = '';
+      saveStudy(); renderSubjChips(); updateStudyUI();
+    });
+  });
+}
+function addSubject() {
+  const inp = $('subjAddInput');
+  const name = (inp.value || '').trim().slice(0, 16);
+  if (!name) return;
+  if (!study.subjectList.includes(name)) study.subjectList.push(name);
+  study.curSubject = name;
+  inp.value = '';
+  saveStudy(); renderSubjChips(); updateStudyUI();
+}
+$('swSubjectBtn').addEventListener('click', () => { renderSubjChips(); subjModal.classList.add('open'); setTimeout(() => $('subjAddInput').focus(), 50); });
+$('subjClose').addEventListener('click', () => subjModal.classList.remove('open'));
+subjModal.addEventListener('click', e => { if (e.target === subjModal) subjModal.classList.remove('open'); });
+$('subjAddBtn').addEventListener('click', addSubject);
+$('subjAddInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addSubject(); } });
+
+// ── Settings ───────────────────────────────────────────────────
+const setModal = $('setModal');
+function renderSettings() {
+  const body = $('setBody');
+  const accentSwatches = ACCENTS.map(c =>
+    `<button class="color-swatch ${study.accent===c?'selected':''}" data-accent="${c}" style="background:${c}"></button>`).join('');
+  const goalH = study.dailyGoalSec ? (Math.round(study.dailyGoalSec / 360) / 10) : '';
+  body.innerHTML = `
+    <div class="set-section">
+      <div class="modal-field-label">테마</div>
+      <div class="seg" id="themeSeg">
+        <button class="seg-btn ${study.theme==='dark'?'active':''}" data-theme="dark">다크</button>
+        <button class="seg-btn ${study.theme==='light'?'active':''}" data-theme="light">라이트</button>
+      </div>
+      <div class="modal-field-label" style="margin-top:6px">강조 색</div>
+      <div class="color-swatches" id="accentSwatches">${accentSwatches}</div>
+    </div>
+
+    <div class="set-section">
+      <div class="setting-row">
+        <div class="sr-text">
+          <div class="sr-label">하루 공부 목표</div>
+          <div class="sr-sub">0 이면 목표 표시를 끕니다</div>
+        </div>
+        <input type="number" class="goal-hours-input" id="goalHoursInput" min="0" max="24" step="0.5" placeholder="0" inputmode="decimal" value="${goalH}">
+      </div>
+    </div>
+
+    <div class="set-section">
+      <div class="setting-row">
+        <div class="sr-text">
+          <div class="sr-label">집중 모드</div>
+          <div class="sr-sub">스톱워치 진행 중 다른 화면으로 나가면 이탈로 기록해요</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="focusModeToggle" ${study.focusMode?'checked':''}><span class="track"></span></label>
+      </div>
+    </div>
+
+    <div class="set-section">
+      <div class="modal-field-label">뽀모도로 (분)</div>
+      <div class="pomo-config">
+        <div class="input-group"><label>집중</label><input type="number" id="pomoFocus" min="1" max="180" inputmode="numeric" value="${study.pomo.focus}"></div>
+        <div class="input-group"><label>휴식</label><input type="number" id="pomoShort" min="1" max="60" inputmode="numeric" value="${study.pomo.short}"></div>
+        <div class="input-group"><label>긴휴식</label><input type="number" id="pomoLong" min="1" max="60" inputmode="numeric" value="${study.pomo.long}"></div>
+        <div class="input-group"><label>세트</label><input type="number" id="pomoSets" min="1" max="12" inputmode="numeric" value="${study.pomo.sets}"></div>
+      </div>
+    </div>`;
+
+  body.querySelectorAll('#themeSeg .seg-btn').forEach(b =>
+    b.addEventListener('click', () => {
+      study.theme = b.dataset.theme; applyTheme(); saveStudy();
+      body.querySelectorAll('#themeSeg .seg-btn').forEach(x => x.classList.toggle('active', x === b));
+    }));
+  body.querySelectorAll('#accentSwatches .color-swatch').forEach(b =>
+    b.addEventListener('click', () => {
+      study.accent = b.dataset.accent; applyTheme(); saveStudy();
+      body.querySelectorAll('#accentSwatches .color-swatch').forEach(x => x.classList.toggle('selected', x === b));
+    }));
+  $('goalHoursInput').addEventListener('change', e => {
+    const h = Math.max(0, Math.min(24, parseFloat(e.target.value) || 0));
+    study.dailyGoalSec = Math.round(h * 3600);
+    saveStudy(); updateStudyUI();
+  });
+  $('focusModeToggle').addEventListener('change', e => { study.focusMode = e.target.checked; saveStudy(); });
+  const bindPomo = (id, key, min, max) => $(id).addEventListener('change', e => {
+    study.pomo[key] = Math.max(min, Math.min(max, parseInt(e.target.value) || min));
+    e.target.value = study.pomo[key];
+    saveStudy(); if (!pomoPhase) renderPomo();
+  });
+  bindPomo('pomoFocus','focus',1,180); bindPomo('pomoShort','short',1,60);
+  bindPomo('pomoLong','long',1,60);    bindPomo('pomoSets','sets',1,12);
+}
+$('setBtn').addEventListener('click', () => { renderSettings(); setModal.classList.add('open'); });
+$('setClose').addEventListener('click', () => setModal.classList.remove('open'));
+setModal.addEventListener('click', e => { if (e.target === setModal) setModal.classList.remove('open'); });
+
+// ── Focus mode: distraction detection ──────────────────────────
+let focusLeftCount = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    if (study.focusMode && study.swRunning) {
+      accountStopwatch();   // commit time up to the moment of leaving
+      const key = studyDayKey(Date.now());
+      study.distractions[key] = (study.distractions[key] || 0) + 1;
+      focusLeftCount++;
+      saveStudy();
+    }
+  } else if (focusLeftCount > 0) {
+    const key = studyDayKey(Date.now());
+    showToast(`집중 모드 · 오늘 ${study.distractions[key] || focusLeftCount}회 이탈했어요`);
+    if ('vibrate' in navigator) navigator.vibrate(120);
+  }
+});
 
 // ── Account sync (Firebase, optional) ─────────────────────────
 // To enable: create a Firebase project, enable Authentication →
@@ -2189,6 +2786,22 @@ function mergeStudy(local, remote, remoteNewer) {
   out.records = {};
   const keys = new Set([...Object.keys(local.records || {}), ...Object.keys(remote.records || {})]);
   keys.forEach(k => out.records[k] = Math.max(local.records?.[k] || 0, remote.records?.[k] || 0));
+  // Per-day subject seconds: max per subject per day (never lose recorded time).
+  out.subjects = {};
+  const sdays = new Set([...Object.keys(local.subjects || {}), ...Object.keys(remote.subjects || {})]);
+  sdays.forEach(d => {
+    const ls = local.subjects?.[d] || {}, rs = remote.subjects?.[d] || {}, m = {};
+    new Set([...Object.keys(ls), ...Object.keys(rs)]).forEach(s => m[s] = Math.max(ls[s] || 0, rs[s] || 0));
+    out.subjects[d] = m;
+  });
+  // Per-day distraction counts: max.
+  out.distractions = {};
+  const xkeys = new Set([...Object.keys(local.distractions || {}), ...Object.keys(remote.distractions || {})]);
+  xkeys.forEach(k => out.distractions[k] = Math.max(local.distractions?.[k] || 0, remote.distractions?.[k] || 0));
+  // Subject list: union (preserve the newer device's ordering first).
+  const baseList = (remoteNewer ? remote.subjectList : local.subjectList) || [];
+  const otherList = (remoteNewer ? local.subjectList : remote.subjectList) || [];
+  out.subjectList = Array.from(new Set([...baseList, ...otherList]));
   return out;
 }
 // Union goals by id, preserving local order; drop tombstoned (deleted) ones.
@@ -2235,7 +2848,20 @@ function canonStudy(s) {
   if (!s) return 'null';
   const rec = {};
   Object.keys(s.records || {}).forEach(k => { const v = Math.floor(s.records[k] || 0); if (v > 0) rec[k] = v; });
-  return stableStr({ resetHour: s.resetHour || 0, records: rec });   // volatile run-state excluded
+  const subj = {};
+  Object.keys(s.subjects || {}).forEach(d => {
+    const m = {}, sd = s.subjects[d] || {};
+    Object.keys(sd).forEach(k => { const v = Math.floor(sd[k] || 0); if (v > 0) m[k] = v; });
+    if (Object.keys(m).length) subj[d] = m;
+  });
+  const dist = {};
+  Object.keys(s.distractions || {}).forEach(k => { const v = Math.floor(s.distractions[k] || 0); if (v > 0) dist[k] = v; });
+  return stableStr({                                   // volatile run-state excluded
+    resetHour: s.resetHour || 0, records: rec, subjects: subj, distractions: dist,
+    subjectList: s.subjectList || [], curSubject: s.curSubject || '',
+    dailyGoalSec: s.dailyGoalSec || 0, theme: s.theme || 'dark',
+    accent: s.accent || '#cef231', focusMode: !!s.focusMode, pomo: s.pomo || null,
+  });
 }
 function canonNotes(n) {
   return stableStr([...(n || [])].sort((a, b) => (a.id || 0) - (b.id || 0))
@@ -2263,12 +2889,15 @@ function applyGoalsStudyLive() {
   loadTomb();
   if (study.swRunning && study.swLastTick == null) study.swLastTick = Date.now();
   lastSeenStudyDay = studyDayKey(Date.now());
+  applyTheme();
   renderGoals();
   renderDayTicks();
   updateStudyUI();
+  if (mode === 'pomodoro') renderPomo();
   renderMemoWidget();
   if (dashModal.classList.contains('open')) renderDashboard();
   if (notesModal.classList.contains('open')) renderNotesList();
+  if (setModal.classList.contains('open')) renderSettings();
 }
 
 // Reconcile a cloud snapshot with local data. Loop-free: the merged version
@@ -2693,6 +3322,7 @@ loadGoals();
 loadStudy();
 loadNotes();
 loadTomb();
+applyTheme();
 lastSeenStudyDay = studyDayKey(Date.now());
 // On restore, do not count time the page was closed.
 if (study.swRunning) study.swLastTick = Date.now();
