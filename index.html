@@ -765,8 +765,9 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 .acct-secondary:active { background: var(--border); }
 
 /* ═══════════════════════ Notes / memo ════════════════════════ */
-.memo-widget { width: 100%; flex-shrink: 0; }
-.memo-widget.collapsed { display: flex; justify-content: flex-end; margin-bottom: -2px; }
+/* The fab stays in normal flow (fixed slot); the expanded card is an absolute
+   popover, so opening/closing the memo never shifts the UI below it. */
+.memo-widget { width: 100%; flex-shrink: 0; position: relative; display: flex; justify-content: flex-end; }
 .memo-fab {
   position: relative;
   width: 42px; height: 42px; border-radius: 10px;
@@ -782,12 +783,15 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   background: var(--danger); border: 2px solid var(--bg);
 }
 .memo-card {
-  width: 100%;
+  position: absolute;
+  top: calc(100% + 6px); left: 0; right: 0;
+  z-index: 40;
   background: var(--surface); border: 1px solid var(--bord2);
   border-radius: 12px; padding: 12px 14px;
   display: flex; flex-direction: column; gap: 8px;
-  transform-origin: top center;
-  animation: memoIn 0.22s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transform-origin: top right;
+  box-shadow: 0 14px 34px rgba(0,0,0,0.55);
+  animation: memoIn 0.2s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 .memo-card.memo-out { animation: memoOut 0.18s ease forwards; }
 @keyframes memoIn  { from { opacity: 0; transform: translateY(-10px) scaleY(0.9); }
@@ -1022,7 +1026,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 <div class="side-panel">
 
 <!-- Pinned / recent memo preview (expands on load, then auto-collapses) -->
-<div class="memo-widget collapsed" id="memoWidget"></div>
+<div class="memo-widget" id="memoWidget"></div>
 
 <!-- Study stopwatch -->
 <div class="study-row">
@@ -1210,6 +1214,7 @@ const STORE_KEY = 'timer_v4';
 const GOALS_KEY = 'timer_goals_v1';
 const STUDY_KEY = 'timer_study_v1';
 const NOTES_KEY = 'timer_notes_v1';
+const TOMB_KEY  = 'timer_tomb_v1';   // deletion tombstones: { id: deletedAt }
 
 const GOAL_COLORS = [
   '#f03c3c', '#ff8800', '#cef231',
@@ -1269,6 +1274,7 @@ let lastSeenStudyDay = null;
 // note: { id, title, type:'text'|'list', text, items:[{t,done}], pinned, updatedAt }
 let notes = [];
 let editingNoteId = null;
+let tomb = {};   // id -> deletedAt, so deletions propagate across devices
 
 // ── DOM ────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -1359,6 +1365,10 @@ function loadGoals() { try { goals = JSON.parse(localStorage.getItem(GOALS_KEY))
 function saveStudy() { try { localStorage.setItem(STUDY_KEY, JSON.stringify(study)); } catch(e) {} syncTouch(); }
 function saveNotes() { try { localStorage.setItem(NOTES_KEY, JSON.stringify(notes)); } catch(e) {} syncTouch(); }
 function loadNotes() { try { notes = JSON.parse(localStorage.getItem(NOTES_KEY)) || []; } catch(e) { notes = []; } if (!Array.isArray(notes)) notes = []; }
+function saveTomb()  { try { localStorage.setItem(TOMB_KEY, JSON.stringify(tomb)); } catch(e) {} syncTouch(); }
+function loadTomb()  { try { tomb = JSON.parse(localStorage.getItem(TOMB_KEY)) || {}; } catch(e) { tomb = {}; } if (!tomb || typeof tomb !== 'object') tomb = {}; }
+// Record a deletion so it propagates to other devices instead of resurrecting.
+function tombstone(id) { tomb[id] = Date.now(); saveTomb(); }
 function loadStudy() {
   try {
     const s = JSON.parse(localStorage.getItem(STUDY_KEY));
@@ -1478,7 +1488,9 @@ function renderGoals() {
     }).join('');
   goalsWrap.querySelectorAll('.goal-del').forEach(btn => {
     btn.addEventListener('click', () => {
-      goals = goals.filter(g => g.id !== parseInt(btn.dataset.del));
+      const delId = parseInt(btn.dataset.del);
+      goals = goals.filter(g => g.id !== delId);
+      tombstone(delId);
       saveGoals(); renderGoals(); renderGoalFlags();
     });
   });
@@ -2037,18 +2049,27 @@ function schedulePush() {
 
 function localBundle() {
   const j = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch(e) { return d; } };
-  return { timer: j(STORE_KEY, null), goals: j(GOALS_KEY, []), study: j(STUDY_KEY, null), notes: j(NOTES_KEY, []) };
+  return { timer: j(STORE_KEY, null), goals: j(GOALS_KEY, []), study: j(STUDY_KEY, null),
+           notes: j(NOTES_KEY, []), tomb: j(TOMB_KEY, {}) };
 }
-// Union notes by id; for the same id keep the more recently edited one.
-function mergeNotes(local, remote) {
-  local = local || []; remote = remote || [];
+// Merge deletion tombstones: keep the latest deletedAt per id.
+function mergeTomb(a, b) {
+  const o = Object.assign({}, a || {}); const r = b || {};
+  for (const k in r) { if (!(k in o) || r[k] > o[k]) o[k] = r[k]; }
+  return o;
+}
+// Union notes by id (newest edit wins); drop ones deleted after their last edit.
+function mergeNotes(local, remote, tmb) {
+  local = local || []; remote = remote || []; tmb = tmb || {};
   const map = new Map();
   remote.forEach(n => map.set(n.id, n));
   local.forEach(n => {
     const ex = map.get(n.id);
     if (!ex || (n.updatedAt || 0) >= (ex.updatedAt || 0)) map.set(n.id, n);
   });
-  return [...map.values()].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  return [...map.values()]
+    .filter(n => !(n.id in tmb) || (n.updatedAt || 0) > tmb[n.id])
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 }
 
 // Merge study: recorded time never lost (max per day), settings follow
@@ -2066,11 +2087,11 @@ function mergeStudy(local, remote, remoteNewer) {
   keys.forEach(k => out.records[k] = Math.max(local.records?.[k] || 0, remote.records?.[k] || 0));
   return out;
 }
-// Union goals by id, preserving local order.
-function mergeGoals(local, remote) {
-  local = local || []; remote = remote || [];
+// Union goals by id, preserving local order; drop tombstoned (deleted) ones.
+function mergeGoals(local, remote, tmb) {
+  local = local || []; remote = remote || []; tmb = tmb || {};
   const ids = new Set(local.map(g => g.id));
-  return local.concat(remote.filter(g => !ids.has(g.id)));
+  return local.concat(remote.filter(g => !ids.has(g.id))).filter(g => !(g.id in tmb));
 }
 
 function pushCloud() {
@@ -2078,7 +2099,7 @@ function pushCloud() {
   if (!cloudUid || !syncReady || !db) return;
   const b = localBundle();
   const payload = { timer: b.timer ?? null, goals: b.goals || [], study: b.study ?? null,
-                    notes: b.notes || [], updatedAt: syncMeta().updatedAt || Date.now() };
+                    notes: b.notes || [], tomb: b.tomb || {}, updatedAt: syncMeta().updatedAt || Date.now() };
   const json = JSON.stringify(payload);
   if (json === lastPushedJson) return;
   lastPushedJson = json;
@@ -2119,6 +2140,7 @@ function canonNotes(n) {
     .map(x => ({ id: x.id, title: x.title || '', type: x.type || 'text',
                  text: x.text || '', items: x.items || [], pinned: !!x.pinned })));
 }
+function canonTomb(t) { return stableStr(t || {}); }
 
 function setMeta(v) { try { localStorage.setItem(META_KEY, JSON.stringify({ updatedAt: v })); } catch(e) {} }
 function writeBundle(b) {
@@ -2128,6 +2150,7 @@ function writeBundle(b) {
     localStorage.setItem(GOALS_KEY, JSON.stringify(b.goals || []));
     if (b.study) localStorage.setItem(STUDY_KEY, JSON.stringify(b.study));
     localStorage.setItem(NOTES_KEY, JSON.stringify(b.notes || []));
+    localStorage.setItem(TOMB_KEY, JSON.stringify(b.tomb || {}));
   } catch(e) {}
 }
 // Refresh goals + study + notes in the live UI without a full page reload.
@@ -2135,6 +2158,7 @@ function applyGoalsStudyLive() {
   loadGoals();
   loadStudy();
   loadNotes();
+  loadTomb();
   if (study.swRunning && study.swLastTick == null) study.swLastTick = Date.now();
   lastSeenStudyDay = studyDayKey(Date.now());
   renderGoals();
@@ -2157,19 +2181,22 @@ function onCloud(doc) {
   const rm = remote?.updatedAt || 0;
   const remoteNewer = rm > lm;
 
+  const mergedTomb = mergeTomb(local.tomb, remote?.tomb);
   const merged = {
     timer: remoteNewer ? (remote?.timer ?? local.timer ?? null) : (local.timer ?? null),
-    goals: mergeGoals(local.goals, remote?.goals),
+    goals: mergeGoals(local.goals, remote?.goals, mergedTomb),
     study: mergeStudy(local.study, remote?.study, remoteNewer),
-    notes: mergeNotes(local.notes, remote?.notes),
+    notes: mergeNotes(local.notes, remote?.notes, mergedTomb),
+    tomb: mergedTomb,
   };
   const mergedVer = Math.max(lm, rm);
 
   // Canonical signatures for change detection.
-  const sig = b => canonTimer(b.timer) + '|' + canonGoals(b.goals) + '|' + canonStudy(b.study) + '|' + canonNotes(b.notes);
+  const sig = b => canonTimer(b.timer) + '|' + canonGoals(b.goals) + '|' + canonStudy(b.study)
+                 + '|' + canonNotes(b.notes) + '|' + canonTomb(b.tomb);
   const localSig  = sig(local);
   const mergedSig = sig(merged);
-  const remoteSig = remote ? sig({ timer: remote.timer, goals: remote.goals, study: remote.study, notes: remote.notes }) : '';
+  const remoteSig = remote ? sig({ timer: remote.timer, goals: remote.goals, study: remote.study, notes: remote.notes, tomb: remote.tomb }) : '';
 
   const localChanged = mergedSig !== localSig;     // our stored data needs updating
   const cloudStale   = mergedSig !== remoteSig;    // cloud is missing some of our data
@@ -2317,35 +2344,37 @@ function notePreviewText(n) {
   return (n.text || '').replace(/\s+/g, ' ').trim().slice(0, 60) || '내용 없음';
 }
 
-// Main-screen memo widget: collapsed icon (with red dot) ↔ expanded card.
+// Main-screen memo widget. The fab is always in flow (fixed slot); the card is
+// an absolute overlay so opening/closing never moves the UI below it.
 function renderMemoWidget() {
   const n = pinnedOrRecentNote();
-  if (!n) { memoWidget.style.display = 'none'; memoWidget.innerHTML = ''; return; }
+  if (!n) { memoWidget.style.display = 'none'; memoWidget.innerHTML = ''; memoWidget.classList.remove('open'); return; }
   memoWidget.style.display = '';
-  if (memoWidget.classList.contains('collapsed')) {
-    memoWidget.innerHTML =
-      `<button class="memo-fab" id="memoFab" title="메모"><span class="memo-fab-ic">📝</span><span class="memo-dot"></span></button>`;
-    $('memoFab').addEventListener('click', expandMemo);
-    return;
-  }
-  const body = n.type === 'list'
-    ? `<div class="memo-checks">${(n.items || []).map((it, i) =>
-        `<label class="memo-check ${it.done ? 'done' : ''}"><input type="checkbox" data-i="${i}" ${it.done ? 'checked' : ''}><span>${escHtml(it.t || '')}</span></label>`
-      ).join('') || '<div class="memo-empty">항목 없음</div>'}</div>`
-    : `<div class="memo-text">${n.text ? escHtml(n.text) : '<span class="memo-empty">내용 없음</span>'}</div>`;
-  memoWidget.innerHTML =
-    `<div class="memo-card">
-       <div class="memo-card-head">
-         ${n.pinned ? '<span class="memo-pin-ic">📌</span>' : ''}
-         <span class="memo-card-title">${escHtml(n.title || '메모')}</span>
-         <div class="memo-card-actions">
-           <button class="memo-mini-btn" id="memoEdit" title="편집">✎</button>
-           <button class="memo-mini-btn" id="memoOpen" title="메모장">📋</button>
-           <button class="memo-mini-btn" id="memoCollapse" title="접기">✕</button>
+  const open = memoWidget.classList.contains('open');
+  let html = `<button class="memo-fab" id="memoFab" title="메모"><span class="memo-fab-ic">📝</span><span class="memo-dot"></span></button>`;
+  if (open) {
+    const body = n.type === 'list'
+      ? `<div class="memo-checks">${(n.items || []).map((it, i) =>
+          `<label class="memo-check ${it.done ? 'done' : ''}"><input type="checkbox" data-i="${i}" ${it.done ? 'checked' : ''}><span>${escHtml(it.t || '')}</span></label>`
+        ).join('') || '<div class="memo-empty">항목 없음</div>'}</div>`
+      : `<div class="memo-text">${n.text ? escHtml(n.text) : '<span class="memo-empty">내용 없음</span>'}</div>`;
+    html +=
+      `<div class="memo-card">
+         <div class="memo-card-head">
+           ${n.pinned ? '<span class="memo-pin-ic">📌</span>' : ''}
+           <span class="memo-card-title">${escHtml(n.title || '메모')}</span>
+           <div class="memo-card-actions">
+             <button class="memo-mini-btn" id="memoEdit" title="편집">✎</button>
+             <button class="memo-mini-btn" id="memoOpen" title="메모장">📋</button>
+             <button class="memo-mini-btn" id="memoCollapse" title="접기">✕</button>
+           </div>
          </div>
-       </div>
-       ${body}
-     </div>`;
+         ${body}
+       </div>`;
+  }
+  memoWidget.innerHTML = html;
+  $('memoFab').addEventListener('click', () => memoWidget.classList.contains('open') ? collapseMemo() : expandMemo());
+  if (!open) return;
   memoWidget.querySelectorAll('.memo-check input').forEach(cb => {
     cb.addEventListener('change', () => {
       cancelMemoAutoCollapse();
@@ -2360,20 +2389,22 @@ function renderMemoWidget() {
   $('memoCollapse').addEventListener('click', collapseMemo);
   memoWidget.querySelector('.memo-card').addEventListener('pointerdown', cancelMemoAutoCollapse, { once: true });
 }
-function expandMemo() { memoWidget.classList.remove('collapsed'); renderMemoWidget(); scheduleMemoAutoCollapse(); }
+// User-initiated expand: stays open until the user closes it (no auto-collapse).
+function expandMemo() { cancelMemoAutoCollapse(); memoWidget.classList.add('open'); renderMemoWidget(); }
 function collapseMemo() {
   cancelMemoAutoCollapse();
   const card = memoWidget.querySelector('.memo-card');
-  if (card && !memoWidget.classList.contains('collapsed')) {
+  if (card && memoWidget.classList.contains('open')) {
     card.classList.add('memo-out');
-    const done = () => { memoWidget.classList.add('collapsed'); renderMemoWidget(); };
+    const done = () => { memoWidget.classList.remove('open'); renderMemoWidget(); };
     card.addEventListener('animationend', done, { once: true });
-    setTimeout(() => { if (!memoWidget.classList.contains('collapsed')) done(); }, 240);
+    setTimeout(() => { if (memoWidget.classList.contains('open')) done(); }, 240);
   } else {
-    memoWidget.classList.add('collapsed');
+    memoWidget.classList.remove('open');
     renderMemoWidget();
   }
 }
+// Only the initial on-entry expansion auto-collapses.
 function scheduleMemoAutoCollapse() { cancelMemoAutoCollapse(); memoCollapseTimer = setTimeout(collapseMemo, 2000); }
 function cancelMemoAutoCollapse() { clearTimeout(memoCollapseTimer); memoCollapseTimer = null; }
 
@@ -2400,7 +2431,9 @@ function renderNotesList() {
   });
   list.querySelectorAll('.note-row-del').forEach(b => {
     b.addEventListener('click', () => {
-      notes = notes.filter(n => n.id !== parseInt(b.dataset.del));
+      const delId = parseInt(b.dataset.del);
+      notes = notes.filter(n => n.id !== delId);
+      tombstone(delId);
       saveNotes(); renderNotesList(); renderMemoWidget();
     });
   });
@@ -2456,9 +2489,15 @@ function saveNoteFromEditor() {
   n.type  = editDraftType;
   if (editDraftType === 'text') { n.text = $('noteTextInput') ? $('noteTextInput').value : ''; n.items = []; }
   else { n.items = editDraftItems.filter(i => i.t.trim() !== '' || i.done).map(i => ({ t: i.t, done: i.done })); n.text = ''; }
-  if ($('notePinInput').checked) notes.forEach(x => x.pinned = (x.id === n.id));
-  else n.pinned = false;
-  n.updatedAt = Date.now();
+  const now = Date.now();
+  if ($('notePinInput').checked) {
+    // Unpin any other pinned note and bump its updatedAt so the unpin syncs.
+    notes.forEach(x => { if (x.id !== n.id && x.pinned) { x.pinned = false; x.updatedAt = now; } });
+    n.pinned = true;
+  } else {
+    n.pinned = false;
+  }
+  n.updatedAt = now;
   saveNotes();
   noteEditModal.classList.remove('open');
   renderNotesList();
@@ -2467,6 +2506,7 @@ function saveNoteFromEditor() {
 function deleteEditingNote() {
   if (editingNoteId != null) {
     notes = notes.filter(n => n.id !== editingNoteId);
+    tombstone(editingNoteId);
     saveNotes();
   }
   noteEditModal.classList.remove('open');
@@ -2488,6 +2528,7 @@ $('noteDelete').addEventListener('click', deleteEditingNote);
 loadGoals();
 loadStudy();
 loadNotes();
+loadTomb();
 lastSeenStudyDay = studyDayKey(Date.now());
 // On restore, do not count time the page was closed.
 if (study.swRunning) study.swLastTick = Date.now();
@@ -2524,7 +2565,7 @@ if (study.swRunning) study.swLastTick = Date.now();
 // Memo widget: show expanded on entry (if a memo exists), then auto-collapse.
 renderMemoWidget();
 if (pinnedOrRecentNote()) {
-  memoWidget.classList.remove('collapsed');
+  memoWidget.classList.add('open');
   renderMemoWidget();
   scheduleMemoAutoCollapse();
 }
