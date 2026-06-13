@@ -49,6 +49,11 @@ body {
     max(env(safe-area-inset-left), 20px);
 }
 
+/* Monochrome icons: inherit the element's color, transparent background. */
+svg.ico { width: 1.3em; height: 1.3em; display: block; flex-shrink: 0; }
+svg.ico-sm { width: 1em; height: 1em; display: inline-block; vertical-align: -0.14em; }
+.btn, #calBtn, .note-row-del, .memo-mini-btn { display: inline-flex; align-items: center; justify-content: center; }
+
 /* Centered content column — caps width on large screens so the layout
    never stretches awkwardly wide on tablets / laptops. */
 .app {
@@ -572,6 +577,24 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 .cal-day:not(:empty):hover { background: var(--surf2); }
 .cal-legend { font-size: 10px; color: var(--dim); text-align: center; margin-top: -6px; }
 
+/* Start/End step chips + live duration hint */
+.cal-steps { display: flex; align-items: stretch; gap: 8px; }
+.cal-step {
+  flex: 1; display: flex; align-items: center; gap: 9px;
+  padding: 10px 12px; border-radius: 11px;
+  background: var(--surf2); border: 1px solid var(--border);
+  cursor: pointer; -webkit-appearance: none; text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+}
+.cal-step.active { border-color: var(--accent); background: rgba(206,242,49,0.06); }
+.cal-step .dot-s, .cal-step .dot-e { width: 9px; height: 9px; }
+.cal-step-text { display: flex; flex-direction: column; min-width: 0; }
+.cal-step-l { font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); }
+.cal-step-v { font-size: 13px; color: var(--text); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-step-arrow { align-self: center; color: var(--dim); font-size: 14px; flex-shrink: 0; }
+.cal-hint { font-size: 12px; color: var(--sub); text-align: center; min-height: 16px; }
+.cal-hint.warn { color: var(--danger); }
+
 .time-section { display: flex; flex-direction: column; gap: 8px; }
 .time-section-label {
   font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--dim);
@@ -992,7 +1015,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 <div class="header">
   <span class="header-title">타이머</span>
   <div class="status-row">
-    <button class="acct-btn" id="acctBtn" title="계정 / 동기화">☁</button>
+    <button class="acct-btn" id="acctBtn" title="계정 / 동기화"></button>
     <span class="status-text" id="statusText"></span>
     <div class="dot" id="statusDot"></div>
   </div>
@@ -1000,8 +1023,8 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 
 <!-- Display area -->
 <div class="display-area">
-  <button class="corner-btn left" id="goalBtn" title="목표 추가">🚩</button>
-  <button class="corner-btn right" id="emgBtn" title="비상 모드">⚠️</button>
+  <button class="corner-btn left" id="goalBtn" title="목표 추가"></button>
+  <button class="corner-btn right" id="emgBtn" title="비상 모드"></button>
 
   <div class="time-display" id="timeDisplay">00:00:00</div>
   <div class="time-sublabel">시간 : 분 : 초</div>
@@ -1035,8 +1058,8 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
     <div class="sw-label">오늘 공부</div>
     <div class="sw-time" id="swTime">00:00:00</div>
   </div>
-  <button class="dash-btn" id="notesBtn" title="메모장">📝</button>
-  <button class="dash-btn" id="dashBtn" title="공부 대시보드">📊</button>
+  <button class="dash-btn" id="notesBtn" title="메모장"></button>
+  <button class="dash-btn" id="dashBtn" title="공부 대시보드"></button>
 </div>
 
 <!-- Goals list -->
@@ -1051,7 +1074,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
     <button class="preset-btn" data-h="168">1주</button>
     <button class="preset-btn" data-h="336">2주</button>
     <button class="preset-btn" data-h="720">1달</button>
-    <button class="preset-btn" id="calBtn" style="border-color:var(--accent);color:var(--accent);font-size:14px;">📅</button>
+    <button class="preset-btn" id="calBtn" title="날짜로 설정" style="border-color:var(--accent);color:var(--accent);font-size:14px;"></button>
   </div>
   <div class="input-row">
     <div class="input-group">
@@ -1070,7 +1093,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
     </div>
   </div>
   <div class="btn-row">
-    <button class="btn" id="fsBtn">⛶</button>
+    <button class="btn" id="fsBtn" title="전체화면"></button>
     <button class="btn" id="resetBtn">초기화</button>
     <button class="btn primary" id="startBtn">시작</button>
     <button class="btn" id="pauseBtn" disabled>일시정지</button>
@@ -1089,13 +1112,24 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
       <span class="modal-title">시작 / 종료 설정</span>
       <button class="modal-close" id="calClose">✕</button>
     </div>
+    <div class="cal-steps">
+      <button class="cal-step" id="calStepStart">
+        <span class="dot-s"></span>
+        <span class="cal-step-text"><span class="cal-step-l">시작</span><span class="cal-step-v" id="calStartVal">—</span></span>
+      </button>
+      <span class="cal-step-arrow">→</span>
+      <button class="cal-step" id="calStepEnd">
+        <span class="dot-e"></span>
+        <span class="cal-step-text"><span class="cal-step-l">종료</span><span class="cal-step-v" id="calEndVal">—</span></span>
+      </button>
+    </div>
     <div class="cal-nav">
       <button class="cal-arrow" id="calPrev">‹</button>
       <span class="cal-month-label" id="calMonthLabel"></span>
       <button class="cal-arrow" id="calNext">›</button>
     </div>
-    <div class="cal-legend">🔵 시작일 &nbsp;|&nbsp; 🟡 종료일</div>
     <div class="cal-grid" id="calGrid"></div>
+    <div class="cal-hint" id="calHint"></div>
     <div class="time-section">
       <div class="time-section-label"><span class="dot-s"></span>시작 시각</div>
       <div class="time-row">
@@ -1278,6 +1312,29 @@ let tomb = {};   // id -> deletedAt, so deletions propagate across devices
 
 // ── DOM ────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
+
+// ── Monochrome line/area icons (currentColor, transparent bg) ──
+const ICONS = {
+  play:   '<svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M7 5.5v13a1 1 0 0 0 1.5.87l11-6.5a1 1 0 0 0 0-1.74l-11-6.5A1 1 0 0 0 7 5.5z"/></svg>',
+  pause:  '<svg class="ico" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg>',
+  flag:   '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 21V4"/><path d="M6 4.5h11l-2.2 4 2.2 4H6"/></svg>',
+  warn:   '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l8.5 15h-17z"/><line x1="12" y1="10" x2="12" y2="14"/><circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"/></svg>',
+  chart:  '<svg class="ico" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="11" width="4" height="9" rx="1"/><rect x="10" y="6" width="4" height="14" rx="1"/><rect x="16" y="14" width="4" height="6" rx="1"/></svg>',
+  note:   '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h8l5 5V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1z"/><path d="M14 3.5V9h5"/><line x1="8.5" y1="13" x2="15.5" y2="13"/><line x1="8.5" y1="16.5" x2="13" y2="16.5"/></svg>',
+  pencil: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9a2 2 0 0 0-3-3L5 16z"/><line x1="14.5" y1="6.5" x2="17.5" y2="9.5"/></svg>',
+  list:   '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><line x1="8.5" y1="9" x2="15.5" y2="9"/><line x1="8.5" y1="13" x2="15.5" y2="13"/><line x1="8.5" y1="17" x2="12.5" y2="17"/></svg>',
+  calendar:'<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="16" rx="2.5"/><line x1="4" y1="9.5" x2="20" y2="9.5"/><line x1="9" y1="3" x2="9" y2="6"/><line x1="15" y1="3" x2="15" y2="6"/></svg>',
+  cloud:  '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 18.5a4 4 0 0 1-.3-8 5 5 0 0 1 9.6-1.2 3.6 3.6 0 0 1 .2 7.2z"/></svg>',
+  expand: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V5a1 1 0 0 1 1-1h4"/><path d="M20 9V5a1 1 0 0 0-1-1h-4"/><path d="M4 15v4a1 1 0 0 0 1 1h4"/><path d="M20 15v4a1 1 0 0 1-1 1h-4"/></svg>',
+  close:  '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>',
+  trash:  '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14"/><path d="M9.5 7V5h5v2"/><path d="M7 7l.8 12.2a1 1 0 0 0 1 .8h6.4a1 1 0 0 0 1-.8L18 7"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>',
+  pin:    '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6l-1 6 3 2.5V14H8v-1.5L11 10z"/><line x1="12" y1="14" x2="12" y2="20"/></svg>',
+  check:  '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 12.5l2.5 2.5 5-5"/></svg>',
+};
+const icoSm = n => ICONS[n].replace('class="ico"', 'class="ico ico-sm"');
+// Swap the static button glyphs for the monochrome icons.
+['acctBtn:cloud','goalBtn:flag','emgBtn:warn','notesBtn:note','dashBtn:chart','calBtn:calendar','fsBtn:expand']
+  .forEach(p => { const [id, name] = p.split(':'); const el = $(id); if (el) el.innerHTML = ICONS[name]; });
 const timeDisplay   = $('timeDisplay');
 const elapsedLabel  = $('elapsedLabel');
 const endLabel      = $('endLabel');
@@ -1548,7 +1605,7 @@ function updateStudyUI() {
   const sec = todayStudySec();
   swTimeEl.textContent = fmt(sec);
   swTimeEl.classList.toggle('running', study.swRunning);
-  swToggle.textContent = study.swRunning ? '⏸' : '▶';
+  swToggle.innerHTML = study.swRunning ? ICONS.pause : ICONS.play;
   swToggle.classList.toggle('running', study.swRunning);
   updateProjection();
 }
@@ -1748,7 +1805,7 @@ fsBtn.addEventListener('click', () => {
 });
 ['fullscreenchange','webkitfullscreenchange'].forEach(ev => {
   document.addEventListener(ev, () => {
-    fsBtn.textContent = (document.fullscreenElement || document.webkitFullscreenElement) ? '✕' : '⛶';
+    fsBtn.innerHTML = (document.fullscreenElement || document.webkitFullscreenElement) ? ICONS.close : ICONS.expand;
   });
 });
 
@@ -1779,8 +1836,35 @@ function between(d,a,b) {
   const t = d.getTime(), ta = a.getTime(), tb = b.getTime();
   return t > Math.min(ta,tb) && t < Math.max(ta,tb);
 }
+function fmtCalDate(d) { return d ? `${d.getMonth()+1}월 ${d.getDate()}일 (${DAYS[d.getDay()]})` : '—'; }
+function calDateTime(d, hId, mId, sId) {
+  const x = new Date(d);
+  x.setHours(parseInt($(hId).value)||0, parseInt($(mId).value)||0, parseInt($(sId).value)||0, 0);
+  return x;
+}
+function updateCalHint() {
+  $('calStartVal').textContent = fmtCalDate(selStart);
+  $('calEndVal').textContent   = fmtCalDate(selEnd);
+  $('calStepStart').classList.toggle('active', picking === 'start');
+  $('calStepEnd').classList.toggle('active', picking === 'end');
+  const hint = $('calHint');
+  if (selStart && selEnd) {
+    const s = calDateTime(selStart, 'sH', 'sM', 'sS');
+    const e = calDateTime(selEnd, 'eH', 'eM', 'eS');
+    const secs = Math.floor((e - s) / 1000);
+    if (secs > 0) {
+      const dys = Math.floor(secs/86400), hrs = Math.floor((secs%86400)/3600), mins = Math.floor((secs%3600)/60);
+      hint.textContent = '기간 ' + [dys?dys+'일':'', hrs?hrs+'시간':'', (!dys&&mins)?mins+'분':''].filter(Boolean).join(' ');
+      hint.classList.remove('warn');
+    } else { hint.textContent = '종료가 시작보다 빨라요'; hint.classList.add('warn'); }
+  } else {
+    hint.classList.remove('warn');
+    hint.textContent = picking === 'start' ? '달력에서 시작일을 선택하세요' : '달력에서 종료일을 선택하세요';
+  }
+}
 function renderCal() {
   calMonthLbl.textContent = `${calYear}년 ${MONTHS[calMonth]}`;
+  updateCalHint();
   calGridEl.innerHTML = '';
   DAYS.forEach(d => { const el = document.createElement('div'); el.className='cal-dow'; el.textContent=d; calGridEl.appendChild(el); });
   const first = new Date(calYear, calMonth, 1).getDay();
@@ -1811,6 +1895,9 @@ function renderCal() {
 }
 $('calPrev').addEventListener('click', () => { calMonth--; if(calMonth<0){calMonth=11;calYear--;} renderCal(); });
 $('calNext').addEventListener('click', () => { calMonth++; if(calMonth>11){calMonth=0;calYear++;} renderCal(); });
+$('calStepStart').addEventListener('click', () => { picking = 'start'; updateCalHint(); });
+$('calStepEnd').addEventListener('click', () => { picking = 'end'; updateCalHint(); });
+['sH','sM','sS','eH','eM','eS'].forEach(id => $(id).addEventListener('input', updateCalHint));
 $('calClose').addEventListener('click', () => calModal.classList.remove('open'));
 calModal.addEventListener('click', e => { if(e.target===calModal) calModal.classList.remove('open'); });
 $('calConfirm').addEventListener('click', () => {
@@ -1876,7 +1963,7 @@ function renderDashboard() {
 
   if (st.days === 0 && today < 1) {
     body.innerHTML = `
-      <div class="dash-empty">아직 기록이 없어요.<br>공부 스톱워치를 시작해 보세요 ▶</div>
+      <div class="dash-empty">아직 기록이 없어요.<br>공부 스톱워치를 시작해 보세요 ${icoSm('play')}</div>
       ${resetHourBlock(hourOpts)}`;
     bindResetHour();
     return;
@@ -2020,6 +2107,7 @@ const MAX_PUSH_WAIT = 30000;   // force a flush at least this often during
                                // continuous activity (e.g. a running stopwatch)
 let fbAuth = null, db = null, cloudUid = null, cloudUnsub = null;
 let syncReady = false, pushTimer = null, lastPushedJson = null, firstDirtyAt = 0;
+let pushSilent = false; // true when the pending push is sync-driven (no toast)
 let syncStatus = '';   // human-readable status shown in the account sheet
 let syncError  = '';   // last error code, if any
 let lastUploadToast = 0;
@@ -2036,6 +2124,7 @@ const fbReady = !!(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.projectId
 function syncMeta() { try { return JSON.parse(localStorage.getItem(META_KEY)) || {}; } catch(e) { return {}; } }
 function syncTouch() {
   try { localStorage.setItem(META_KEY, JSON.stringify({ updatedAt: Date.now() })); } catch(e) {}
+  pushSilent = false;   // a genuine local change → confirm with a toast on upload
   if (cloudUid && syncReady) schedulePush();
 }
 function schedulePush() {
@@ -2096,6 +2185,7 @@ function mergeGoals(local, remote, tmb) {
 
 function pushCloud() {
   clearTimeout(pushTimer); pushTimer = null; firstDirtyAt = 0;
+  const silent = pushSilent; pushSilent = false;
   if (!cloudUid || !syncReady || !db) return;
   const b = localBundle();
   const payload = { timer: b.timer ?? null, goals: b.goals || [], study: b.study ?? null,
@@ -2106,9 +2196,9 @@ function pushCloud() {
   db.collection('users').doc(cloudUid).set(payload)
     .then(() => {
       setSyncStatus('동기화됨', '');
-      // Skip the toast for the periodic flushes while the stopwatch runs.
-      if (!study.swRunning && Date.now() - lastUploadToast > 4000) {
-        lastUploadToast = Date.now(); showToast('☁ 동기화 완료');
+      // Toast only for genuine local changes — not sync relays or stopwatch flushes.
+      if (!silent && !study.swRunning && Date.now() - lastUploadToast > 4000) {
+        lastUploadToast = Date.now(); showToast('동기화 완료');
       }
     })
     .catch(e => {
@@ -2209,7 +2299,8 @@ function onCloud(doc) {
     const timerChanged = canonTimer(local.timer) !== canonTimer(merged.timer);
     if (timerChanged) {
       // Active countdown changed — a reload is the safe way to restart it.
-      if (cloudStale) { lastPushedJson = null; schedulePush(); }
+      if (cloudStale) { lastPushedJson = null; pushSilent = true; schedulePush(); }
+      try { sessionStorage.setItem('syncReload', '1'); } catch(e) {}
       location.reload();
       return;
     }
@@ -2218,7 +2309,7 @@ function onCloud(doc) {
     setMeta(mergedVer);         // adopt the higher version so we stop re-diffing
   }
 
-  if (cloudStale) { lastPushedJson = null; schedulePush(); }
+  if (cloudStale) { lastPushedJson = null; pushSilent = true; schedulePush(); }
   renderAcct();
 }
 
@@ -2351,7 +2442,7 @@ function renderMemoWidget() {
   if (!n) { memoWidget.style.display = 'none'; memoWidget.innerHTML = ''; memoWidget.classList.remove('open'); return; }
   memoWidget.style.display = '';
   const open = memoWidget.classList.contains('open');
-  let html = `<button class="memo-fab" id="memoFab" title="메모"><span class="memo-fab-ic">📝</span><span class="memo-dot"></span></button>`;
+  let html = `<button class="memo-fab" id="memoFab" title="메모">${ICONS.note}<span class="memo-dot"></span></button>`;
   if (open) {
     const body = n.type === 'list'
       ? `<div class="memo-checks">${(n.items || []).map((it, i) =>
@@ -2361,12 +2452,12 @@ function renderMemoWidget() {
     html +=
       `<div class="memo-card">
          <div class="memo-card-head">
-           ${n.pinned ? '<span class="memo-pin-ic">📌</span>' : ''}
+           ${n.pinned ? '<span class="memo-pin-ic">'+icoSm('pin')+'</span>' : ''}
            <span class="memo-card-title">${escHtml(n.title || '메모')}</span>
            <div class="memo-card-actions">
-             <button class="memo-mini-btn" id="memoEdit" title="편집">✎</button>
-             <button class="memo-mini-btn" id="memoOpen" title="메모장">📋</button>
-             <button class="memo-mini-btn" id="memoCollapse" title="접기">✕</button>
+             <button class="memo-mini-btn" id="memoEdit" title="편집">${ICONS.pencil}</button>
+             <button class="memo-mini-btn" id="memoOpen" title="메모장">${ICONS.list}</button>
+             <button class="memo-mini-btn" id="memoCollapse" title="접기">${ICONS.close}</button>
            </div>
          </div>
          ${body}
@@ -2421,10 +2512,10 @@ function renderNotesList() {
   list.innerHTML = sorted.map(n =>
     `<div class="note-row" data-id="${n.id}">
        <div class="note-row-body">
-         <div class="note-row-title">${n.pinned ? '📌 ' : ''}${n.type === 'list' ? '☑ ' : ''}${escHtml(n.title || '메모')}</div>
+         <div class="note-row-title">${n.pinned ? icoSm('pin')+' ' : ''}${n.type === 'list' ? icoSm('check')+' ' : ''}${escHtml(n.title || '메모')}</div>
          <div class="note-row-sub">${escHtml(notePreviewText(n))}</div>
        </div>
-       <button class="note-row-del" data-del="${n.id}">🗑</button>
+       <button class="note-row-del" data-del="${n.id}">${ICONS.trash}</button>
      </div>`).join('');
   list.querySelectorAll('.note-row').forEach(r => {
     r.addEventListener('click', e => { if (!e.target.closest('.note-row-del')) openNoteEditor(parseInt(r.dataset.id)); });
@@ -2559,7 +2650,10 @@ if (study.swRunning) study.swLastTick = Date.now();
   }
 
   render(); renderGoals(); renderDayTicks(); updateStudyUI();
-  if (restoreMsg) setTimeout(() => showToast(restoreMsg), 300);
+  // Don't show the restore notice when the reload was triggered by a sync update.
+  let syncReload = false;
+  try { syncReload = sessionStorage.getItem('syncReload') === '1'; sessionStorage.removeItem('syncReload'); } catch(e) {}
+  if (restoreMsg && !syncReload) setTimeout(() => showToast(restoreMsg), 300);
 })();
 
 // Memo widget: show expanded on entry (if a memo exists), then auto-collapse.
