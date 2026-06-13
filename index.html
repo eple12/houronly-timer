@@ -2003,8 +2003,8 @@ const FIREBASE_CONFIG = {
   measurementId: "G-GDN5TL9DCR"
 };
 const META_KEY     = 'timer_sync_meta_v1';
-const PUSH_DELAY    = 2000;    // settle time after the last change
-const MAX_PUSH_WAIT = 15000;   // force a flush at least this often during
+const PUSH_DELAY    = 4000;    // settle time after the last change
+const MAX_PUSH_WAIT = 30000;   // force a flush at least this often during
                                // continuous activity (e.g. a running stopwatch)
 let fbAuth = null, db = null, cloudUid = null, cloudUnsub = null;
 let syncReady = false, pushTimer = null, lastPushedJson = null, firstDirtyAt = 0;
