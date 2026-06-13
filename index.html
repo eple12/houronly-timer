@@ -1287,12 +1287,13 @@ const SVG_H    = POLE_BOT;
 
 function makeFlagSVG(color) {
   const tip = Math.round(BANNER_H / 2);
-  /* Pole left edge at x=0 (the marker). Banner mounts from the pole rightward
-     with a pointed right tip — instantly reads as a flag. */
+  /* Pole left edge at x=0 (the marker). Draw the pole full-height first so the
+     banner mounts flush onto it (no seam), then the banner on top. The right
+     edge notches INWARD — a concave swallowtail like the flag toolbar icon. */
   return `<svg width="26" height="${SVG_H}" viewBox="0 0 26 ${SVG_H}"
     xmlns="http://www.w3.org/2000/svg" fill="${color}">
-    <path d="M0,0 H18 L23,${tip} L18,${BANNER_H} H0 Z"/>
-    <rect x="0" y="${POLE_TOP}" width="2.4" height="${POLE_BOT - POLE_TOP}" rx="1.2"/>
+    <rect x="0" y="0" width="2.4" height="${POLE_BOT}" rx="1.2"/>
+    <path d="M0,0 H18 L13,${tip} L18,${BANNER_H} H0 Z"/>
   </svg>`;
 }
 
