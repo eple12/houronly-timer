@@ -114,7 +114,7 @@ body {
 .corner-btn {
   position: absolute;
   top: 0;
-  width: 34px; height: 34px;
+  width: 32px; height: 32px;
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--surface);
@@ -132,8 +132,8 @@ body {
 .time-display {
   font-family: 'Space Mono', monospace;
   /* min(vw,vh) keeps the clock within BOTH dimensions, so it never gets
-     clipped in landscape where height is the tight constraint. */
-  font-size: clamp(46px, min(15vw, 19vh), 104px);
+     clipped in landscape; sized to clear the corner buttons horizontally. */
+  font-size: clamp(42px, min(13.5vw, 18vh), 100px);
   font-weight: 700;
   letter-spacing: -3px;
   line-height: 1;
@@ -363,14 +363,14 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
+  padding: 7px 12px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
 }
 .goal-stripe {
-  width: 2px; height: 26px;
+  width: 2px; height: 22px;
   border-radius: 1px;
   flex-shrink: 0;
   background: var(--goal-c, var(--dim));
@@ -786,7 +786,16 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   background: var(--surface); border: 1px solid var(--bord2);
   border-radius: 12px; padding: 12px 14px;
   display: flex; flex-direction: column; gap: 8px;
+  transform-origin: top center;
+  animation: memoIn 0.22s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
+.memo-card.memo-out { animation: memoOut 0.18s ease forwards; }
+@keyframes memoIn  { from { opacity: 0; transform: translateY(-10px) scaleY(0.9); }
+                     to   { opacity: 1; transform: none; } }
+@keyframes memoOut { from { opacity: 1; transform: none; }
+                     to   { opacity: 0; transform: translateY(-10px) scaleY(0.9); } }
+.memo-fab { animation: memoFabIn 0.18s ease; }
+@keyframes memoFabIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: none; } }
 .memo-card-head { display: flex; align-items: center; gap: 8px; }
 .memo-card-title {
   flex: 1; font-size: 14px; font-weight: 600; color: var(--text);
@@ -845,6 +854,15 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 .note-add-item { align-self: flex-start; background: none; border: 1px dashed var(--bord2);
   color: var(--sub); border-radius: 8px; padding: 8px 12px; font-size: 13px; cursor: pointer; -webkit-appearance: none; }
 .note-add-item:active { background: var(--surf2); }
+
+/* Note editor opens from the TOP so the on-screen keyboard can't cover the
+   inputs (bottom-sheet editors get hidden behind the keyboard on phones). */
+#noteEditModal { align-items: flex-start; }
+#noteEditModal .modal {
+  border-radius: 0 0 20px 20px;
+  padding-top: max(env(safe-area-inset-top), 16px);
+  max-height: 100dvh;
+}
 
 /* ═══════════════════════ Responsive layouts ══════════════════════ */
 
@@ -1976,10 +1994,13 @@ dashModal.addEventListener('click', e => { if(e.target===dashModal) dashModal.cl
 // app config below. Firestore rule (per-user access):
 //   match /users/{uid} { allow read, write: if request.auth.uid == uid; }
 const FIREBASE_CONFIG = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  appId: "",
+  apiKey: "AIzaSyBXiXFrwbR5QAv741MibNUFGD-fVu1NlHQ",
+  authDomain: "houronly-timer.firebaseapp.com",
+  projectId: "houronly-timer",
+  storageBucket: "houronly-timer.firebasestorage.app",
+  messagingSenderId: "680066324066",
+  appId: "1:680066324066:web:a28d618323cde9c7f9233b",
+  measurementId: "G-GDN5TL9DCR"
 };
 const META_KEY    = 'timer_sync_meta_v1';
 const PUSH_DELAY  = 8000;
@@ -2327,7 +2348,19 @@ function renderMemoWidget() {
   memoWidget.querySelector('.memo-card').addEventListener('pointerdown', cancelMemoAutoCollapse, { once: true });
 }
 function expandMemo() { memoWidget.classList.remove('collapsed'); renderMemoWidget(); scheduleMemoAutoCollapse(); }
-function collapseMemo() { cancelMemoAutoCollapse(); memoWidget.classList.add('collapsed'); renderMemoWidget(); }
+function collapseMemo() {
+  cancelMemoAutoCollapse();
+  const card = memoWidget.querySelector('.memo-card');
+  if (card && !memoWidget.classList.contains('collapsed')) {
+    card.classList.add('memo-out');
+    const done = () => { memoWidget.classList.add('collapsed'); renderMemoWidget(); };
+    card.addEventListener('animationend', done, { once: true });
+    setTimeout(() => { if (!memoWidget.classList.contains('collapsed')) done(); }, 240);
+  } else {
+    memoWidget.classList.add('collapsed');
+    renderMemoWidget();
+  }
+}
 function scheduleMemoAutoCollapse() { cancelMemoAutoCollapse(); memoCollapseTimer = setTimeout(collapseMemo, 2000); }
 function cancelMemoAutoCollapse() { clearTimeout(memoCollapseTimer); memoCollapseTimer = null; }
 
