@@ -944,33 +944,38 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 .seg-btn.active { background: var(--accent); color: var(--on-accent); font-weight: 700; }
 .seg-btn svg { width: 0.95em; height: 0.95em; }
 
-.pomo-panel { display: flex; flex-direction: column; gap: 11px; padding: 4px 0 2px; }
-.pomo-phase-row { display: flex; align-items: center; justify-content: center; gap: 12px; }
-.pomo-phase {
-  font-size: 13px; font-weight: 700; letter-spacing: -0.3px;
-  color: var(--accent); text-transform: uppercase;
-}
-.pomo-phase.brk { color: var(--good); }
-.pomo-dots { display: flex; gap: 6px; }
-.pomo-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--bord2); transition: background 0.2s, box-shadow 0.2s; }
+.pomo-dots { display: flex; gap: 5px; }
+.pomo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--bord2); transition: background 0.2s, box-shadow 0.2s; }
 .pomo-dot.done { background: var(--accent); }
 .pomo-dot.cur  { background: transparent; box-shadow: inset 0 0 0 2px var(--accent); }
-.pomo-hint { font-size: 11px; color: var(--dim); text-align: center; letter-spacing: -0.2px; min-height: 14px; }
 
 /* ═══════════════════ Subject picker + chips ═════════════════ */
+/* Subject is an obvious tappable pill, not a tiny label. */
 .sw-subject {
-  background: none; border: none; padding: 0; margin: 0;
-  font-family: 'Noto Sans KR', sans-serif;
-  font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase;
-  color: var(--dim); cursor: pointer; -webkit-appearance: none;
   display: inline-flex; align-items: center; gap: 5px; max-width: 100%;
+  padding: 3px 9px 3px 8px; margin-bottom: 4px;
+  border: 1px solid var(--bord2); border-radius: 999px;
+  background: var(--surf2); color: var(--sub);
+  font-family: 'Noto Sans KR', sans-serif; font-size: 11px; font-weight: 600;
+  cursor: pointer; -webkit-appearance: none;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
+.sw-subject svg { width: 0.95em; height: 0.95em; flex-shrink: 0; color: var(--dim); }
 .sw-subject .subj-name {
-  letter-spacing: 0; text-transform: none; font-size: 11px; font-weight: 600;
-  color: var(--accent); max-width: 9em;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 8em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.sw-subject .subj-caret { color: var(--dim); }
+.sw-subject.tagged { border-color: var(--accent); color: var(--accent); background: transparent; }
+.sw-subject.tagged svg { color: var(--accent); }
+.sw-subject .subj-caret { color: var(--dim); font-size: 9px; }
+
+/* Pomodoro row: shares the study-row shell, but its own accent + phase colour */
+.pomo-toggle.running { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.pomo-line { display: flex; align-items: center; gap: 9px; }
+.pomo-line .pomo-phase {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent);
+}
+.pomo-line .pomo-phase.brk { color: var(--good); }
+#pomoReset { color: #c98bff; }
 .sw-goalbar { height: 3px; border-radius: 2px; background: var(--bord2); margin-top: 6px; overflow: hidden; }
 .sw-goalbar > i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 2px; transition: width 0.5s, background 0.3s; }
 .sw-goalbar.hit > i { background: var(--good); }
@@ -1124,8 +1129,9 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   .btn { padding: 11px 6px; font-size: 13.5px; }
   .preset-btn { padding: 8px 3px; font-size: 11px; }
   .seg-btn { padding: 6px 4px; font-size: 11.5px; }
-  .pomo-panel { gap: 8px; }
+  .study-row { padding: 7px 11px; gap: 9px; }
   .study-row .sw-goalbar { margin-top: 4px; }
+  .sw-subject { margin-bottom: 3px; }
 }
 
 /* ── Laptop / desktop / large tablet landscape: roomy two-column ── */
@@ -1216,7 +1222,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 <div class="study-row">
   <button class="sw-toggle" id="swToggle">▶</button>
   <div class="sw-info">
-    <button class="sw-subject" id="swSubjectBtn" title="과목 선택">오늘 공부</button>
+    <button class="sw-subject" id="swSubjectBtn" title="과목 선택"></button>
     <div class="sw-time" id="swTime">00:00:00</div>
     <div class="sw-goalbar" id="swGoalBar" style="display:none"><i></i></div>
   </div>
@@ -1224,54 +1230,49 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   <button class="dash-btn" id="dashBtn" title="공부 대시보드"></button>
 </div>
 
+<!-- Pomodoro (independent — runs alongside the main timer) -->
+<div class="study-row pomo-row">
+  <button class="sw-toggle pomo-toggle" id="pomoToggle">▶</button>
+  <div class="sw-info">
+    <div class="pomo-line">
+      <span class="pomo-phase" id="pomoPhaseLabel">집중</span>
+      <span class="pomo-dots" id="pomoDots"></span>
+    </div>
+    <div class="sw-time" id="pomoTime">25:00</div>
+  </div>
+  <button class="dash-btn" id="pomoReset" title="뽀모도로 초기화"></button>
+</div>
+
 <!-- Goals list -->
 <div class="goals-wrap" id="goalsWrap"></div>
 
 <!-- Controls -->
 <div class="controls">
-  <div class="seg" id="modeSeg">
-    <button class="seg-btn active" data-mode="general" id="modeGeneral">일반 타이머</button>
-    <button class="seg-btn" data-mode="pomodoro" id="modePomodoro">뽀모도로</button>
+  <div class="presets">
+    <button class="preset-btn" data-h="24">24h</button>
+    <button class="preset-btn" data-h="48">48h</button>
+    <button class="preset-btn" data-h="72">72h</button>
+    <button class="preset-btn" data-h="168">1주</button>
+    <button class="preset-btn" data-h="336">2주</button>
+    <button class="preset-btn" data-h="720">1달</button>
+    <button class="preset-btn" id="calBtn" title="날짜로 설정" style="border-color:var(--accent);color:var(--accent);font-size:14px;"></button>
   </div>
-
-  <!-- General countdown controls -->
-  <div id="generalControls" style="display:flex;flex-direction:column;gap:9px;">
-    <div class="presets">
-      <button class="preset-btn" data-h="24">24h</button>
-      <button class="preset-btn" data-h="48">48h</button>
-      <button class="preset-btn" data-h="72">72h</button>
-      <button class="preset-btn" data-h="168">1주</button>
-      <button class="preset-btn" data-h="336">2주</button>
-      <button class="preset-btn" data-h="720">1달</button>
-      <button class="preset-btn" id="calBtn" title="날짜로 설정" style="border-color:var(--accent);color:var(--accent);font-size:14px;"></button>
+  <div class="input-row">
+    <div class="input-group">
+      <label>시간</label>
+      <input type="number" id="hInput" min="0" max="8760" placeholder="0" inputmode="numeric">
     </div>
-    <div class="input-row">
-      <div class="input-group">
-        <label>시간</label>
-        <input type="number" id="hInput" min="0" max="8760" placeholder="0" inputmode="numeric">
-      </div>
-      <div class="colon">:</div>
-      <div class="input-group">
-        <label>분</label>
-        <input type="number" id="mInput" min="0" max="59" placeholder="0" inputmode="numeric">
-      </div>
-      <div class="colon">:</div>
-      <div class="input-group">
-        <label>초</label>
-        <input type="number" id="sInput" min="0" max="59" placeholder="0" inputmode="numeric">
-      </div>
+    <div class="colon">:</div>
+    <div class="input-group">
+      <label>분</label>
+      <input type="number" id="mInput" min="0" max="59" placeholder="0" inputmode="numeric">
+    </div>
+    <div class="colon">:</div>
+    <div class="input-group">
+      <label>초</label>
+      <input type="number" id="sInput" min="0" max="59" placeholder="0" inputmode="numeric">
     </div>
   </div>
-
-  <!-- Pomodoro panel -->
-  <div id="pomoPanel" class="pomo-panel" style="display:none">
-    <div class="pomo-phase-row">
-      <span class="pomo-phase" id="pomoPhaseLabel">집중</span>
-      <span class="pomo-dots" id="pomoDots"></span>
-    </div>
-    <div class="pomo-hint" id="pomoHint"></div>
-  </div>
-
   <div class="btn-row">
     <button class="btn" id="fsBtn" title="전체화면"></button>
     <button class="btn" id="resetBtn">초기화</button>
@@ -1544,12 +1545,13 @@ const ICONS = {
   trash:  '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14"/><path d="M9.5 7V5h5v2"/><path d="M7 7l.8 12.2a1 1 0 0 0 1 .8h6.4a1 1 0 0 0 1-.8L18 7"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>',
   pin:    '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6l-1 6 3 2.5V14H8v-1.5L11 10z"/><line x1="12" y1="14" x2="12" y2="20"/></svg>',
   check:  '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 12.5l2.5 2.5 5-5"/></svg>',
-  gear:   '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 13.5a7.8 7.8 0 0 0 0-3l1.8-1.4-1.8-3.1-2.2.9a7.6 7.6 0 0 0-2.6-1.5L12 2h-3.6L8 4.9a7.6 7.6 0 0 0-2.6 1.5l-2.2-.9-1.8 3.1L3.2 10a7.8 7.8 0 0 0 0 3l-1.8 1.4 1.8 3.1 2.2-.9a7.6 7.6 0 0 0 2.6 1.5L8.4 22H12l.4-2.9a7.6 7.6 0 0 0 2.6-1.5l2.2.9 1.8-3.1z"/></svg>',
-  tomato: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7c-3.5 0-6 2.6-6 6.5S8.5 21 12 21s6-3.6 6-7.5S15.5 7 12 7z"/><path d="M9 6c1-1.5 5-1.5 6 0"/><path d="M12 7V4"/></svg>',
+  gear:   '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.4"/><g><line x1="12" y1="2.2" x2="12" y2="5.2"/><line x1="12" y1="18.8" x2="12" y2="21.8"/><line x1="2.2" y1="12" x2="5.2" y2="12"/><line x1="18.8" y1="12" x2="21.8" y2="12"/><line x1="5.1" y1="5.1" x2="7.2" y2="7.2"/><line x1="16.8" y1="16.8" x2="18.9" y2="18.9"/><line x1="18.9" y1="5.1" x2="16.8" y2="7.2"/><line x1="7.2" y1="16.8" x2="5.1" y2="18.9"/></g></svg>',
+  tag:    '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 13.3 13 20.8a1.6 1.6 0 0 1-2.3 0L3.2 13.3a1.6 1.6 0 0 1-.5-1.1V5a1.6 1.6 0 0 1 1.6-1.6h7.2a1.6 1.6 0 0 1 1.1.5l7.9 7.9a1.6 1.6 0 0 1 0 2.5z"/><circle cx="8" cy="8" r="1.3" fill="currentColor" stroke="none"/></svg>',
+  refresh:'<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14-4.5L4 8"/><path d="M4 4v4h4"/><path d="M4 13a8 8 0 0 0 14 4.5L20 16"/><path d="M20 20v-4h-4"/></svg>',
 };
 const icoSm = n => ICONS[n].replace('class="ico"', 'class="ico ico-sm"');
 // Swap the static button glyphs for the monochrome icons.
-['acctBtn:cloud','setBtn:gear','goalBtn:flag','emgBtn:warn','notesBtn:note','dashBtn:chart','calBtn:calendar','fsBtn:expand']
+['acctBtn:cloud','setBtn:gear','goalBtn:flag','emgBtn:warn','notesBtn:note','dashBtn:chart','calBtn:calendar','fsBtn:expand','pomoReset:refresh']
   .forEach(p => { const [id, name] = p.split(':'); const el = $(id); if (el) el.innerHTML = ICONS[name]; });
 const timeDisplay   = $('timeDisplay');
 const elapsedLabel  = $('elapsedLabel');
@@ -1830,7 +1832,6 @@ function studyStats() {
 // ── Projection line on main screen ─────────────────────────────
 function updateProjection() {
   metaRow2.innerHTML = '';
-  if (pomoPhase) return;   // pomodoro phase end isn't a meaningful D-day
   const dd = dDayNum();
   if (dd === null) return;
 
@@ -1866,9 +1867,9 @@ function updateStudyUI() {
 function updateSubjectLabel() {
   const btn = $('swSubjectBtn');
   if (!btn) return;
-  btn.innerHTML = study.curSubject
-    ? `오늘 공부 · <span class="subj-name">${escHtml(study.curSubject)}</span><span class="subj-caret">▾</span>`
-    : `오늘 공부 <span class="subj-caret">▾</span>`;
+  const tagged = !!study.curSubject;
+  btn.classList.toggle('tagged', tagged);
+  btn.innerHTML = `${icoSm('tag')}<span class="subj-name">${tagged ? escHtml(study.curSubject) : '과목 선택'}</span><span class="subj-caret">▾</span>`;
 }
 
 function updateGoalBar(sec) {
@@ -1991,7 +1992,6 @@ function startTick() {
       goalEpoch = null;
       if ('vibrate' in navigator) navigator.vibrate([400,200,400,200,400]);
       render(); save(); rafId = null;
-      if (pomoPhase) pomoComplete();
       return;
     }
     save(); rafId = requestAnimationFrame(loop);
@@ -2027,18 +2027,12 @@ function doPause() {
   if (!isRunning()) return;
   pausedRemaining = getRem(); goalEpoch = null;
   if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
-  // In a pomodoro focus phase, pause the auto-running study stopwatch too.
-  if (pomoPhase === 'focus' && study.swRunning) {
-    accountStopwatch(); study.swRunning = false; study.swLastTick = null;
-    saveStudy(); updateStudyUI();
-  }
   render(); save();
 }
 function doReset() {
   if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
   goalEpoch = null; startEpoch = null; pausedRemaining = null;
   totalSeconds = 0; lastDisplayed = -1;
-  if (pomoPhase) pomoStop();   // ending a pomodoro session
   render(); clearSave();
   renderDayTicks();
 }
@@ -2046,58 +2040,127 @@ function setDuration(secs) {
   doReset(); totalSeconds = secs; pausedRemaining = secs; render(); save();
 }
 
-// ── Pomodoro ───────────────────────────────────────────────────
-let mode      = 'general';   // 'general' | 'pomodoro'  (UI mode, device-local)
-let pomoPhase = null;        // 'focus' | 'short' | 'long' while a session runs
-let pomoSet   = 0;           // completed focus blocks in the current cycle
+// ── Pomodoro (independent engine — runs alongside the main timer) ──
+const POMO_KEY  = 'timer_pomo_v1';
+let pomoPhase     = 'focus';   // 'focus' | 'short' | 'long'
+let pomoSet       = 0;         // completed focus blocks in the current cycle
+let pomoRemaining = 0;         // seconds left in the current phase
+let pomoEndEpoch  = null;      // epoch ms when the phase ends (null = not running)
+let pomoTimer     = null;      // setInterval handle
+let pomoStartedSW = false;     // true if pomodoro auto-started the study stopwatch
+const pomoToggleBtn = $('pomoToggle');
+const pomoTimeEl    = $('pomoTime');
 
 function phaseSec(p) {
   const m = p === 'focus' ? study.pomo.focus : p === 'short' ? study.pomo.short : study.pomo.long;
   return Math.max(1, Math.round((parseFloat(m) || 0) * 60));
 }
 function phaseName(p) { return p === 'focus' ? '집중' : p === 'short' ? '짧은 휴식' : '긴 휴식'; }
-
-function pomoBegin(phase) {
-  pomoPhase = phase;
-  totalSeconds = phaseSec(phase);
-  pausedRemaining = totalSeconds;
-  goalEpoch = null; startEpoch = null; lastDisplayed = -1;
-  // Focus → auto-run the study stopwatch; break → pause it.
-  if (phase === 'focus') {
-    if (!study.swRunning) { study.swRunning = true; study.swLastTick = Date.now(); saveStudy(); }
-  } else if (study.swRunning) {
-    accountStopwatch(); study.swRunning = false; study.swLastTick = null; saveStudy();
-  }
-  doStart();
-  updateStudyUI(); renderPomo();
+function pomoRunning() { return pomoEndEpoch !== null; }
+function fmtClock(secs) {
+  secs = Math.max(0, Math.round(secs));
+  const h = Math.floor(secs/3600), m = Math.floor((secs%3600)/60), s = secs%60;
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 }
-function pomoComplete() {
-  if (pomoPhase === 'focus') {
-    pomoSet++;
-    const isLong = study.pomo.sets > 0 && pomoSet % study.pomo.sets === 0;
-    notify('집중 완료', isLong ? '긴 휴식 시간이에요' : '잠깐 휴식하세요');
-    pomoBegin(isLong ? 'long' : 'short');
+function savePomo() {
+  try { localStorage.setItem(POMO_KEY, JSON.stringify(
+    { phase: pomoPhase, set: pomoSet, remaining: pomoRemaining, endEpoch: pomoEndEpoch, startedSW: pomoStartedSW })); } catch(e) {}
+}
+function loadPomo() {
+  let p; try { p = JSON.parse(localStorage.getItem(POMO_KEY)); } catch(e) {}
+  if (p) {
+    pomoPhase     = (p.phase === 'short' || p.phase === 'long') ? p.phase : 'focus';
+    pomoSet       = p.set || 0;
+    pomoStartedSW = !!p.startedSW;
+    pomoRemaining = (typeof p.remaining === 'number') ? p.remaining : phaseSec(pomoPhase);
+    pomoEndEpoch  = p.endEpoch || null;
   } else {
-    notify('휴식 끝', '다시 집중해 볼까요');
-    pomoBegin('focus');
+    pomoRemaining = phaseSec('focus');
   }
 }
-// Stop the pomodoro session (called from reset / mode switch).
-function pomoStop() {
-  pomoPhase = null; pomoSet = 0;
-  if (study.swRunning) {
+
+// Auto-run / release the study stopwatch in sync with focus phases — but only
+// touch it when pomodoro itself started it, so a manual stopwatch is untouched.
+function pomoAcquireSW() {
+  if (!study.swRunning) {
+    study.swRunning = true; study.swLastTick = Date.now(); pomoStartedSW = true;
+    saveStudy(); updateStudyUI();
+  }
+}
+function pomoReleaseSW() {
+  if (pomoStartedSW && study.swRunning) {
     accountStopwatch(); study.swRunning = false; study.swLastTick = null;
     saveStudy(); updateStudyUI();
   }
-  renderPomo();
+  pomoStartedSW = false;
 }
 
+function pomoStart() {
+  if (pomoRemaining <= 0) pomoRemaining = phaseSec(pomoPhase);
+  pomoEndEpoch = Date.now() + pomoRemaining * 1000;
+  if (pomoPhase === 'focus') pomoAcquireSW();
+  startPomoInterval();
+  requestNotifyPermission();
+  savePomo(); renderPomo();
+}
+function pomoPause() {
+  if (!pomoRunning()) return;
+  pomoRemaining = Math.max(0, Math.ceil((pomoEndEpoch - Date.now()) / 1000));
+  pomoEndEpoch = null;
+  stopPomoInterval();
+  if (pomoPhase === 'focus') pomoReleaseSW();
+  savePomo(); renderPomo();
+}
+function pomoReset() {
+  stopPomoInterval();
+  if (pomoPhase === 'focus') pomoReleaseSW();
+  pomoPhase = 'focus'; pomoSet = 0; pomoEndEpoch = null;
+  pomoRemaining = phaseSec('focus');
+  savePomo(); renderPomo();
+}
+function pomoToggle() { pomoRunning() ? pomoPause() : pomoStart(); }
+
+function startPomoInterval() {
+  stopPomoInterval();
+  pomoTimer = setInterval(pomoTick, 250);
+}
+function stopPomoInterval() { if (pomoTimer) { clearInterval(pomoTimer); pomoTimer = null; } }
+
+function pomoTick() {
+  if (!pomoRunning()) { stopPomoInterval(); return; }
+  const rem = (pomoEndEpoch - Date.now()) / 1000;
+  if (rem <= 0) { pomoAdvance(); return; }
+  pomoRemaining = rem;
+  renderPomoTime();
+}
+// A phase finished → notify and roll into the next one (keeps running).
+function pomoAdvance() {
+  if ('vibrate' in navigator) navigator.vibrate([300,150,300]);
+  let next;
+  if (pomoPhase === 'focus') {
+    pomoSet++;
+    const isLong = study.pomo.sets > 0 && pomoSet % study.pomo.sets === 0;
+    next = isLong ? 'long' : 'short';
+    notify('집중 완료', isLong ? '긴 휴식 시간이에요' : '잠깐 휴식하세요');
+    pomoReleaseSW();
+  } else {
+    next = 'focus';
+    notify('휴식 끝', '다시 집중해 볼까요');
+  }
+  pomoPhase = next;
+  pomoRemaining = phaseSec(next);
+  pomoEndEpoch = Date.now() + pomoRemaining * 1000;
+  if (next === 'focus') pomoAcquireSW();
+  savePomo(); renderPomo();
+}
+
+function renderPomoTime() { if (pomoTimeEl) pomoTimeEl.textContent = fmtClock(pomoRemaining); }
 function renderPomo() {
-  const label = $('pomoPhaseLabel'), dots = $('pomoDots'), hint = $('pomoHint');
+  const label = $('pomoPhaseLabel'), dots = $('pomoDots');
   if (!label) return;
-  const phase = pomoPhase || 'focus';
-  label.textContent = phaseName(phase);
-  label.classList.toggle('brk', phase !== 'focus');
+  renderPomoTime();
+  label.textContent = phaseName(pomoPhase);
+  label.classList.toggle('brk', pomoPhase !== 'focus');
   const sets = Math.max(1, study.pomo.sets || 4);
   const doneInCycle = pomoSet % sets;
   let d = '';
@@ -2107,45 +2170,16 @@ function renderPomo() {
     d += `<span class="${cls}"></span>`;
   }
   dots.innerHTML = d;
-  if (!pomoPhase) {
-    hint.textContent = `집중 ${study.pomo.focus}분 · 휴식 ${study.pomo.short}분 · ${sets}회마다 긴 휴식 ${study.pomo.long}분`;
-  } else if (pomoPhase === 'focus') {
-    hint.textContent = `${pomoSet}회 완료 · 집중하세요`;
-  } else {
-    hint.textContent = '휴식 중 — 잠시 쉬어가세요';
-  }
+  pomoToggleBtn.innerHTML = pomoRunning() ? ICONS.pause : ICONS.play;
+  pomoToggleBtn.classList.toggle('running', pomoRunning());
+  pomoTimeEl.classList.toggle('running', pomoRunning());
 }
 
-function setMode(m) {
-  if (m === mode) return;
-  doReset();            // clear any active timer / pomodoro state
-  mode = m;
-  $('modeGeneral').classList.toggle('active', m === 'general');
-  $('modePomodoro').classList.toggle('active', m === 'pomodoro');
-  $('generalControls').style.display = m === 'general' ? 'flex' : 'none';
-  $('pomoPanel').style.display       = m === 'pomodoro' ? 'flex' : 'none';
-  if (m === 'pomodoro') renderPomo();
-  render();
-}
-$('modeGeneral').addEventListener('click', () => setMode('general'));
-$('modePomodoro').addEventListener('click', () => setMode('pomodoro'));
+pomoToggleBtn.addEventListener('click', pomoToggle);
+$('pomoReset').addEventListener('click', pomoReset);
 
 // ── Button events ──────────────────────────────────────────────
 startBtn.addEventListener('click', () => {
-  if (mode === 'pomodoro') {
-    if (isRunning()) { doPause(); return; }
-    if (isPaused()) {
-      doStart();
-      // resume the focus stopwatch when un-pausing a focus phase
-      if (pomoPhase === 'focus' && !study.swRunning) {
-        study.swRunning = true; study.swLastTick = Date.now(); saveStudy(); updateStudyUI();
-      }
-      return;
-    }
-    requestNotifyPermission();
-    pomoBegin('focus');
-    return;
-  }
   if (isRunning()) { doPause(); return; }
   if (isPaused())  { doStart(); return; }
   // idle → read inputs and start
@@ -2893,7 +2927,7 @@ function applyGoalsStudyLive() {
   renderGoals();
   renderDayTicks();
   updateStudyUI();
-  if (mode === 'pomodoro') renderPomo();
+  renderPomo();
   renderMemoWidget();
   if (dashModal.classList.contains('open')) renderDashboard();
   if (notesModal.classList.contains('open')) renderNotesList();
@@ -3322,8 +3356,23 @@ loadGoals();
 loadStudy();
 loadNotes();
 loadTomb();
+loadPomo();
 applyTheme();
 lastSeenStudyDay = studyDayKey(Date.now());
+
+// Resume a pomodoro phase that was running before reload (don't fast-forward
+// through phases missed while away — just resume, or stop at 0 if it expired).
+if (pomoEndEpoch) {
+  if (Date.now() < pomoEndEpoch) {
+    pomoRemaining = Math.ceil((pomoEndEpoch - Date.now()) / 1000);
+    if (pomoPhase === 'focus' && study.swRunning) pomoStartedSW = true;
+    startPomoInterval();
+  } else {
+    pomoEndEpoch = null; pomoStartedSW = false;
+    pomoRemaining = 0;   // finished while the page was closed; tap to continue
+  }
+}
+renderPomo();
 // On restore, do not count time the page was closed.
 if (study.swRunning) study.swLastTick = Date.now();
 
