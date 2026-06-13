@@ -1716,11 +1716,16 @@ function localBundle() {
   return { timer: j(STORE_KEY, null), goals: j(GOALS_KEY, []), study: j(STUDY_KEY, null) };
 }
 
-// Merge study so no recorded time is lost (take the larger value per day).
-function mergeStudy(local, remote) {
+// Merge study: recorded time never lost (max per day), settings follow
+// newest-wins, and the live stopwatch run-state stays device-local so two
+// devices can't double-count the same running stopwatch.
+function mergeStudy(local, remote, remoteNewer) {
   if (!remote) return local;
   if (!local)  return remote;
-  const out = Object.assign({}, remote, local); // local scalar fields win
+  const out = remoteNewer ? Object.assign({}, local, remote)
+                          : Object.assign({}, remote, local);
+  out.swRunning  = local.swRunning;   // runtime state: this device only
+  out.swLastTick = local.swLastTick;
   out.records = {};
   const keys = new Set([...Object.keys(local.records || {}), ...Object.keys(remote.records || {})]);
   keys.forEach(k => out.records[k] = Math.max(local.records?.[k] || 0, remote.records?.[k] || 0));
@@ -1754,7 +1759,7 @@ function onCloud(doc) {
 
   const mergedTimer = (rm > lm) ? (remote?.timer ?? local.timer) : local.timer;
   const mergedGoals = mergeGoals(local.goals, remote?.goals);
-  const mergedStudy = mergeStudy(local.study, remote?.study);
+  const mergedStudy = mergeStudy(local.study, remote?.study, rm > lm);
 
   const before = JSON.stringify(local);
   const after  = JSON.stringify({ timer: mergedTimer, goals: mergedGoals, study: mergedStudy });
