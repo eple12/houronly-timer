@@ -480,7 +480,13 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 .btn:active { transform: scale(0.96); background: var(--surf2); }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #0a0a0a; font-weight: 700; }
 .btn.primary:active { background: #b8d92a; border-color: #b8d92a; }
-.btn:disabled { opacity: 0.26; pointer-events: none; }
+.btn:disabled {
+  opacity: 1;                      /* keep text legible */
+  color: var(--dim);
+  background: var(--surface);
+  border-color: var(--border);
+  pointer-events: none;
+}
 
 /* ═══════════════════════════ Modals ══════════════════════════ */
 .modal-overlay {
@@ -729,19 +735,24 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   transition: color 0.15s, border-color 0.15s;
 }
 .acct-btn.on { color: var(--accent); border-color: var(--accent); }
-.acct-row { display: flex; flex-direction: column; gap: 6px; }
-.acct-email { font-size: 14px; color: var(--text); word-break: break-all; }
-.acct-meta { font-size: 11px; color: var(--dim); }
-.acct-note { font-size: 12px; color: var(--sub); line-height: 1.6; }
+
+/* Larger, roomier account sheet */
+#acctModal .modal { padding: 28px 24px 40px; gap: 22px; min-height: 38dvh; }
+#acctBody { display: flex; flex-direction: column; gap: 22px; }
+#acctBody .modal-confirm { padding: 16px; font-size: 16px; }
+.acct-row { display: flex; flex-direction: column; gap: 8px; }
+.acct-email { font-size: 15px; font-weight: 500; color: var(--text); word-break: break-all; }
+.acct-meta { font-size: 12px; color: var(--sub); }
+.acct-note { font-size: 14px; color: var(--sub); line-height: 1.75; }
 .acct-note code {
-  font-family: 'Space Mono', monospace; font-size: 11px;
-  background: var(--surf2); padding: 1px 5px; border-radius: 4px; color: var(--text);
+  font-family: 'Space Mono', monospace; font-size: 12px;
+  background: var(--surf2); padding: 2px 6px; border-radius: 4px; color: var(--text);
 }
 .acct-secondary {
-  width: 100%; padding: 12px; border-radius: 11px;
+  width: 100%; padding: 14px; border-radius: 11px;
   background: var(--surf2); border: 1px solid var(--bord2);
   color: var(--text); font-family: 'Noto Sans KR', sans-serif;
-  font-size: 14px; font-weight: 500; cursor: pointer;
+  font-size: 15px; font-weight: 500; cursor: pointer;
   transition: background 0.15s; -webkit-appearance: none;
 }
 .acct-secondary:active { background: var(--border); }
@@ -1465,9 +1476,9 @@ function render() {
   pauseBtn.textContent = isPaused() ? '계속' : '일시정지';
 
   const locked = isRunning();
-  [hInput, mInput, sInput].forEach(inp => { inp.disabled = locked; inp.style.opacity = locked ? '0.25' : '1'; });
+  [hInput, mInput, sInput].forEach(inp => { inp.disabled = locked; inp.style.opacity = locked ? '0.5' : '1'; });
   document.querySelectorAll('.preset-btn').forEach(b => {
-    b.disabled = locked; b.style.opacity = locked ? '0.25' : '1'; b.style.pointerEvents = locked ? 'none' : '';
+    b.disabled = locked; b.style.opacity = locked ? '0.5' : '1'; b.style.pointerEvents = locked ? 'none' : '';
   });
 
   emgBtn.classList.toggle('on', emergency);
