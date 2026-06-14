@@ -1712,6 +1712,16 @@ function saveGoals() { try { localStorage.setItem(GOALS_KEY, JSON.stringify(goal
 function loadGoals() { try { goals = JSON.parse(localStorage.getItem(GOALS_KEY)) || []; } catch(e) { goals = []; } }
 function saveStudy() { try { localStorage.setItem(STUDY_KEY, JSON.stringify(study)); } catch(e) {} syncTouch(); }
 function touchSetting(field) { if (!study.settingsAt) study.settingsAt = {}; study.settingsAt[field] = Date.now(); }
+// Manually correct a day's study record. The correction propagates across devices
+// even when it lowers the value, overriding max-merge for that day.
+function setDayOverride(dayKey, sec) {
+  sec = Math.max(0, sec);
+  if (!study.recordsOverride) study.recordsOverride = {};
+  study.records[dayKey] = sec;
+  study.recordsOverride[dayKey] = { sec, at: Date.now() };
+  saveStudy();
+  updateStudyUI();
+}
 function saveNotes() { try { localStorage.setItem(NOTES_KEY, JSON.stringify(notes)); } catch(e) {} syncTouch(); }
 function loadNotes() { try { notes = JSON.parse(localStorage.getItem(NOTES_KEY)) || []; } catch(e) { notes = []; } if (!Array.isArray(notes)) notes = []; }
 function saveTomb()  { try { localStorage.setItem(TOMB_KEY, JSON.stringify(tomb)); } catch(e) {} syncTouch(); }
@@ -1741,6 +1751,8 @@ function ensureSettings() {
   if (typeof study.focusMode !== 'boolean') study.focusMode = false;
   if (study.comboMode !== 'pomo' && study.comboMode !== 'study') study.comboMode = 'study';
   study.pomo = Object.assign({}, DEFAULT_POMO, (study.pomo && typeof study.pomo === 'object') ? study.pomo : {});
+  if (!study.settingsAt     || typeof study.settingsAt     !== 'object') study.settingsAt     = {};
+  if (!study.recordsOverride || typeof study.recordsOverride !== 'object') study.recordsOverride = {};
 }
 
 // Apply the chosen theme + accent colour to the document.
@@ -2970,10 +2982,33 @@ function mergeStudy(local, remote, remoteNewer) {
   // Runtime state: this device only.
   out.swRunning  = local.swRunning;
   out.swLastTick = local.swLastTick;
-  // Records: max per day (never lose recorded time).
+  // Records: max per day for natural accumulation; manual corrections (recordsOverride)
+  // take precedence so a user-initiated fix propagates even though it lowers the value.
   out.records = {};
-  const keys = new Set([...Object.keys(local.records || {}), ...Object.keys(remote.records || {})]);
-  keys.forEach(k => out.records[k] = Math.max(local.records?.[k] || 0, remote.records?.[k] || 0));
+  out.recordsOverride = {};
+  const keys = new Set([
+    ...Object.keys(local.records || {}), ...Object.keys(remote.records || {}),
+    ...Object.keys(local.recordsOverride || {}), ...Object.keys(remote.recordsOverride || {}),
+  ]);
+  keys.forEach(k => {
+    const lv = local.records?.[k] || 0;
+    const rv = remote.records?.[k] || 0;
+    const lo = local.recordsOverride?.[k];   // { sec, at }
+    const ro = remote.recordsOverride?.[k];  // { sec, at }
+    if (!lo && !ro) {
+      out.records[k] = Math.max(lv, rv);     // no correction: normal max-merge
+    } else {
+      const winner = (!lo) ? ro : (!ro) ? lo : (lo.at >= ro.at ? lo : ro);
+      out.recordsOverride[k] = winner;
+      if (lo && ro && lo.at === ro.at) {
+        // Both sides share the same correction: max-merge accumulation above it.
+        out.records[k] = Math.max(lv, rv);
+      } else {
+        // Winning correction overrides the other side; keep any accumulation above it.
+        out.records[k] = Math.max(winner.sec, winner === lo ? lv : rv);
+      }
+    }
+  });
   // Per-day subject seconds: max per subject per day.
   out.subjects = {};
   const sdays = new Set([...Object.keys(local.subjects || {}), ...Object.keys(remote.subjects || {})]);
@@ -3046,7 +3081,7 @@ function canonStudy(s) {
     dailyGoalSec: s.dailyGoalSec || 0, theme: s.theme || 'dark',
     accent: s.accent || '#cef231', focusMode: !!s.focusMode,
     comboMode: s.comboMode || 'study', pomo: s.pomo || null,
-    settingsAt: s.settingsAt || {},
+    settingsAt: s.settingsAt || {}, recordsOverride: s.recordsOverride || {},
   });
 }
 function canonNotes(n) {
