@@ -55,6 +55,10 @@ html, body {
   overflow: hidden;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
+  /* Prevent in-app browsers (Instagram etc.) from auto-inflating text, which
+     widened the monospace clock so it overflowed onto the card's buttons. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -363,7 +367,7 @@ svg.ico-sm { width: 1em; height: 1em; display: inline-block; vertical-align: -0.
   color: #0a0a0a;
   box-shadow: 0 0 12px rgba(206,242,49,0.4);
 }
-.sw-info { flex: 1; min-width: 0; }
+.sw-info { flex: 1; min-width: 0; overflow: hidden; }
 .sw-label {
   font-size: 9px;
   letter-spacing: 0.2em;
@@ -696,9 +700,9 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 /* Goal modal */
 .modal-field { display: flex; flex-direction: column; gap: 8px; }
 .modal-field-label { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--dim); }
-.goal-dur-row { display: flex; gap: 6px; align-items: center; }
+.goal-dur-row { display: flex; gap: 6px; align-items: flex-end; }
 .goal-dur-row .input-group input { font-size: 17px; padding: 9px 4px; }
-.goal-dur-row .colon { font-size: 16px; padding-bottom: 14px; }
+.goal-dur-row .colon { font-size: 16px; padding-bottom: 10px; }
 .goal-memo-input {
   width: 100%;
   background: var(--bg);
@@ -714,7 +718,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 }
 .goal-memo-input:focus { border-color: var(--accent); }
 .goal-memo-input::placeholder { color: var(--dim); }
-.color-swatches { display: flex; gap: 10px; flex-wrap: wrap; }
+.color-swatches { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 3px; }
 .color-swatch {
   width: 30px; height: 30px;
   border-radius: 50%;
@@ -2771,7 +2775,7 @@ function addSubject() {
   inp.value = '';
   touchSetting('curSubject'); saveStudy(); renderSubjChips(); updateStudyUI();
 }
-$('swSubjectBtn').addEventListener('click', () => { renderSubjChips(); subjModal.classList.add('open'); setTimeout(() => $('subjAddInput').focus(), 50); });
+$('swSubjectBtn').addEventListener('click', () => { renderSubjChips(); subjModal.classList.add('open'); });
 $('subjClose').addEventListener('click', () => subjModal.classList.remove('open'));
 subjModal.addEventListener('click', e => { if (e.target === subjModal) subjModal.classList.remove('open'); });
 $('subjAddBtn').addEventListener('click', addSubject);
@@ -3113,6 +3117,7 @@ function applyGoalsStudyLive() {
   applyTheme();
   renderGoals();
   renderDayTicks();
+  renderGoalFlags();
   updateStudyUI();
   renderPomo();
   renderMemoWidget();
