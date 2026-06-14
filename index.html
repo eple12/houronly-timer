@@ -2735,7 +2735,10 @@ function renderDashboard() {
     const y  = padT + plotH - bh;
     const w  = bw*0.64;
     const isToday = i === N-1;
-    const fill = isToday ? 'var(--accent)' : (d.sec>0 ? '#4a5a18' : '#1c1c1c');
+    // Today: full accent. Past days with study: a subdued shade of the chosen
+    // accent (like the heatmap). Empty days: the theme track colour.
+    const fill = isToday ? 'var(--accent)'
+               : (d.sec > 0 ? 'color-mix(in srgb, var(--accent) 45%, var(--surf2))' : 'var(--surf2)');
     return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(0,bh).toFixed(1)}" rx="2" fill="${fill}"></rect>`;
   }).join('');
 
