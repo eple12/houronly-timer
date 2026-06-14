@@ -1711,6 +1711,7 @@ function clearSave() { try { localStorage.removeItem(STORE_KEY); } catch(e) {} s
 function saveGoals() { try { localStorage.setItem(GOALS_KEY, JSON.stringify(goals)); } catch(e) {} syncTouch(); }
 function loadGoals() { try { goals = JSON.parse(localStorage.getItem(GOALS_KEY)) || []; } catch(e) { goals = []; } }
 function saveStudy() { try { localStorage.setItem(STUDY_KEY, JSON.stringify(study)); } catch(e) {} syncTouch(); }
+function touchSetting(field) { if (!study.settingsAt) study.settingsAt = {}; study.settingsAt[field] = Date.now(); }
 function saveNotes() { try { localStorage.setItem(NOTES_KEY, JSON.stringify(notes)); } catch(e) {} syncTouch(); }
 function loadNotes() { try { notes = JSON.parse(localStorage.getItem(NOTES_KEY)) || []; } catch(e) { notes = []; } if (!Array.isArray(notes)) notes = []; }
 function saveTomb()  { try { localStorage.setItem(TOMB_KEY, JSON.stringify(tomb)); } catch(e) {} syncTouch(); }
@@ -2277,7 +2278,7 @@ function setComboMode(m) {
   studyCard.dataset.mode = m;
   $('modeStudy').classList.toggle('active', m === 'study');
   $('modePomo').classList.toggle('active', m === 'pomo');
-  study.comboMode = m; saveStudy();
+  study.comboMode = m; touchSetting('comboMode'); saveStudy();
   updateModeDots();
 }
 $('modeStudy').addEventListener('click', () => setComboMode('study'));
@@ -2690,7 +2691,7 @@ function bindResetHour() {
   if (!sel) return;
   sel.addEventListener('change', () => {
     study.resetHour = parseInt(sel.value) || 0;
-    saveStudy();
+    touchSetting('resetHour'); saveStudy();
     lastSeenStudyDay = studyDayKey(Date.now());
     updateStudyUI();
     renderDashboard();
@@ -2717,7 +2718,7 @@ function renderSubjChips() {
     btn.addEventListener('click', e => {
       if (e.target.closest('.subj-x')) return;
       study.curSubject = btn.dataset.subj || '';
-      saveStudy(); updateStudyUI();
+      touchSetting('curSubject'); saveStudy(); updateStudyUI();
       subjModal.classList.remove('open');
     });
   });
@@ -2726,8 +2727,8 @@ function renderSubjChips() {
       e.stopPropagation();
       const name = x.dataset.del;
       study.subjectList = study.subjectList.filter(s => s !== name);
-      if (study.curSubject === name) study.curSubject = '';
-      saveStudy(); renderSubjChips(); updateStudyUI();
+      if (study.curSubject === name) { study.curSubject = ''; touchSetting('curSubject'); }
+      touchSetting('subjectList'); saveStudy(); renderSubjChips(); updateStudyUI();
     });
   });
 }
@@ -2735,10 +2736,10 @@ function addSubject() {
   const inp = $('subjAddInput');
   const name = (inp.value || '').trim().slice(0, 16);
   if (!name) return;
-  if (!study.subjectList.includes(name)) study.subjectList.push(name);
+  if (!study.subjectList.includes(name)) { study.subjectList.push(name); touchSetting('subjectList'); }
   study.curSubject = name;
   inp.value = '';
-  saveStudy(); renderSubjChips(); updateStudyUI();
+  touchSetting('curSubject'); saveStudy(); renderSubjChips(); updateStudyUI();
 }
 $('swSubjectBtn').addEventListener('click', () => { renderSubjChips(); subjModal.classList.add('open'); setTimeout(() => $('subjAddInput').focus(), 50); });
 $('subjClose').addEventListener('click', () => subjModal.classList.remove('open'));
@@ -2796,24 +2797,24 @@ function renderSettings() {
 
   body.querySelectorAll('#themeSeg .seg-btn').forEach(b =>
     b.addEventListener('click', () => {
-      study.theme = b.dataset.theme; applyTheme(); saveStudy();
+      study.theme = b.dataset.theme; touchSetting('theme'); applyTheme(); saveStudy();
       body.querySelectorAll('#themeSeg .seg-btn').forEach(x => x.classList.toggle('active', x === b));
     }));
   body.querySelectorAll('#accentSwatches .color-swatch').forEach(b =>
     b.addEventListener('click', () => {
-      study.accent = b.dataset.accent; applyTheme(); saveStudy();
+      study.accent = b.dataset.accent; touchSetting('accent'); applyTheme(); saveStudy();
       body.querySelectorAll('#accentSwatches .color-swatch').forEach(x => x.classList.toggle('selected', x === b));
     }));
   $('goalHoursInput').addEventListener('change', e => {
     const h = Math.max(0, Math.min(24, parseFloat(e.target.value) || 0));
     study.dailyGoalSec = Math.round(h * 3600);
-    saveStudy(); updateStudyUI();
+    touchSetting('dailyGoalSec'); saveStudy(); updateStudyUI();
   });
-  $('focusModeToggle').addEventListener('change', e => { study.focusMode = e.target.checked; saveStudy(); });
+  $('focusModeToggle').addEventListener('change', e => { study.focusMode = e.target.checked; touchSetting('focusMode'); saveStudy(); });
   const bindPomo = (id, key, min, max) => $(id).addEventListener('change', e => {
     study.pomo[key] = Math.max(min, Math.min(max, parseInt(e.target.value) || min));
     e.target.value = study.pomo[key];
-    saveStudy(); if (!pomoPhase) renderPomo();
+    touchSetting('pomo'); saveStudy(); if (!pomoPhase) renderPomo();
   });
   bindPomo('pomoFocus','focus',1,180); bindPomo('pomoShort','short',1,60);
   bindPomo('pomoLong','long',1,60);    bindPomo('pomoSets','sets',1,12);
@@ -2913,20 +2914,49 @@ function mergeNotes(local, remote, tmb) {
     .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 }
 
-// Merge study: recorded time never lost (max per day), settings follow
-// newest-wins, and the live stopwatch run-state stays device-local so two
-// devices can't double-count the same running stopwatch.
+// Merge study: recorded time never lost (max per day), each setting uses its
+// own per-field timestamp so only the field that actually changed on a device
+// wins — not every setting on whichever device happened to touch anything last.
+// The live stopwatch run-state stays device-local (no cross-device double-count).
 function mergeStudy(local, remote, remoteNewer) {
   if (!remote) return local;
   if (!local)  return remote;
+  const la = local.settingsAt  || {};
+  const ra = remote.settingsAt || {};
+  // Merge settingsAt: keep the highest timestamp per field so every device
+  // eventually learns when each setting was last changed.
+  const mergedAt = {};
+  new Set([...Object.keys(la), ...Object.keys(ra)]).forEach(f => {
+    mergedAt[f] = Math.max(la[f] || 0, ra[f] || 0);
+  });
+  // Start with the newer device as the base (backwards-compat fallback for any
+  // fields not listed in SETTING_FIELDS below).
   const out = remoteNewer ? Object.assign({}, local, remote)
                           : Object.assign({}, remote, local);
-  out.swRunning  = local.swRunning;   // runtime state: this device only
+  // Per-setting newest-wins: each field independently resolved by its own stamp.
+  const SETTING_FIELDS = ['theme', 'accent', 'focusMode', 'dailyGoalSec',
+                          'resetHour', 'curSubject', 'pomo', 'comboMode'];
+  SETTING_FIELDS.forEach(f => {
+    const lt = la[f] || 0, rt = ra[f] || 0;
+    if (lt === 0 && rt === 0) return; // no per-field stamp yet: keep Object.assign result
+    out[f] = rt > lt ? remote[f] : local[f];
+  });
+  out.settingsAt = mergedAt;
+  // Subject list ordering: prefer the device whose subjectList stamp is newer.
+  const useRemoteOrder = (ra.subjectList || 0) > (la.subjectList || 0) ? true
+                       : (la.subjectList || 0) > (ra.subjectList || 0) ? false
+                       : remoteNewer;
+  const baseList  = (useRemoteOrder ? remote.subjectList : local.subjectList) || [];
+  const otherList = (useRemoteOrder ? local.subjectList  : remote.subjectList) || [];
+  out.subjectList = Array.from(new Set([...baseList, ...otherList]));
+  // Runtime state: this device only.
+  out.swRunning  = local.swRunning;
   out.swLastTick = local.swLastTick;
+  // Records: max per day (never lose recorded time).
   out.records = {};
   const keys = new Set([...Object.keys(local.records || {}), ...Object.keys(remote.records || {})]);
   keys.forEach(k => out.records[k] = Math.max(local.records?.[k] || 0, remote.records?.[k] || 0));
-  // Per-day subject seconds: max per subject per day (never lose recorded time).
+  // Per-day subject seconds: max per subject per day.
   out.subjects = {};
   const sdays = new Set([...Object.keys(local.subjects || {}), ...Object.keys(remote.subjects || {})]);
   sdays.forEach(d => {
@@ -2938,10 +2968,6 @@ function mergeStudy(local, remote, remoteNewer) {
   out.distractions = {};
   const xkeys = new Set([...Object.keys(local.distractions || {}), ...Object.keys(remote.distractions || {})]);
   xkeys.forEach(k => out.distractions[k] = Math.max(local.distractions?.[k] || 0, remote.distractions?.[k] || 0));
-  // Subject list: union (preserve the newer device's ordering first).
-  const baseList = (remoteNewer ? remote.subjectList : local.subjectList) || [];
-  const otherList = (remoteNewer ? local.subjectList : remote.subjectList) || [];
-  out.subjectList = Array.from(new Set([...baseList, ...otherList]));
   return out;
 }
 // Union goals by id, preserving local order; drop tombstoned (deleted) ones.
@@ -3000,7 +3026,9 @@ function canonStudy(s) {
     resetHour: s.resetHour || 0, records: rec, subjects: subj, distractions: dist,
     subjectList: s.subjectList || [], curSubject: s.curSubject || '',
     dailyGoalSec: s.dailyGoalSec || 0, theme: s.theme || 'dark',
-    accent: s.accent || '#cef231', focusMode: !!s.focusMode, pomo: s.pomo || null,
+    accent: s.accent || '#cef231', focusMode: !!s.focusMode,
+    comboMode: s.comboMode || 'study', pomo: s.pomo || null,
+    settingsAt: s.settingsAt || {},
   });
 }
 function canonNotes(n) {
