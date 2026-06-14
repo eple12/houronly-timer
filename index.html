@@ -189,7 +189,6 @@ svg.ico-sm { width: 1em; height: 1em; display: inline-block; vertical-align: -0.
 /* In-app browsers (Instagram / Facebook) render cramped; shrink the big
    monospace numbers a notch so the clock and study-time fit comfortably. */
 .inapp .time-display { font-size: clamp(36px, min(11vw, 15vh), 84px); }
-.inapp .sw-time { font-size: 21px; }
 .time-display.done      { color: var(--danger); animation: pulse 1.1s ease-in-out infinite; }
 .time-display.emergency { color: var(--emg-a);  animation: flicker 0.9s ease-in-out infinite; }
 @keyframes pulse   { 0%,100%{opacity:1} 50%{opacity:0.28} }
@@ -347,7 +346,7 @@ svg.ico-sm { width: 1em; height: 1em; display: inline-block; vertical-align: -0.
   content: ''; position: absolute; top: 3px; right: 3px;
   width: 5px; height: 5px; border-radius: 50%; background: var(--accent);
 }
-.combo-pane { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; }
+.combo-pane { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
 .study-row.combo[data-mode="study"] .combo-pane[data-pane="pomo"],
 .study-row.combo[data-mode="pomo"]  .combo-pane[data-pane="study"] { display: none; }
 
@@ -380,7 +379,10 @@ svg.ico-sm { width: 1em; height: 1em; display: inline-block; vertical-align: -0.
 }
 .sw-time {
   font-family: 'Space Mono', monospace;
-  font-size: 24px;
+  /* Scale with width so "00:00:00" fits the combo card on narrow phones
+     (the mode switch + toggle + two buttons leave it little room). Tablet /
+     desktop / landscape media queries set their own fixed sizes below. */
+  font-size: clamp(16px, 4.9vw, 24px);
   font-weight: 700;
   letter-spacing: -1px;
   color: var(--text);
