@@ -1764,20 +1764,38 @@ function studyDayKeyOffset(n) {
 }
 function todayStudySec() { return Math.floor(study.records[studyDayKey(Date.now())] || 0); }
 
+// Returns the epoch ms when the study day containing 'ms' ends and the next begins.
+function nextStudyDayStart(ms) {
+  const d = new Date(ms - study.resetHour * 3600 * 1000);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 1);
+  return d.getTime() + study.resetHour * 3600 * 1000;
+}
+
 // ── Stopwatch accounting (incremental, attributes to correct day) ─
 function accountStopwatch() {
   if (!study.swRunning) return;
   const now = Date.now();
   if (study.swLastTick == null) { study.swLastTick = now; return; }
-  const dt = (now - study.swLastTick) / 1000;
+  const from = study.swLastTick;
   study.swLastTick = now;
-  if (dt <= 0) return;
-  const key = studyDayKey(now);
-  study.records[key] = (study.records[key] || 0) + dt;
-  // Attribute to the currently selected subject (untagged time stays implicit).
-  if (study.curSubject) {
-    if (!study.subjects[key]) study.subjects[key] = {};
-    study.subjects[key][study.curSubject] = (study.subjects[key][study.curSubject] || 0) + dt;
+  if (now <= from) return;
+  // Split elapsed time across study-day boundaries so a throttled background
+  // tab (or a gap spanning midnight) doesn't dump hours into the wrong day.
+  let cur = from;
+  while (cur < now) {
+    const key = studyDayKey(cur);
+    const boundary = nextStudyDayStart(cur);
+    const until = Math.min(now, boundary);
+    const dt = (until - cur) / 1000;
+    if (dt > 0) {
+      study.records[key] = (study.records[key] || 0) + dt;
+      if (study.curSubject) {
+        if (!study.subjects[key]) study.subjects[key] = {};
+        study.subjects[key][study.curSubject] = (study.subjects[key][study.curSubject] || 0) + dt;
+      }
+    }
+    cur = boundary;
   }
   saveStudy();
 }
