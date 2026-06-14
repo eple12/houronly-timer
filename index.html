@@ -1598,11 +1598,30 @@ let lastGoalSec   = -1;
 // ── Study state ────────────────────────────────────────────────
 let study = {
   resetHour: 0,        // local hour at which the study day rolls over
-  records:   {},       // 'YYYY-MM-DD' -> seconds
-  swRunning: false,
-  swLastTick: null,    // epoch ms of last accounting tick
+  records:   {},       // 'YYYY-MM-DD' -> committed (finalized) seconds
+  // Active stopwatch run, synced across devices. While a session is live the
+  // elapsed time is DERIVED from startEpoch (see sessionOverlay) rather than
+  // accumulated per-tick, so several devices counting at once can never double
+  // up. committedRuns[runId] = epoch-ms already folded into records (lets a
+  // run be committed/resumed idempotently). See toggleStopwatch & mergeStudy.
+  session:   null,     // { runId, startEpoch, beatAt } or null
+  sessionAt: 0,        // LWW stamp for the last start/stop transition
+  committedRuns: {},   // runId -> epoch ms committed up to
 };
 let lastSeenStudyDay = null;
+
+// Stable per-device id (NOT synced) used to tag the runs this device starts.
+const DEVICE_ID = (() => {
+  try {
+    let d = localStorage.getItem('timer_device_id');
+    if (!d) { d = Date.now().toString(36) + Math.random().toString(36).slice(2, 8); localStorage.setItem('timer_device_id', d); }
+    return d;
+  } catch (e) { return 'dev' + Math.random().toString(36).slice(2, 8); }
+})();
+// A session whose heartbeat is older than this is treated as ended (the device
+// running it was closed/crashed) — its time is capped at the last heartbeat so
+// closed-tab time isn't credited.
+const SW_STALE_MS = 90000;
 
 // ── Notes / memos state ────────────────────────────────────────
 // note: { id, title, type:'text'|'list', text, items:[{t,done}], pinned, updatedAt }
@@ -1766,6 +1785,12 @@ function ensureSettings() {
   study.pomo = Object.assign({}, DEFAULT_POMO, (study.pomo && typeof study.pomo === 'object') ? study.pomo : {});
   if (!study.settingsAt     || typeof study.settingsAt     !== 'object') study.settingsAt     = {};
   if (!study.recordsOverride || typeof study.recordsOverride !== 'object') study.recordsOverride = {};
+  if (!study.committedRuns  || typeof study.committedRuns  !== 'object') study.committedRuns  = {};
+  if (typeof study.sessionAt !== 'number') study.sessionAt = 0;
+  if (study.session && typeof study.session !== 'object') study.session = null;
+  // Migrate the old device-local run-state (swRunning/swLastTick) — just drop it;
+  // any unsaved time from before the upgrade was already in records.
+  delete study.swRunning; delete study.swLastTick;
 }
 
 // Apply the chosen theme + accent colour to the document.
@@ -1787,7 +1812,7 @@ function studyDayKeyOffset(n) {
   base.setDate(base.getDate() - n);
   return `${base.getFullYear()}-${pad(base.getMonth()+1)}-${pad(base.getDate())}`;
 }
-function todayStudySec() { return Math.floor(study.records[studyDayKey(Date.now())] || 0); }
+function todayStudySec() { return Math.floor(recSec(studyDayKey(Date.now()))); }
 
 // Returns the epoch ms when the study day containing 'ms' ends and the next begins.
 function nextStudyDayStart(ms) {
@@ -1797,21 +1822,55 @@ function nextStudyDayStart(ms) {
   return d.getTime() + study.resetHour * 3600 * 1000;
 }
 
-// ── Stopwatch accounting (incremental, attributes to correct day) ─
-function accountStopwatch() {
-  if (!study.swRunning) return;
-  const now = Date.now();
-  if (study.swLastTick == null) { study.swLastTick = now; return; }
-  const from = study.swLastTick;
-  study.swLastTick = now;
-  if (now <= from) return;
-  // Split elapsed time across study-day boundaries so a throttled background
-  // tab (or a gap spanning midnight) doesn't dump hours into the wrong day.
+// ── Stopwatch session (synced, conflict-free) ──────────────────
+// A run's elapsed time is a pure function of (startEpoch, now) so every device
+// — and every commit — computes the same value. Time is NOT accumulated per
+// tick; it's committed into `records` once on stop (or when a stale session is
+// finalized), keyed by runId so committing twice is a no-op.
+function isRunning() { return !!(study.session && study.session.startEpoch); }
+function sessionStale(s) { s = s || study.session; return !!s && (Date.now() - (s.beatAt || s.startEpoch)) > SW_STALE_MS; }
+
+// Live (not-yet-committed) seconds the active session contributes, split by
+// study-day. Starts from whatever has already been committed for this run so a
+// resumed/resurrected run is never counted twice.
+function sessionOverlay() {
+  const s = study.session;
+  if (!s || !s.startEpoch) return {};
+  const cap = sessionStale(s) ? (s.beatAt || s.startEpoch) : Date.now();
+  const from = Math.max(s.startEpoch, (study.committedRuns && study.committedRuns[s.runId]) || 0);
+  const out = {};
   let cur = from;
-  while (cur < now) {
+  while (cur < cap) {
     const key = studyDayKey(cur);
     const boundary = nextStudyDayStart(cur);
-    const until = Math.min(now, boundary);
+    const until = Math.min(cap, boundary);
+    const dt = (until - cur) / 1000;
+    if (dt > 0) out[key] = (out[key] || 0) + dt;
+    cur = boundary;
+  }
+  return out;
+}
+// Committed records with the live session overlaid — what the UI should show.
+function effRecords() {
+  const ov = sessionOverlay();
+  const out = Object.assign({}, study.records);
+  for (const k in ov) out[k] = (out[k] || 0) + ov[k];
+  return out;
+}
+function recSec(key) { return (study.records[key] || 0) + (sessionOverlay()[key] || 0); }
+
+// Fold the session's elapsed time (up to `cap`) into committed records. Picks
+// up from committedRuns[runId] so calling it repeatedly only adds new time.
+function commitSession(cap) {
+  const s = study.session;
+  if (!s || !s.startEpoch) return;
+  if (sessionStale(s)) cap = Math.min(cap, s.beatAt || s.startEpoch);
+  const from = Math.max(s.startEpoch, study.committedRuns[s.runId] || 0);
+  let cur = from;
+  while (cur < cap) {
+    const key = studyDayKey(cur);
+    const boundary = nextStudyDayStart(cur);
+    const until = Math.min(cap, boundary);
     const dt = (until - cur) / 1000;
     if (dt > 0) {
       study.records[key] = (study.records[key] || 0) + dt;
@@ -1822,27 +1881,73 @@ function accountStopwatch() {
     }
     cur = boundary;
   }
-  saveStudy();
+  study.committedRuns[s.runId] = Math.max(study.committedRuns[s.runId] || 0, cap);
+  pruneCommittedRuns();
+}
+function pruneCommittedRuns() {
+  const cut = Date.now() - 3 * 86400000;
+  const keep = study.session && study.session.runId;
+  for (const k in study.committedRuns) if (k !== keep && study.committedRuns[k] < cut) delete study.committedRuns[k];
+}
+function startSession() {
+  const now = Date.now();
+  study.session = { runId: DEVICE_ID + '-' + now, startEpoch: now, beatAt: now };
+  study.sessionAt = now;
+}
+function stopSession() {
+  commitSession(Date.now());
+  study.session = null;
+  study.sessionAt = Date.now();   // explicit stop: newest stamp wins over any peer
+}
+// A session whose heartbeat went stale: commit what's real (capped at the last
+// beat) and stop counting locally. We do NOT bump sessionAt past the heartbeat,
+// so if another device is actually still running this run, its fresher state
+// wins on the next merge and the run resumes (committedRuns keeps it honest).
+function finalizeStaleSession() {
+  const s = study.session;
+  if (!s) return;
+  commitSession(s.beatAt || s.startEpoch);
+  study.session = null;
+  // Leave sessionAt at the run's START stamp (not the heartbeat): if a peer is
+  // genuinely still running this same run, its fresher state resurrects it on
+  // the next merge — and committedRuns ensures the resumed time isn't doubled.
+}
+// Per-tick maintenance while a session exists: finalize if stale, else keep the
+// heartbeat fresh (only an awake page beats, so a closed tab goes stale).
+function accountStopwatch() {
+  const s = study.session;
+  if (!s || !s.startEpoch) return;
+  if (sessionStale(s)) { finalizeStaleSession(); saveStudy(); updateStudyUI(); return; }
+  if (document.visibilityState === 'visible') { s.beatAt = Date.now(); saveStudy(); }
+}
+// On load / returning to foreground: finalize a dead session or resume a live one.
+function reconcileSession() {
+  const s = study.session;
+  if (!s || !s.startEpoch) return;
+  if (sessionStale(s)) { finalizeStaleSession(); saveStudy(); }
+  else if (document.visibilityState === 'visible') { s.beatAt = Date.now(); saveStudy(); }
 }
 
 // Seconds studied today for one subject ('' = total of all tagged).
 function todaySubjectSec(name) {
-  const day = study.subjects[studyDayKey(Date.now())] || {};
-  return Math.floor(day[name] || 0);
+  const key = studyDayKey(Date.now());
+  const day = study.subjects[key] || {};
+  let v = day[name] || 0;
+  if (isRunning() && study.curSubject && name === study.curSubject) v += (sessionOverlay()[key] || 0);
+  return Math.floor(v);
 }
 
 function toggleStopwatch() {
-  if (study.swRunning) {
-    accountStopwatch();
-    study.swRunning = false;
-    study.swLastTick = null;
+  if (isRunning()) {
+    stopSession();
   } else {
     requestNotifyPermission();
-    study.swRunning = true;
-    study.swLastTick = Date.now();
+    startSession();
   }
   saveStudy();
   updateStudyUI();
+  // Propagate the start/stop promptly instead of waiting out the debounce.
+  if (cloudUid && syncReady) { lastPushedJson = null; schedulePush(); }
 }
 
 // ── Flag + tick rendering ──────────────────────────────────────
@@ -1935,16 +2040,17 @@ function updateGoalTimes() {
 
 // ── Study stats ────────────────────────────────────────────────
 function studyStats() {
-  const entries = Object.entries(study.records).filter(([,v]) => v > 0.5);
+  const R = effRecords();   // committed + live session
+  const entries = Object.entries(R).filter(([,v]) => v > 0.5);
   const total   = entries.reduce((a,[,v]) => a + v, 0);
   const days    = entries.length;
   const avg     = days ? total / days : 0;
   const best    = entries.reduce((m,[,v]) => Math.max(m, v), 0);
   // streak: consecutive study days ending today or yesterday
   let streak = 0;
-  const todayHas = (study.records[studyDayKeyOffset(0)] || 0) > 0.5;
+  const todayHas = (R[studyDayKeyOffset(0)] || 0) > 0.5;
   let i = todayHas ? 0 : 1;
-  while ((study.records[studyDayKeyOffset(i)] || 0) > 0.5) { streak++; i++; }
+  while ((R[studyDayKeyOffset(i)] || 0) > 0.5) { streak++; i++; }
   return { total, days, avg, best, streak };
 }
 
@@ -1972,12 +2078,12 @@ function updateProjection() {
 
 // ── Study UI ───────────────────────────────────────────────────
 function updateStudyUI() {
-  accountStopwatch();
+  const running = isRunning();
   const sec = todayStudySec();
   swTimeEl.textContent = fmt(sec);
-  swTimeEl.classList.toggle('running', study.swRunning);
-  swToggle.innerHTML = study.swRunning ? ICONS.pause : ICONS.play;
-  swToggle.classList.toggle('running', study.swRunning);
+  swTimeEl.classList.toggle('running', running);
+  swToggle.innerHTML = running ? ICONS.pause : ICONS.play;
+  swToggle.classList.toggle('running', running);
   updateSubjectLabel();
   updateGoalBar(sec);
   updateProjection();
@@ -2129,7 +2235,7 @@ setInterval(() => {
   updateStudyUI();
   if (goals.length && !rafId) { updateGoalTimes(); }
   // Keep the dashboard charts live while the stopwatch is running.
-  if (study.swRunning && dashModal.classList.contains('open')) {
+  if (isRunning() && dashModal.classList.contains('open')) {
     const sc = dashModal.querySelector('.modal');
     const top = sc ? sc.scrollTop : 0;
     renderDashboard();
@@ -2140,7 +2246,7 @@ setInterval(() => {
 // Re-account when returning to foreground (don't count background time
 // beyond the wall clock; accounting uses real dt so this just commits).
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') { accountStopwatch(); updateStudyUI(); }
+  if (document.visibilityState === 'visible') { reconcileSession(); updateStudyUI(); }
 });
 
 // ── Keyboard-aware modals ──────────────────────────────────────
@@ -2321,7 +2427,7 @@ $('pomoReset').addEventListener('click', pomoReset);
 const studyCard = $('studyCard');
 function updateModeDots() {
   const m = studyCard.dataset.mode;
-  $('modeStudy').classList.toggle('live', study.swRunning && m !== 'study');
+  $('modeStudy').classList.toggle('live', isRunning() && m !== 'study');
   $('modePomo').classList.toggle('live', pomoRunning() && m !== 'pomo');
 }
 function setComboMode(m) {
@@ -2522,8 +2628,9 @@ const dashModal = $('dashModal');
 
 // ── Dashboard helpers (period sums, subjects, heatmap) ─────────
 function sumLastDays(n) {
+  const R = effRecords();
   let t = 0;
-  for (let i = 0; i < n; i++) t += study.records[studyDayKeyOffset(i)] || 0;
+  for (let i = 0; i < n; i++) t += R[studyDayKeyOffset(i)] || 0;
   return t;
 }
 function todayDistractions() { return study.distractions[studyDayKey(Date.now())] || 0; }
@@ -2546,7 +2653,10 @@ function goalGaugeHTML(today) {
 }
 
 function subjectBreakHTML() {
-  const day = study.subjects[studyDayKey(Date.now())] || {};
+  const dayKey = studyDayKey(Date.now());
+  const day = Object.assign({}, study.subjects[dayKey] || {});
+  // Fold the live session into its current subject so the breakdown grows too.
+  if (isRunning() && study.curSubject) day[study.curSubject] = (day[study.curSubject] || 0) + (sessionOverlay()[dayKey] || 0);
   const total = todayStudySec();
   const entries = Object.entries(day).filter(([,v]) => v > 0.5).sort((a,b) => b[1]-a[1]);
   const tagged = entries.reduce((a,[,v]) => a+v, 0);
@@ -2572,13 +2682,14 @@ function heatmapHTML() {
   const todayDow = base.getDay();
   const start = new Date(base);
   start.setDate(start.getDate() - (WEEKS - 1) * 7 - todayDow);
+  const R = effRecords();
   const cells = [];
   let max = 1;
   const cur = new Date(start);
   for (let i = 0; i < WEEKS * 7; i++) {
     const key = `${cur.getFullYear()}-${pad(cur.getMonth()+1)}-${pad(cur.getDate())}`;
     const future = cur.getTime() > base.getTime();
-    const sec = future ? -1 : (study.records[key] || 0);
+    const sec = future ? -1 : (R[key] || 0);
     if (sec > max) max = sec;
     cells.push({ sec, future, label: `${cur.getMonth()+1}/${cur.getDate()}` });
     cur.setDate(cur.getDate() + 1);
@@ -2620,10 +2731,11 @@ function renderDashboard() {
 
   // Last 14 days bar chart data
   const N = 14;
+  const R = effRecords();
   const data = [];
   for (let i = N-1; i >= 0; i--) {
     const key = studyDayKeyOffset(i);
-    const sec = study.records[key] || 0;
+    const sec = R[key] || 0;
     const parts = key.split('-');
     data.push({ key, sec, label: `${parseInt(parts[1])}/${parseInt(parts[2])}` });
   }
@@ -2877,8 +2989,7 @@ setModal.addEventListener('click', e => { if (e.target === setModal) setModal.cl
 let focusLeftCount = 0;
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
-    if (study.focusMode && study.swRunning) {
-      accountStopwatch();   // commit time up to the moment of leaving
+    if (study.focusMode && isRunning()) {
       const key = studyDayKey(Date.now());
       study.distractions[key] = (study.distractions[key] || 0) + 1;
       focusLeftCount++;
@@ -2999,9 +3110,34 @@ function mergeStudy(local, remote, remoteNewer) {
   const baseList  = (useRemoteOrder ? remote.subjectList : local.subjectList) || [];
   const otherList = (useRemoteOrder ? local.subjectList  : remote.subjectList) || [];
   out.subjectList = Array.from(new Set([...baseList, ...otherList]));
-  // Runtime state: this device only.
-  out.swRunning  = local.swRunning;
-  out.swLastTick = local.swLastTick;
+  // Active stopwatch session: resolve without ever double-counting time.
+  // - same run on both sides → keep it, adopt the freshest heartbeat;
+  // - two different live runs → newest START wins ("최신 시작 채택");
+  // - otherwise (a stop on one side) → newest transition stamp wins.
+  const ls = local.session, rs = remote.session;
+  const lAt = local.sessionAt || 0, rAt = remote.sessionAt || 0;
+  if (ls && rs) {
+    if (ls.runId === rs.runId) {
+      out.session = Object.assign({}, ls, rs, { beatAt: Math.max(ls.beatAt || 0, rs.beatAt || 0) });
+    } else {
+      out.session = (rs.startEpoch || 0) > (ls.startEpoch || 0) ? rs : ls;
+    }
+    out.sessionAt = Math.max(lAt, rAt, out.session.beatAt || 0);
+  } else if (rAt !== lAt) {
+    // one side is null (a stop/finalize): newest transition stamp wins.
+    if (rAt > lAt) { out.session = rs || null; out.sessionAt = rAt; }
+    else           { out.session = ls || null; out.sessionAt = lAt; }
+  } else {
+    // Equal stamp with one side null = a stale-finalize racing the same run
+    // that's still live on the peer. Prefer the running side so it resurrects.
+    out.session = rs || ls || null;
+    out.sessionAt = lAt;
+  }
+  // committedRuns: highest committed-up-to epoch per run (so neither side
+  // re-commits time the other already folded into records).
+  out.committedRuns = {};
+  new Set([...Object.keys(local.committedRuns || {}), ...Object.keys(remote.committedRuns || {})]).forEach(k =>
+    out.committedRuns[k] = Math.max(local.committedRuns?.[k] || 0, remote.committedRuns?.[k] || 0));
   // Records: max per day for natural accumulation; manual corrections (recordsOverride)
   // take precedence so a user-initiated fix propagates even though it lowers the value.
   out.records = {};
@@ -3095,13 +3231,20 @@ function canonStudy(s) {
   });
   const dist = {};
   Object.keys(s.distractions || {}).forEach(k => { const v = Math.floor(s.distractions[k] || 0); if (v > 0) dist[k] = v; });
-  return stableStr({                                   // volatile run-state excluded
+  // Active session is included (so a peer start/stop reaches the UI) but the
+  // per-second heartbeat is coarsened to ~10s buckets to avoid sig churn on
+  // every beat; runId+startEpoch still flip the signature on start/stop.
+  const sess = s.session
+    ? { runId: s.session.runId, startEpoch: s.session.startEpoch || 0, beat: Math.floor((s.session.beatAt || 0) / 10000) }
+    : null;
+  return stableStr({
     resetHour: s.resetHour || 0, records: rec, subjects: subj, distractions: dist,
     subjectList: s.subjectList || [], curSubject: s.curSubject || '',
     dailyGoalSec: s.dailyGoalSec || 0, theme: s.theme || 'dark',
     accent: s.accent || '#cef231', focusMode: !!s.focusMode,
     comboMode: s.comboMode || 'study', pomo: s.pomo || null,
     settingsAt: s.settingsAt || {}, recordsOverride: s.recordsOverride || {},
+    session: sess, sessionAt: s.sessionAt || 0, committedRuns: s.committedRuns || {},
   });
 }
 function canonNotes(n) {
@@ -3128,7 +3271,7 @@ function applyGoalsStudyLive() {
   loadStudy();
   loadNotes();
   loadTomb();
-  if (study.swRunning && study.swLastTick == null) study.swLastTick = Date.now();
+  reconcileSession();   // adopt/resume or finalize the merged session
   lastSeenStudyDay = studyDayKey(Date.now());
   applyTheme();
   renderGoals();
@@ -3626,8 +3769,9 @@ if (pomoEndEpoch) {
 }
 renderPomo();
 setComboMode(study.comboMode === 'pomo' ? 'pomo' : 'study');
-// On restore, do not count time the page was closed.
-if (study.swRunning) study.swLastTick = Date.now();
+// On restore, resume a live session or finalize a stale one (so time spent
+// with the tab closed isn't credited beyond the last heartbeat).
+reconcileSession();
 
 (function restore() {
   let saved;
