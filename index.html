@@ -274,7 +274,7 @@ svg.ico-sm { width: 1em; height: 1em; display: inline-block; vertical-align: -0.
   gap: 10px;
   margin-top: 8px;
 }
-.elapsed-label { font-size: 12px; color: var(--sub); }
+.elapsed-label { font-size: 12px; color: var(--sub); font-variant-numeric: tabular-nums; }
 .meta-sep { width: 1px; height: 11px; background: var(--border); flex-shrink: 0; }
 .end-label { font-size: 11px; color: var(--dim); }
 
@@ -1686,14 +1686,12 @@ function fmtDate(ms) {
   const d = new Date(ms);
   return `종료 ${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+// Fixed-width so the label never shifts as the value changes: always two-digit
+// 분·초 (e.g. "경과 02분 00초"), with 시간 prefixed only once an hour is reached.
 function fmtElapsed(secs) {
-  if (secs <= 0) return '—';
+  secs = Math.max(0, Math.floor(secs));
   const h = Math.floor(secs/3600), m = Math.floor((secs%3600)/60), s = secs%60;
-  const p = [];
-  if (h) p.push(`${h}시간`);
-  if (m) p.push(`${m}분`);
-  if (s || !p.length) p.push(`${s}초`);
-  return '경과 ' + p.join(' ');
+  return `경과 ${h ? pad(h) + '시간 ' : ''}${pad(m)}분 ${pad(s)}초`;
 }
 function fmtGoalRem(endEpoch) {
   const rem = Math.max(0, Math.floor((endEpoch - Date.now()) / 1000));
@@ -2937,6 +2935,16 @@ function renderSettings() {
         <div class="input-group"><label>긴휴식</label><input type="number" id="pomoLong" min="1" max="60" inputmode="numeric" value="${study.pomo.long}"></div>
         <div class="input-group"><label>세트</label><input type="number" id="pomoSets" min="1" max="12" inputmode="numeric" value="${study.pomo.sets}"></div>
       </div>
+    </div>
+
+    <div class="set-section">
+      <div class="setting-row">
+        <div class="sr-text">
+          <div class="sr-label">캐시 비우고 새로고침</div>
+          <div class="sr-sub">앱이 최신 버전으로 안 보일 때 캐시를 지우고 다시 불러와요 (저장된 기록·메모는 유지)</div>
+        </div>
+        <button class="acct-secondary" id="cacheReset">새로고침</button>
+      </div>
     </div>`;
 
   body.querySelectorAll('#themeSeg .seg-btn').forEach(b =>
@@ -2962,6 +2970,28 @@ function renderSettings() {
   });
   bindPomo('pomoFocus','focus',1,180); bindPomo('pomoShort','short',1,60);
   bindPomo('pomoLong','long',1,60);    bindPomo('pomoSets','sets',1,12);
+  $('cacheReset').addEventListener('click', fullCacheRefresh);
+}
+
+// Clear cached app assets (Cache Storage + any service worker) and hard-reload
+// to the freshest deployed version. Saved data in localStorage is kept — and if
+// signed in it's in the cloud anyway. Flushes pending sync first.
+async function fullCacheRefresh() {
+  if (!confirm('앱 캐시를 비우고 최신 버전으로 새로고침할까요?\n저장된 공부 기록·메모는 그대로 유지됩니다.')) return;
+  try { pushCloud(); } catch (e) {}
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    if (window.caches) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+  } catch (e) {}
+  const u = new URL(location.href);
+  u.searchParams.set('_', Date.now());   // cache-bust the document fetch
+  location.replace(u.toString());
 }
 $('setBtn').addEventListener('click', () => { renderSettings(); setModal.classList.add('open'); });
 $('setClose').addEventListener('click', () => setModal.classList.remove('open'));
@@ -3249,6 +3279,7 @@ function writeBundle(b) {
 }
 // Refresh goals + study + notes in the live UI without a full page reload.
 function applyGoalsStudyLive() {
+  const notesSigBefore = canonNotes(notes);
   loadGoals();
   loadStudy();
   loadNotes();
@@ -3261,7 +3292,10 @@ function applyGoalsStudyLive() {
   renderGoalFlags();
   updateStudyUI();
   renderPomo();
-  renderMemoWidget();
+  // Only re-render the memo widget when the notes themselves changed — otherwise
+  // a study-only sync (e.g. a session heartbeat) would needlessly rebuild it and
+  // replay its open/close animation, which looked like a flicker.
+  if (canonNotes(notes) !== notesSigBefore) renderMemoWidget();
   if (dashModal.classList.contains('open')) renderDashboard();
   if (notesModal.classList.contains('open')) renderNotesList();
   if (setModal.classList.contains('open')) renderSettings();
