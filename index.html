@@ -186,6 +186,10 @@ svg.ico-sm { width: 1em; height: 1em; display: inline-block; vertical-align: -0.
   margin-top: 6px;
   max-width: 100%;
 }
+/* In-app browsers (Instagram / Facebook) render cramped; shrink the big
+   monospace numbers a notch so the clock and study-time fit comfortably. */
+.inapp .time-display { font-size: clamp(36px, min(11vw, 15vh), 84px); }
+.inapp .sw-time { font-size: 21px; }
 .time-display.done      { color: var(--danger); animation: pulse 1.1s ease-in-out infinite; }
 .time-display.emergency { color: var(--emg-a);  animation: flicker 0.9s ease-in-out infinite; }
 @keyframes pulse   { 0%,100%{opacity:1} 50%{opacity:0.28} }
@@ -1243,6 +1247,9 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   .cal-arrow:hover { background: var(--surf2); }
 }
 </style>
+<!-- Tag in-app browsers (Instagram / Facebook) early so the cramped-layout
+     CSS (smaller clock & study-time numbers) applies before first paint. -->
+<script>if (/Instagram|FBAN|FBAV/i.test(navigator.userAgent)) document.documentElement.classList.add('inapp');</script>
 <!-- Firebase SDK (compat) for optional account sync -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
