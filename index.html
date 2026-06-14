@@ -948,7 +948,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 .note-pin-row input { width: 17px; height: 17px; accent-color: var(--accent); }
 .note-delete { color: var(--danger); }
 #noteEditBody textarea {
-  width: 100%; min-height: 140px; resize: vertical;
+  width: 100%; min-height: 300px; max-height: 60vh; resize: vertical;
   background: var(--surface); border: 1px solid var(--bord2); border-radius: 10px;
   color: var(--text); font-family: 'Noto Sans KR', sans-serif; font-size: 14px;
   padding: 12px; outline: none; line-height: 1.6; -webkit-appearance: none;
@@ -2128,6 +2128,13 @@ setInterval(() => {
   checkDayRollover();
   updateStudyUI();
   if (goals.length && !rafId) { updateGoalTimes(); }
+  // Keep the dashboard charts live while the stopwatch is running.
+  if (study.swRunning && dashModal.classList.contains('open')) {
+    const sc = dashModal.querySelector('.modal');
+    const top = sc ? sc.scrollTop : 0;
+    renderDashboard();
+    if (sc) sc.scrollTop = top;
+  }
 }, 1000);
 
 // Re-account when returning to foreground (don't count background time
@@ -3100,7 +3107,7 @@ function canonStudy(s) {
 function canonNotes(n) {
   return stableStr([...(n || [])].sort((a, b) => (a.id || 0) - (b.id || 0))
     .map(x => ({ id: x.id, title: x.title || '', type: x.type || 'text',
-                 text: x.text || '', items: x.items || [], pinned: !!x.pinned })));
+                 text: x.text || '', items: x.items || [], pinned: !!x.pinned, pinnedAt: x.pinnedAt || 0 })));
 }
 function canonTomb(t) { return stableStr(t || {}); }
 
@@ -3299,10 +3306,17 @@ let memoIndex = 0;     // which note the widget is showing
 let editDraftItems = [];
 let editDraftType  = 'text';
 
+// Stable ordering: pinned first (in the order they were pinned, so editing a
+// note never reshuffles the pinned ones), then unpinned by most-recent edit.
+function noteSortCmp(a, b) {
+  const pa = a.pinned ? 1 : 0, pb = b.pinned ? 1 : 0;
+  if (pa !== pb) return pb - pa;
+  if (pa) return (a.pinnedAt || a.id || 0) - (b.pinnedAt || b.id || 0);
+  return (b.updatedAt || 0) - (a.updatedAt || 0);
+}
 // Notes ordered for the main widget: pinned first, then most-recent.
 function memoOrderedNotes() {
-  return notes.slice().sort((a, b) =>
-    (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (b.updatedAt || 0) - (a.updatedAt || 0));
+  return notes.slice().sort(noteSortCmp);
 }
 function pinnedOrRecentNote() {
   const list = memoOrderedNotes();
@@ -3318,6 +3332,89 @@ function notePreviewText(n) {
 
 // Main-screen memo widget. The fab is always in flow (fixed slot); the card is
 // an absolute overlay so opening/closing never moves the UI below it.
+// Inner HTML of the open card for a given note.
+function memoCardInner(n, list) {
+  const body = n.type === 'list'
+    ? `<div class="memo-checks">${(n.items || []).map((it, i) =>
+        `<label class="memo-check ${it.done ? 'done' : ''}"><input type="checkbox" data-i="${i}" ${it.done ? 'checked' : ''}><span>${escHtml(it.t || '')}</span></label>`
+      ).join('') || '<div class="memo-empty">항목 없음</div>'}</div>`
+    : `<div class="memo-text">${n.text ? escHtml(n.text) : '<span class="memo-empty">내용 없음</span>'}</div>`;
+  const nav = list.length > 1
+    ? `<div class="memo-nav">
+         <button class="memo-mini-btn" id="memoPrev" title="이전">${ICONS.chevL}</button>
+         <span class="memo-nav-count">${memoIndex + 1} / ${list.length}</span>
+         <button class="memo-mini-btn" id="memoNext" title="다음">${ICONS.chevR}</button>
+       </div>`
+    : '';
+  return `<div class="memo-card-head">
+            ${n.pinned ? '<span class="memo-pin-ic">'+icoSm('pin')+'</span>' : ''}
+            <span class="memo-card-title">${escHtml(n.title || '메모')}</span>
+            <div class="memo-card-actions">
+              <button class="memo-mini-btn" id="memoEdit" title="편집">${ICONS.pencil}</button>
+              <button class="memo-mini-btn" id="memoOpen" title="메모장">${ICONS.list}</button>
+              <button class="memo-mini-btn" id="memoCollapse" title="접기">${ICONS.close}</button>
+            </div>
+          </div>
+          ${body}
+          ${nav}`;
+}
+// Wire up the card's interactive elements. `n` and `list` describe the note
+// currently shown in the card.
+function bindMemoCard(n, list) {
+  memoWidget.querySelectorAll('.memo-check input').forEach(cb => {
+    cb.addEventListener('change', () => {
+      cancelMemoAutoCollapse();
+      n.items[+cb.dataset.i].done = cb.checked;
+      n.updatedAt = Date.now();
+      saveNotes();
+      memoShowNote(n.id);  // update in place; keep showing this note
+    });
+  });
+  // Prev/next swap the card contents in place (no re-mount → no flicker/animation).
+  const go = d => {
+    cancelMemoAutoCollapse();
+    const cur = memoOrderedNotes();
+    if (cur.length < 2) return;
+    memoIndex = (memoIndex + d + cur.length) % cur.length;
+    const next = cur[memoIndex];
+    const card = memoWidget.querySelector('.memo-card');
+    card.innerHTML = memoCardInner(next, cur);
+    bindMemoCard(next, cur);
+  };
+  if ($('memoPrev')) $('memoPrev').addEventListener('click', () => go(-1));
+  if ($('memoNext')) $('memoNext').addEventListener('click', () => go(1));
+  $('memoEdit').addEventListener('click', () => { collapseMemo(); openNoteEditor(n.id); });
+  $('memoOpen').addEventListener('click', () => { collapseMemo(); openNotes(); });
+  $('memoCollapse').addEventListener('click', collapseMemo);
+  const card = memoWidget.querySelector('.memo-card');
+  card.addEventListener('pointerdown', cancelMemoAutoCollapse, { once: true });
+  // Horizontal swipe to flip between notes (swipe left → next, right → prev).
+  if (list.length > 1) {
+    let sx = 0, sy = 0, swiping = false;
+    card.addEventListener('pointerdown', e => {
+      if (e.target.closest('button, input, label')) return;  // don't hijack taps on controls
+      sx = e.clientX; sy = e.clientY; swiping = true;
+    });
+    card.addEventListener('pointerup', e => {
+      if (!swiping) return;
+      swiping = false;
+      const dx = e.clientX - sx, dy = e.clientY - sy;
+      if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.5) go(dx < 0 ? 1 : -1);
+    });
+  }
+}
+// Re-render just the open card in place to show the note with the given id,
+// without re-mounting the widget (avoids the entrance animation re-firing).
+function memoShowNote(id) {
+  const cur = memoOrderedNotes();
+  const i = cur.findIndex(x => x.id === id);
+  if (i < 0 || !memoWidget.classList.contains('open')) { renderMemoWidget(); return; }
+  memoIndex = i;
+  const card = memoWidget.querySelector('.memo-card');
+  if (!card) { renderMemoWidget(); return; }
+  card.innerHTML = memoCardInner(cur[i], cur);
+  bindMemoCard(cur[i], cur);
+}
 function renderMemoWidget() {
   const list = memoOrderedNotes();
   if (!list.length) { memoWidget.style.display = 'none'; memoWidget.innerHTML = ''; memoWidget.classList.remove('open'); return; }
@@ -3326,54 +3423,10 @@ function renderMemoWidget() {
   const n = list[memoIndex];
   const open = memoWidget.classList.contains('open');
   let html = `<button class="memo-fab" id="memoFab" title="메모">${ICONS.note}<span class="memo-dot"></span></button>`;
-  if (open) {
-    const body = n.type === 'list'
-      ? `<div class="memo-checks">${(n.items || []).map((it, i) =>
-          `<label class="memo-check ${it.done ? 'done' : ''}"><input type="checkbox" data-i="${i}" ${it.done ? 'checked' : ''}><span>${escHtml(it.t || '')}</span></label>`
-        ).join('') || '<div class="memo-empty">항목 없음</div>'}</div>`
-      : `<div class="memo-text">${n.text ? escHtml(n.text) : '<span class="memo-empty">내용 없음</span>'}</div>`;
-    const nav = list.length > 1
-      ? `<div class="memo-nav">
-           <button class="memo-mini-btn" id="memoPrev" title="이전">${ICONS.chevL}</button>
-           <span class="memo-nav-count">${memoIndex + 1} / ${list.length}</span>
-           <button class="memo-mini-btn" id="memoNext" title="다음">${ICONS.chevR}</button>
-         </div>`
-      : '';
-    html +=
-      `<div class="memo-card">
-         <div class="memo-card-head">
-           ${n.pinned ? '<span class="memo-pin-ic">'+icoSm('pin')+'</span>' : ''}
-           <span class="memo-card-title">${escHtml(n.title || '메모')}</span>
-           <div class="memo-card-actions">
-             <button class="memo-mini-btn" id="memoEdit" title="편집">${ICONS.pencil}</button>
-             <button class="memo-mini-btn" id="memoOpen" title="메모장">${ICONS.list}</button>
-             <button class="memo-mini-btn" id="memoCollapse" title="접기">${ICONS.close}</button>
-           </div>
-         </div>
-         ${body}
-         ${nav}
-       </div>`;
-  }
+  if (open) html += `<div class="memo-card">${memoCardInner(n, list)}</div>`;
   memoWidget.innerHTML = html;
   $('memoFab').addEventListener('click', () => memoWidget.classList.contains('open') ? collapseMemo() : expandMemo());
-  if (!open) return;
-  memoWidget.querySelectorAll('.memo-check input').forEach(cb => {
-    cb.addEventListener('change', () => {
-      cancelMemoAutoCollapse();
-      n.items[+cb.dataset.i].done = cb.checked;
-      n.updatedAt = Date.now();
-      saveNotes();
-      memoIndex = memoOrderedNotes().findIndex(x => x.id === n.id);  // keep showing this note
-      renderMemoWidget();
-    });
-  });
-  const nav = d => () => { cancelMemoAutoCollapse(); memoIndex = (memoIndex + d + list.length) % list.length; renderMemoWidget(); };
-  if ($('memoPrev')) $('memoPrev').addEventListener('click', nav(-1));
-  if ($('memoNext')) $('memoNext').addEventListener('click', nav(1));
-  $('memoEdit').addEventListener('click', () => { collapseMemo(); openNoteEditor(n.id); });
-  $('memoOpen').addEventListener('click', () => { collapseMemo(); openNotes(); });
-  $('memoCollapse').addEventListener('click', collapseMemo);
-  memoWidget.querySelector('.memo-card').addEventListener('pointerdown', cancelMemoAutoCollapse, { once: true });
+  if (open) bindMemoCard(n, list);
 }
 // User-initiated expand: stays open until the user closes it (no auto-collapse).
 function expandMemo() { cancelMemoAutoCollapse(); memoIndex = 0; memoWidget.classList.add('open'); renderMemoWidget(); }
@@ -3402,8 +3455,7 @@ function renderNotesList() {
     list.innerHTML = '<div class="notes-empty">아직 메모가 없습니다.<br>위 버튼으로 새 메모를 추가하세요.</div>';
     return;
   }
-  const sorted = notes.slice().sort((a, b) =>
-    (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (b.updatedAt || 0) - (a.updatedAt || 0));
+  const sorted = notes.slice().sort(noteSortCmp);
   list.innerHTML = sorted.map(n =>
     `<div class="note-row" data-id="${n.id}">
        <div class="note-row-body">
@@ -3507,11 +3559,11 @@ function saveNoteFromEditor() {
   else { n.items = editDraftItems.filter(i => i.t.trim() !== '' || i.done).map(i => ({ t: i.t, done: i.done })); n.text = ''; }
   const now = Date.now();
   if ($('notePinInput').checked) {
-    // Unpin any other pinned note and bump its updatedAt so the unpin syncs.
-    notes.forEach(x => { if (x.id !== n.id && x.pinned) { x.pinned = false; x.updatedAt = now; } });
+    if (!n.pinned) n.pinnedAt = now;   // record pin order (keep prior value if already pinned)
     n.pinned = true;
   } else {
     n.pinned = false;
+    n.pinnedAt = 0;
   }
   n.updatedAt = now;
   saveNotes();
