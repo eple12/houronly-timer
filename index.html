@@ -1823,7 +1823,9 @@ function nextStudyDayStart(ms) {
 // twice is a no-op. A run only ends on an explicit stop: the timer keeps
 // counting while the device is locked/closed, and that wall-clock time is
 // credited in full when it's stopped (or seen again on any device).
-function isRunning() { return !!(study.session && study.session.startEpoch); }
+// NOTE: named swRunning (not isRunning) — isRunning() is the MAIN countdown
+// timer's state. They are independent; don't conflate them.
+function swRunning() { return !!(study.session && study.session.startEpoch); }
 
 // Live (not-yet-committed) seconds the active session contributes, split by
 // study-day. Starts from whatever has already been committed for this run so a
@@ -1913,12 +1915,12 @@ function todaySubjectSec(name) {
   const key = studyDayKey(Date.now());
   const day = study.subjects[key] || {};
   let v = day[name] || 0;
-  if (isRunning() && study.curSubject && name === study.curSubject) v += (sessionOverlay()[key] || 0);
+  if (swRunning() && study.curSubject && name === study.curSubject) v += (sessionOverlay()[key] || 0);
   return Math.floor(v);
 }
 
 function toggleStopwatch() {
-  if (isRunning()) {
+  if (swRunning()) {
     stopSession();
   } else {
     requestNotifyPermission();
@@ -2058,7 +2060,7 @@ function updateProjection() {
 
 // ── Study UI ───────────────────────────────────────────────────
 function updateStudyUI() {
-  const running = isRunning();
+  const running = swRunning();
   const sec = todayStudySec();
   swTimeEl.textContent = fmt(sec);
   swTimeEl.classList.toggle('running', running);
@@ -2215,7 +2217,7 @@ setInterval(() => {
   updateStudyUI();
   if (goals.length && !rafId) { updateGoalTimes(); }
   // Keep the dashboard charts live while the stopwatch is running.
-  if (isRunning() && dashModal.classList.contains('open')) {
+  if (swRunning() && dashModal.classList.contains('open')) {
     const sc = dashModal.querySelector('.modal');
     const top = sc ? sc.scrollTop : 0;
     renderDashboard();
@@ -2407,7 +2409,7 @@ $('pomoReset').addEventListener('click', pomoReset);
 const studyCard = $('studyCard');
 function updateModeDots() {
   const m = studyCard.dataset.mode;
-  $('modeStudy').classList.toggle('live', isRunning() && m !== 'study');
+  $('modeStudy').classList.toggle('live', swRunning() && m !== 'study');
   $('modePomo').classList.toggle('live', pomoRunning() && m !== 'pomo');
 }
 function setComboMode(m) {
@@ -2636,7 +2638,7 @@ function subjectBreakHTML() {
   const dayKey = studyDayKey(Date.now());
   const day = Object.assign({}, study.subjects[dayKey] || {});
   // Fold the live session into its current subject so the breakdown grows too.
-  if (isRunning() && study.curSubject) day[study.curSubject] = (day[study.curSubject] || 0) + (sessionOverlay()[dayKey] || 0);
+  if (swRunning() && study.curSubject) day[study.curSubject] = (day[study.curSubject] || 0) + (sessionOverlay()[dayKey] || 0);
   const total = todayStudySec();
   const entries = Object.entries(day).filter(([,v]) => v > 0.5).sort((a,b) => b[1]-a[1]);
   const tagged = entries.reduce((a,[,v]) => a+v, 0);
@@ -3001,7 +3003,7 @@ setModal.addEventListener('click', e => { if (e.target === setModal) setModal.cl
 let focusLeftCount = 0;
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
-    if (study.focusMode && isRunning()) {
+    if (study.focusMode && swRunning()) {
       const key = studyDayKey(Date.now());
       study.distractions[key] = (study.distractions[key] || 0) + 1;
       focusLeftCount++;
