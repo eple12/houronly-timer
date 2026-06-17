@@ -293,7 +293,7 @@ svg.ico-sm { width: 1em; height: 1em; display: inline-block; vertical-align: -0.
   font-weight: 700;
   color: var(--accent);
   letter-spacing: -0.3px;
-  border: 1px solid rgba(206,242,49,0.35);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
   border-radius: 6px;
   padding: 2px 8px;
 }
@@ -1101,6 +1101,75 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 .subj-line-bar { height: 6px; border-radius: 3px; background: var(--bord2); overflow: hidden; }
 .subj-line-bar > i { display: block; height: 100%; border-radius: 3px; }
 
+/* Subject rows in dashboard */
+.subj-line-top .sl-name { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+.sl-right { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.subj-line.zero .sl-name { color: var(--dim); }
+.subj-line.zero .sl-val  { color: var(--dim); }
+.subj-line.zero .subj-line-bar { opacity: 0.4; }
+
+/* Color dot inside subject chip */
+.subj-color-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  display: inline-block; border: 1px solid rgba(255,255,255,0.18);
+}
+/* Color swatches row inside subject add modal */
+.subj-color-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.subj-cswatch {
+  width: 22px; height: 22px; border-radius: 50%; cursor: pointer;
+  border: 2px solid transparent; outline: 2.5px solid transparent;
+  outline-offset: 2px; transition: transform 0.14s, outline-color 0.14s;
+  -webkit-appearance: none; flex-shrink: 0;
+}
+.subj-cswatch.selected { outline-color: var(--text); transform: scale(1.18); }
+.subj-cswatch:active   { transform: scale(0.88); }
+
+/* Subject time adjustment tab in dashboard */
+.subj-add-time-wrap {
+  display: flex; flex-direction: column; gap: 0;
+  background: var(--surf2); border-radius: 14px;
+  padding: 10px 12px; border: 1px solid var(--bord2); margin-top: 10px;
+}
+.subj-add-time-row  { display: flex; gap: 8px; align-items: center; }
+
+/* Custom subject dropdown (native <select> popups can't be styled) */
+.subj-dd { position: relative; flex: 1; min-width: 0; }
+.subj-dd-btn {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  background: var(--bg); border: 1px solid var(--bord2); border-radius: 20px;
+  color: var(--text); font-family: 'Noto Sans KR', sans-serif; font-size: 13px;
+  padding: 8px 14px; cursor: pointer; -webkit-appearance: none; outline: none;
+  transition: border-color 0.12s;
+}
+.subj-dd-btn .dd-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.subj-dd-btn .dd-caret { flex-shrink: 0; transition: transform 0.18s; opacity: 0.6; }
+.subj-dd.open .subj-dd-btn { border-color: var(--accent); }
+.subj-dd.open .dd-caret { transform: rotate(180deg); }
+.subj-dd-menu {
+  position: absolute; left: 0; right: 0; bottom: calc(100% + 6px);
+  background: var(--surface); border: 1px solid var(--bord2); border-radius: 14px;
+  padding: 5px; box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+  display: none; flex-direction: column; gap: 2px; z-index: 30;
+  max-height: 220px; overflow-y: auto;
+}
+.subj-dd.open .subj-dd-menu { display: flex; }
+.subj-dd-opt {
+  text-align: left; background: none; border: none; border-radius: 10px;
+  color: var(--text); font-family: 'Noto Sans KR', sans-serif; font-size: 13px;
+  padding: 9px 12px; cursor: pointer; -webkit-appearance: none;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  transition: background 0.1s;
+}
+.subj-dd-opt:hover  { background: var(--surf2); }
+.subj-dd-opt.sel    { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font-weight: 600; }
+.subj-add-time-row .sad-btn {
+  background: none; border: 1.5px solid var(--bord2); border-radius: 20px;
+  color: var(--text); font-family: 'Noto Sans KR', sans-serif; font-size: 12px; font-weight: 600;
+  padding: 8px 13px; cursor: pointer; -webkit-appearance: none; white-space: nowrap;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+}
+.subj-add-time-row .sad-btn:active { background: var(--accent); color: #000; border-color: var(--accent); }
+
 .heat-wrap { overflow-x: auto; padding-bottom: 4px; }
 .heat {
   display: grid; grid-auto-flow: column;
@@ -1524,6 +1593,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
         <input type="text" class="goal-memo-input" id="subjAddInput" placeholder="예: 수학" maxlength="16">
         <button class="modal-confirm" id="subjAddBtn">추가</button>
       </div>
+      <div class="subj-color-row" id="subjColorSwatches"></div>
     </div>
   </div>
 </div>
@@ -1553,6 +1623,13 @@ const GOAL_COLORS = [
   '#f03c3c', '#ff8800', '#cef231',
   '#2edf7a', '#3a8fff', '#a855f7',
   '#f542c8', '#00cfff',
+];
+
+// Colors available for subject tags (palette shown in subject picker)
+const SUBJECT_COLORS = [
+  '#7aa2f7','#5ed3a8','#f7a23a','#f76b6b',
+  '#c47cff','#36d1dc','#cef231','#ff9f7a',
+  '#ff7eb3','#facc15',
 ];
 
 /* ── Flag SVG geometry (must stay in sync with CSS .progress-track padding-top) ──
@@ -1591,9 +1668,11 @@ let lastLocked      = null;
 let emergency       = false;
 
 // ── Goals state ────────────────────────────────────────────────
-let goals         = [];
-let selectedColor = GOAL_COLORS[0];
-let lastGoalSec   = -1;
+let goals              = [];
+let selectedColor      = GOAL_COLORS[0];
+let selectedSubjColor  = SUBJECT_COLORS[0];   // color chosen in subject picker
+let sadSubject         = '';                  // subject chosen in dashboard "add time" dropdown
+let lastGoalSec        = -1;
 
 // ── Study state ────────────────────────────────────────────────
 let study = {
@@ -1748,6 +1827,35 @@ function setDayOverride(dayKey, sec) {
   saveStudy();
   updateStudyUI();
 }
+// Returns the effective (committed + live session) seconds for one subject on a day.
+// Respects subjectsOverride: override.sec + any time accumulated after the override.
+function effectiveSubjectSec(dayKey, name) {
+  let accumulated = (study.subjects[dayKey] || {})[name] || 0;
+  if (swRunning() && study.curSubject === name) accumulated += (sessionOverlay()[dayKey] || 0);
+  const ov = (study.subjectsOverride[dayKey] || {})[name];
+  if (!ov) return Math.floor(accumulated);
+  return Math.max(0, Math.floor(ov.sec + Math.max(0, accumulated - ov.base)));
+}
+// Manually set a subject's study time for a given day.
+// Stores an override that "wins" over any accumulated value unless new time is added later.
+function setSubjectOverride(dayKey, name, sec) {
+  sec = Math.max(0, sec);
+  const accumulated = (study.subjects[dayKey] || {})[name] || 0;
+  if (!study.subjectsOverride[dayKey]) study.subjectsOverride[dayKey] = {};
+  study.subjectsOverride[dayKey][name] = { sec, at: Date.now(), base: accumulated };
+  saveStudy();
+  updateStudyUI();
+}
+// Returns a map { subjectName → effectiveSec } for the given day,
+// covering all subjects in subjectList + any recorded in subjects[dayKey].
+// Delegates to effectiveSubjectSec so the session overlay is counted exactly once.
+function effectiveSubjectsForDay(dayKey) {
+  const raw = study.subjects[dayKey] || {};
+  const allNames = new Set([...Object.keys(raw), ...study.subjectList]);
+  const out = {};
+  allNames.forEach(name => { out[name] = effectiveSubjectSec(dayKey, name); });
+  return out;
+}
 function saveNotes() { try { localStorage.setItem(NOTES_KEY, JSON.stringify(notes)); } catch(e) {} syncTouch(); }
 function loadNotes() { try { notes = JSON.parse(localStorage.getItem(NOTES_KEY)) || []; } catch(e) { notes = []; } if (!Array.isArray(notes)) notes = []; }
 function saveTomb()  { try { localStorage.setItem(TOMB_KEY, JSON.stringify(tomb)); } catch(e) {} syncTouch(); }
@@ -1777,9 +1885,11 @@ function ensureSettings() {
   if (typeof study.focusMode !== 'boolean') study.focusMode = false;
   if (study.comboMode !== 'pomo' && study.comboMode !== 'study') study.comboMode = 'study';
   study.pomo = Object.assign({}, DEFAULT_POMO, (study.pomo && typeof study.pomo === 'object') ? study.pomo : {});
-  if (!study.settingsAt     || typeof study.settingsAt     !== 'object') study.settingsAt     = {};
+  if (!study.settingsAt      || typeof study.settingsAt      !== 'object') study.settingsAt      = {};
   if (!study.recordsOverride || typeof study.recordsOverride !== 'object') study.recordsOverride = {};
-  if (!study.committedRuns  || typeof study.committedRuns  !== 'object') study.committedRuns  = {};
+  if (!study.committedRuns   || typeof study.committedRuns   !== 'object') study.committedRuns   = {};
+  if (!study.subjectColors   || typeof study.subjectColors   !== 'object') study.subjectColors   = {};
+  if (!study.subjectsOverride|| typeof study.subjectsOverride!== 'object') study.subjectsOverride= {};
   if (typeof study.sessionAt !== 'number') study.sessionAt = 0;
   if (study.session && typeof study.session !== 'object') study.session = null;
   // Migrate the old device-local run-state (swRunning/swLastTick) — just drop it;
@@ -2216,12 +2326,10 @@ setInterval(() => {
   checkDayRollover();
   updateStudyUI();
   if (goals.length && !rafId) { updateGoalTimes(); }
-  // Keep the dashboard charts live while the stopwatch is running.
+  // Keep the dashboard numbers/bars live while the stopwatch is running.
+  // Surgical update (not a full re-render) so an open subject dropdown stays open.
   if (swRunning() && dashModal.classList.contains('open')) {
-    const sc = dashModal.querySelector('.modal');
-    const top = sc ? sc.scrollTop : 0;
-    renderDashboard();
-    if (sc) sc.scrollTop = top;
+    refreshDashboardLive();
   }
 }, 1000);
 
@@ -2634,27 +2742,95 @@ function goalGaugeHTML(today) {
     </div>`;
 }
 
-function subjectBreakHTML() {
+function subjectColor(name) {
+  return (study.subjectColors && study.subjectColors[name]) || null;
+}
+// Just the per-subject bar rows (the part that changes live while studying).
+// Kept separate so refreshDashboardLive() can rebuild only this, leaving the
+// "add time" dropdown intact.
+function subjectBreakRowsHTML() {
   const dayKey = studyDayKey(Date.now());
-  const day = Object.assign({}, study.subjects[dayKey] || {});
-  // Fold the live session into its current subject so the breakdown grows too.
-  if (swRunning() && study.curSubject) day[study.curSubject] = (day[study.curSubject] || 0) + (sessionOverlay()[dayKey] || 0);
-  const total = todayStudySec();
-  const entries = Object.entries(day).filter(([,v]) => v > 0.5).sort((a,b) => b[1]-a[1]);
-  const tagged = entries.reduce((a,[,v]) => a+v, 0);
-  const untag = Math.max(0, total - tagged);
-  if (!entries.length && untag < 1) return '';
+  const effMap = effectiveSubjectsForDay(dayKey);
+  const total  = todayStudySec();
+
+  // Sort: by effective seconds desc; zero-time subjects from subjectList go last
+  const allNames = Array.from(new Set([...Object.keys(effMap), ...study.subjectList]));
+  allNames.sort((a, b) => {
+    const va = effMap[a] || 0, vb = effMap[b] || 0;
+    if (va !== vb) return vb - va;
+    return (study.subjectList.indexOf(a) ?? 99) - (study.subjectList.indexOf(b) ?? 99);
+  });
+
+  // Untagged = total stopwatch time minus tagged time
+  const taggedSec = allNames.reduce((s, n) => s + (effMap[n] || 0), 0);
+  const untag = Math.max(0, total - taggedSec);
+  // Bar lengths are relative to everything shown. When per-subject time is added
+  // via overrides, tagged time can exceed the raw stopwatch total — so the
+  // denominator is the larger of the two, keeping bars proportional (not maxed out).
+  const denom = Math.max(total, taggedSec);
+
+  // Generate a fallback palette color by list-index (for subjects without a custom color)
+  const paletteColor = name => {
+    const i = study.subjectList.indexOf(name);
+    return SUBJECT_COLORS[(i >= 0 ? i : allNames.indexOf(name)) % SUBJECT_COLORS.length];
+  };
+
+  if (!allNames.length && untag < 1) return '';
+
   const line = (name, sec, color) => {
-    const pct = total > 0 ? Math.min(100, sec/total*100) : 0;
-    return `<div class="subj-line">
-      <div class="subj-line-top"><span class="sl-name">${name}</span><span class="sl-val">${fmt(sec).slice(0,5)}</span></div>
+    const pct  = denom > 0 ? Math.min(100, sec / denom * 100) : 0;
+    const zero = sec < 1;
+    const nameEsc = escHtml(name);
+    return `<div class="subj-line${zero ? ' zero' : ''}">
+      <div class="subj-line-top">
+        <span class="sl-name">${nameEsc}</span>
+        <div class="sl-right"><span class="sl-val">${fmt(sec).slice(0, 5)}</span></div>
+      </div>
       <div class="subj-line-bar"><i style="width:${pct.toFixed(1)}%;background:${color}"></i></div>
     </div>`;
   };
-  const rows = entries.map(([name,sec],i) => line(escHtml(name), sec, ACCENTS[i % ACCENTS.length]));
+
+  const rows = allNames.map(name => {
+    const sec   = effMap[name] || 0;
+    const color = subjectColor(name) || paletteColor(name);
+    return line(name, sec, color);
+  });
   if (untag >= 1) rows.push(line('기타', untag, 'var(--dim)'));
-  return `<div class="chart-block"><div class="chart-title"><span>오늘 과목별</span></div>
-    <div class="subj-break">${rows.join('')}</div></div>`;
+  return rows.join('');
+}
+
+function subjectBreakHTML() {
+  const rowsHTML = subjectBreakRowsHTML();
+  if (!rowsHTML) return '';
+
+  // Custom dropdown (native <select> popups can't be rounded/styled). The chosen
+  // subject is held in `sadSubject`; default to the first subject if unset/stale.
+  const cur = study.subjectList.includes(sadSubject) ? sadSubject : (study.subjectList[0] || '');
+  const opts = study.subjectList.map(n =>
+    `<button type="button" class="subj-dd-opt${n === cur ? ' sel' : ''}" data-val="${escHtml(n)}">${escHtml(n)}</button>`
+  ).join('');
+  const addRow = study.subjectList.length ? `
+    <div class="subj-add-time-wrap">
+      <div class="subj-add-time-row">
+        <div class="subj-dd" id="sadDropdown" data-val="${escHtml(cur)}">
+          <button class="subj-dd-btn" id="sadDdBtn" type="button">
+            <span class="dd-label">${escHtml(cur)}</span>
+            <svg class="dd-caret" width="11" height="7" viewBox="0 0 11 7" fill="none"><path d="M1 1l4.5 4.5L10 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="subj-dd-menu" id="sadDdMenu">${opts}</div>
+        </div>
+        <button class="sad-btn" id="sadMinus">-15분</button>
+        <button class="sad-btn" id="sadPlus">+15분</button>
+      </div>
+    </div>` : '';
+
+  return `<div class="chart-block" id="subjBreakBlock">
+    <div class="chart-title">
+      <span>오늘 과목별</span>
+    </div>
+    <div class="subj-break" id="subjBreakRows">${rowsHTML}</div>
+    ${addRow}
+  </div>`;
 }
 
 function heatmapHTML() {
@@ -2706,8 +2882,10 @@ function renderDashboard() {
   if (st.days === 0 && today < 1) {
     body.innerHTML = `
       <div class="dash-empty">아직 기록이 없어요.<br>공부 스톱워치를 시작해 보세요 ${icoSm('play')}</div>
+      ${subjectBreakHTML()}
       ${resetHourBlock(hourOpts)}`;
     bindResetHour();
+    bindSubjectEdits();
     return;
   }
 
@@ -2779,17 +2957,17 @@ function renderDashboard() {
 
   body.innerHTML = `
     <div class="stat-grid">
-      <div class="stat-card"><div class="stat-label">오늘</div><div class="stat-value">${fmtHrs(today)}<small> ${fmt(today).slice(0,5)}</small></div></div>
-      <div class="stat-card"><div class="stat-label">일 평균</div><div class="stat-value">${fmtHrs(st.avg)}</div></div>
-      <div class="stat-card"><div class="stat-label">총 공부</div><div class="stat-value">${fmtHrs(st.total)}</div></div>
+      <div class="stat-card"><div class="stat-label">오늘</div><div class="stat-value"><span id="dvToday">${fmtHrs(today)}</span><small id="dvTodayS"> ${fmt(today).slice(0,5)}</small></div></div>
+      <div class="stat-card"><div class="stat-label">일 평균</div><div class="stat-value" id="dvAvg">${fmtHrs(st.avg)}</div></div>
+      <div class="stat-card"><div class="stat-label">총 공부</div><div class="stat-value" id="dvTotal">${fmtHrs(st.total)}</div></div>
       <div class="stat-card"><div class="stat-label">연속 일수</div><div class="stat-value">${st.streak}<small> 일</small></div></div>
     </div>
 
-    ${goalGaugeHTML(today)}
+    <div id="dashGoalGauge">${goalGaugeHTML(today)}</div>
 
     <div class="stat-grid">
-      <div class="stat-card"><div class="stat-label">최근 7일</div><div class="stat-value">${fmtHrs(sumLastDays(7))}</div></div>
-      <div class="stat-card"><div class="stat-label">최근 30일</div><div class="stat-value">${fmtHrs(sumLastDays(30))}</div></div>
+      <div class="stat-card"><div class="stat-label">최근 7일</div><div class="stat-value" id="dvWeek">${fmtHrs(sumLastDays(7))}</div></div>
+      <div class="stat-card"><div class="stat-label">최근 30일</div><div class="stat-value" id="dvMonth">${fmtHrs(sumLastDays(30))}</div></div>
     </div>
 
     ${projHTML}
@@ -2809,13 +2987,77 @@ function renderDashboard() {
     ${heatmapHTML()}
 
     <div class="stat-grid">
-      <div class="stat-card"><div class="stat-label">하루 최대</div><div class="stat-value">${fmtHrs(st.best)}</div></div>
+      <div class="stat-card"><div class="stat-label">하루 최대</div><div class="stat-value" id="dvBest">${fmtHrs(st.best)}</div></div>
       ${focusCard}
     </div>
 
     ${resetHourBlock(hourOpts)}
   `;
   bindResetHour();
+  bindSubjectEdits();
+}
+
+// Update only the live-changing numbers/bars while the stopwatch runs, without
+// rebuilding the whole dashboard (a full re-render would close the open subject
+// dropdown every second). If the full structure isn't present (empty state),
+// fall back to a one-time full render.
+function refreshDashboardLive() {
+  if (!$('subjBreakRows') || !$('dvToday')) { renderDashboard(); return; }
+  $('subjBreakRows').innerHTML = subjectBreakRowsHTML();
+
+  const st    = studyStats();
+  const today = todayStudySec();
+  const set = (id, txt) => { const el = $(id); if (el) el.textContent = txt; };
+  set('dvToday',  fmtHrs(today));
+  set('dvTodayS', ' ' + fmt(today).slice(0,5));
+  set('dvAvg',    fmtHrs(st.avg));
+  set('dvTotal',  fmtHrs(st.total));
+  set('dvWeek',   fmtHrs(sumLastDays(7)));
+  set('dvMonth',  fmtHrs(sumLastDays(30)));
+  set('dvBest',   fmtHrs(st.best));
+  const gg = $('dashGoalGauge');
+  if (gg) gg.innerHTML = goalGaugeHTML(today);
+}
+
+function bindSubjectEdits() {
+  const dayKey = studyDayKey(Date.now());
+
+  // Bottom "add time" row: custom subject dropdown + ±15m buttons
+  const dd       = $('sadDropdown');
+  const ddBtn    = $('sadDdBtn');
+  const ddMenu   = $('sadDdMenu');
+  const sadMinus = $('sadMinus');
+  const sadPlus  = $('sadPlus');
+  if (!dd || !ddBtn || !ddMenu || !sadMinus || !sadPlus) return;
+
+  // Sync the module-level selection with what's actually shown.
+  sadSubject = dd.dataset.val || sadSubject;
+
+  ddBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    dd.classList.toggle('open');
+  });
+  ddMenu.querySelectorAll('.subj-dd-opt').forEach(opt => {
+    opt.addEventListener('click', e => {
+      e.stopPropagation();
+      sadSubject       = opt.dataset.val;
+      dd.dataset.val   = sadSubject;
+      dd.querySelector('.dd-label').textContent = sadSubject;
+      ddMenu.querySelectorAll('.subj-dd-opt').forEach(o => o.classList.toggle('sel', o === opt));
+      dd.classList.remove('open');
+    });
+  });
+
+  const applyAdj = delta => {
+    const name = dd.dataset.val;
+    if (!name) return;
+    const cur  = effectiveSubjectSec(dayKey, name);
+    const next = Math.max(0, cur + delta);
+    setSubjectOverride(dayKey, name, next);
+    refreshDashboardLive();   // updates bars/numbers in place, keeps dropdown
+  };
+  sadMinus.addEventListener('click', () => applyAdj(-900));
+  sadPlus.addEventListener('click',  () => applyAdj(900));
 }
 
 function resetHourBlock(hourOpts) {
@@ -2848,22 +3090,47 @@ function bindResetHour() {
 $('dashBtn').addEventListener('click', () => { requestNotifyPermission(); renderDashboard(); dashModal.classList.add('open'); });
 $('dashClose').addEventListener('click', () => dashModal.classList.remove('open'));
 dashModal.addEventListener('click', e => { if(e.target===dashModal) dashModal.classList.remove('open'); });
+// Close any open custom subject dropdown when clicking elsewhere (registered
+// once; survives dashboard re-renders since it targets live .subj-dd nodes).
+document.addEventListener('click', e => {
+  document.querySelectorAll('.subj-dd.open').forEach(dd => {
+    if (!dd.contains(e.target)) dd.classList.remove('open');
+  });
+});
 
 // ── Subject picker ─────────────────────────────────────────────
 const subjModal = $('subjModal');
+function buildSubjColorSwatches() {
+  const wrap = $('subjColorSwatches');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  SUBJECT_COLORS.forEach(c => {
+    const btn = document.createElement('button');
+    btn.className = 'subj-cswatch' + (c === selectedSubjColor ? ' selected' : '');
+    btn.style.background = c;
+    btn.title = c;
+    btn.addEventListener('click', () => {
+      selectedSubjColor = c;
+      wrap.querySelectorAll('.subj-cswatch').forEach(s => s.classList.toggle('selected', s === btn));
+    });
+    wrap.appendChild(btn);
+  });
+}
 function renderSubjChips() {
   const wrap = $('subjChips');
   const chips = [`<button class="subj-chip ${study.curSubject==='' ? 'active' : ''}" data-subj="">전체</button>`];
   study.subjectList.forEach(name => {
+    const color = (study.subjectColors && study.subjectColors[name]) || SUBJECT_COLORS[study.subjectList.indexOf(name) % SUBJECT_COLORS.length];
     chips.push(
       `<button class="subj-chip ${study.curSubject===name ? 'active' : ''}" data-subj="${escHtml(name)}">
+         <span class="subj-color-dot" style="background:${color}"></span>
          ${escHtml(name)}<span class="subj-x" data-del="${escHtml(name)}" title="삭제">✕</span>
        </button>`);
   });
   wrap.innerHTML = chips.join('');
   wrap.querySelectorAll('.subj-chip').forEach(btn => {
     btn.addEventListener('click', e => {
-      if (e.target.closest('.subj-x')) return;
+      if (e.target.closest('.subj-x') || e.target.closest('.subj-color-dot')) return;
       study.curSubject = btn.dataset.subj || '';
       touchSetting('curSubject'); saveStudy(); updateStudyUI();
       subjModal.classList.remove('open');
@@ -2874,18 +3141,31 @@ function renderSubjChips() {
       e.stopPropagation();
       const name = x.dataset.del;
       study.subjectList = study.subjectList.filter(s => s !== name);
+      if (study.subjectColors) delete study.subjectColors[name];
       if (study.curSubject === name) { study.curSubject = ''; touchSetting('curSubject'); }
       touchSetting('subjectList'); saveStudy(); renderSubjChips(); updateStudyUI();
     });
   });
+  buildSubjColorSwatches();
 }
 function addSubject() {
   const inp = $('subjAddInput');
   const name = (inp.value || '').trim().slice(0, 16);
   if (!name) return;
-  if (!study.subjectList.includes(name)) { study.subjectList.push(name); touchSetting('subjectList'); }
+  if (!study.subjectList.includes(name)) {
+    study.subjectList.push(name);
+    touchSetting('subjectList');
+    // Assign the currently selected color (or auto-assign from palette)
+    if (!study.subjectColors) study.subjectColors = {};
+    const autoColor = SUBJECT_COLORS[(study.subjectList.length - 1) % SUBJECT_COLORS.length];
+    study.subjectColors[name] = selectedSubjColor || autoColor;
+    touchSetting('subjectColors');
+  }
   study.curSubject = name;
   inp.value = '';
+  // Advance selectedSubjColor to the next in the palette for the next add
+  const ni = (SUBJECT_COLORS.indexOf(selectedSubjColor) + 1) % SUBJECT_COLORS.length;
+  selectedSubjColor = SUBJECT_COLORS[ni];
   touchSetting('curSubject'); saveStudy(); renderSubjChips(); updateStudyUI();
 }
 $('swSubjectBtn').addEventListener('click', () => { renderSubjChips(); subjModal.classList.add('open'); });
@@ -3194,6 +3474,34 @@ function mergeStudy(local, remote, remoteNewer) {
   out.distractions = {};
   const xkeys = new Set([...Object.keys(local.distractions || {}), ...Object.keys(remote.distractions || {})]);
   xkeys.forEach(k => out.distractions[k] = Math.max(local.distractions?.[k] || 0, remote.distractions?.[k] || 0));
+
+  // subjectsOverride: newest `at` wins per subject per day.
+  out.subjectsOverride = {};
+  const ovDays = new Set([
+    ...Object.keys(local.subjectsOverride  || {}),
+    ...Object.keys(remote.subjectsOverride || {}),
+  ]);
+  ovDays.forEach(day => {
+    const lo = local.subjectsOverride?.[day]  || {};
+    const ro = remote.subjectsOverride?.[day] || {};
+    const m  = {};
+    new Set([...Object.keys(lo), ...Object.keys(ro)]).forEach(name => {
+      if      (!lo[name]) m[name] = ro[name];
+      else if (!ro[name]) m[name] = lo[name];
+      else m[name] = (lo[name].at || 0) >= (ro[name].at || 0) ? lo[name] : ro[name];
+    });
+    out.subjectsOverride[day] = m;
+  });
+
+  // subjectColors: merge by union; if both have a color for the same name, newest
+  // settingsAt.subjectColors timestamp wins (falls back to remoteNewer).
+  const useRemoteColors = (ra.subjectColors || 0) > (la.subjectColors || 0) ? true
+                        : (la.subjectColors || 0) > (ra.subjectColors || 0) ? false
+                        : remoteNewer;
+  const baseColors  = (useRemoteColors ? remote.subjectColors : local.subjectColors)  || {};
+  const otherColors = (useRemoteColors ? local.subjectColors  : remote.subjectColors) || {};
+  out.subjectColors = Object.assign({}, otherColors, baseColors);
+
   return out;
 }
 // Union goals by id, preserving local order; drop tombstoned (deleted) ones.
@@ -3254,6 +3562,14 @@ function canonStudy(s) {
   const sess = s.session
     ? { runId: s.session.runId, startEpoch: s.session.startEpoch || 0, beat: Math.floor((s.session.beatAt || 0) / 10000) }
     : null;
+  const subjOv = {};
+  Object.keys(s.subjectsOverride || {}).forEach(day => {
+    const m = {}, sd = s.subjectsOverride[day] || {};
+    Object.keys(sd).forEach(n => {
+      if (sd[n]) m[n] = { sec: Math.floor(sd[n].sec || 0), at: Math.floor(sd[n].at || 0) };
+    });
+    if (Object.keys(m).length) subjOv[day] = m;
+  });
   return stableStr({
     resetHour: s.resetHour || 0, records: rec, subjects: subj, distractions: dist,
     subjectList: s.subjectList || [], curSubject: s.curSubject || '',
@@ -3262,6 +3578,7 @@ function canonStudy(s) {
     comboMode: s.comboMode || 'study', pomo: s.pomo || null,
     settingsAt: s.settingsAt || {}, recordsOverride: s.recordsOverride || {},
     session: sess, sessionAt: s.sessionAt || 0, committedRuns: s.committedRuns || {},
+    subjectsOverride: subjOv, subjectColors: s.subjectColors || {},
   });
 }
 function canonNotes(n) {
