@@ -2761,13 +2761,8 @@ function subjectBreakRowsHTML() {
     return (study.subjectList.indexOf(a) ?? 99) - (study.subjectList.indexOf(b) ?? 99);
   });
 
-  // Untagged = total stopwatch time minus tagged time
+  // Bar widths are proportional to each subject's share of the total shown.
   const taggedSec = allNames.reduce((s, n) => s + (effMap[n] || 0), 0);
-  const untag = Math.max(0, total - taggedSec);
-  // Bar lengths are relative to everything shown. When per-subject time is added
-  // via overrides, tagged time can exceed the raw stopwatch total — so the
-  // denominator is the larger of the two, keeping bars proportional (not maxed out).
-  const denom = Math.max(total, taggedSec);
 
   // Generate a fallback palette color by list-index (for subjects without a custom color)
   const paletteColor = name => {
@@ -2775,10 +2770,10 @@ function subjectBreakRowsHTML() {
     return SUBJECT_COLORS[(i >= 0 ? i : allNames.indexOf(name)) % SUBJECT_COLORS.length];
   };
 
-  if (!allNames.length && untag < 1) return '';
+  if (!allNames.length) return '';
 
   const line = (name, sec, color) => {
-    const pct  = denom > 0 ? Math.min(100, sec / denom * 100) : 0;
+    const pct  = taggedSec > 0 ? Math.min(100, sec / taggedSec * 100) : 0;
     const zero = sec < 1;
     const nameEsc = escHtml(name);
     return `<div class="subj-line${zero ? ' zero' : ''}">
@@ -2795,7 +2790,6 @@ function subjectBreakRowsHTML() {
     const color = subjectColor(name) || paletteColor(name);
     return line(name, sec, color);
   });
-  if (untag >= 1) rows.push(line('기타', untag, 'var(--dim)'));
   return rows.join('');
 }
 
