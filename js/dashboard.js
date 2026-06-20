@@ -368,7 +368,7 @@ function bindSubjectEdits() {
     const actualDelta = next - cur;
     setSubjectOverride(dayKey, name, next);
     if (actualDelta !== 0) {
-      const totalCur = Math.floor(recSec(dayKey));
+      const totalCur = study.records[dayKey] || 0;
       setDayOverride(dayKey, Math.max(0, totalCur + actualDelta));
     }
     refreshDashboardLive();   // updates bars/numbers in place, keeps dropdown
