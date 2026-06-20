@@ -79,19 +79,20 @@ function subjectBreakRowsHTML() {
     return (study.subjectList.indexOf(a) ?? 99) - (study.subjectList.indexOf(b) ?? 99);
   });
 
-  // Bar widths are proportional to each subject's share of the total shown.
-  const taggedSec = allNames.reduce((s, n) => s + (effMap[n] || 0), 0);
+  const taggedSec   = allNames.reduce((s, n) => s + (effMap[n] || 0), 0);
+  const untaggedSec = Math.max(0, total - taggedSec);
+  // Bar widths are proportional to the full day total (tagged + untagged).
+  const displayTotal = Math.max(total, taggedSec);
 
-  // Generate a fallback palette color by list-index (for subjects without a custom color)
   const paletteColor = name => {
     const i = study.subjectList.indexOf(name);
     return SUBJECT_COLORS[(i >= 0 ? i : allNames.indexOf(name)) % SUBJECT_COLORS.length];
   };
 
-  if (!allNames.length) return '';
+  if (!allNames.length && untaggedSec < 1) return '';
 
   const line = (name, sec, color) => {
-    const pct  = taggedSec > 0 ? Math.min(100, sec / taggedSec * 100) : 0;
+    const pct  = displayTotal > 0 ? Math.min(100, sec / displayTotal * 100) : 0;
     const zero = sec < 1;
     const nameEsc = escHtml(name);
     return `<div class="subj-line${zero ? ' zero' : ''}">
@@ -108,6 +109,7 @@ function subjectBreakRowsHTML() {
     const color = subjectColor(name) || paletteColor(name);
     return line(name, sec, color);
   });
+  if (untaggedSec >= 1) rows.push(line('기타', untaggedSec, 'var(--dim)'));
   return rows.join('');
 }
 
@@ -117,11 +119,13 @@ function subjectBreakHTML() {
 
   // Custom dropdown (native <select> popups can't be rounded/styled). The chosen
   // subject is held in `sadSubject`; default to the first subject if unset/stale.
-  const cur = study.subjectList.includes(sadSubject) ? sadSubject : (study.subjectList[0] || '');
-  const opts = study.subjectList.map(n =>
+  // '기타' is always appended after named subjects so untagged time is adjustable.
+  const allOpts = [...study.subjectList, '기타'];
+  const cur = allOpts.includes(sadSubject) ? sadSubject : (study.subjectList[0] || '기타');
+  const opts = allOpts.map(n =>
     `<button type="button" class="subj-dd-opt${n === cur ? ' sel' : ''}" data-val="${escHtml(n)}">${escHtml(n)}</button>`
   ).join('');
-  const addRow = study.subjectList.length ? `
+  const addRow = (study.subjectList.length || todayStudySec() >= 1) ? `
     <div class="subj-add-time-wrap">
       <div class="subj-add-time-row">
         <div class="subj-dd" id="sadDropdown" data-val="${escHtml(cur)}">
@@ -363,13 +367,24 @@ function bindSubjectEdits() {
   const applyAdj = delta => {
     const name = dd.dataset.val;
     if (!name) return;
-    const cur  = effectiveSubjectSec(dayKey, name);
-    const next = Math.max(0, cur + delta);
-    const actualDelta = next - cur;
-    setSubjectOverride(dayKey, name, next);
-    if (actualDelta !== 0) {
-      const totalCur = study.records[dayKey] || 0;
-      setDayOverride(dayKey, Math.max(0, totalCur + actualDelta));
+    if (name === '기타') {
+      // Adjust total without touching any named subject
+      const effMap = effectiveSubjectsForDay(dayKey);
+      const taggedSec = Object.values(effMap).reduce((s, v) => s + v, 0);
+      const untaggedSec = Math.max(0, todayStudySec() - taggedSec);
+      const actualDelta = delta > 0 ? delta : Math.max(delta, -untaggedSec);
+      if (actualDelta !== 0) {
+        setDayOverride(dayKey, Math.max(0, (study.records[dayKey] || 0) + actualDelta));
+      }
+    } else {
+      const cur  = effectiveSubjectSec(dayKey, name);
+      const next = Math.max(0, cur + delta);
+      const actualDelta = next - cur;
+      setSubjectOverride(dayKey, name, next);
+      if (actualDelta !== 0) {
+        const totalCur = study.records[dayKey] || 0;
+        setDayOverride(dayKey, Math.max(0, totalCur + actualDelta));
+      }
     }
     refreshDashboardLive();   // updates bars/numbers in place, keeps dropdown
   };
