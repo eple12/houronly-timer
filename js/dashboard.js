@@ -365,7 +365,12 @@ function bindSubjectEdits() {
     if (!name) return;
     const cur  = effectiveSubjectSec(dayKey, name);
     const next = Math.max(0, cur + delta);
+    const actualDelta = next - cur;
     setSubjectOverride(dayKey, name, next);
+    if (actualDelta !== 0) {
+      const totalCur = Math.floor(recSec(dayKey));
+      setDayOverride(dayKey, Math.max(0, totalCur + actualDelta));
+    }
     refreshDashboardLive();   // updates bars/numbers in place, keeps dropdown
   };
   sadMinus.addEventListener('click', () => applyAdj(-900));
