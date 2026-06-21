@@ -20,8 +20,12 @@ function noteSortCmp(a, b) {
 }
 // Give every note an explicit `order` following the current display order, so
 // drag-reordering and new notes have a stable basis. Pinned notes keep smaller
-// values (they always sort above unpinned regardless).
+// values (they always sort above unpinned regardless). Once every note has an
+// order this is a no-op, so reloads don't renumber (which would churn sync).
+// Seeded notes get no `orderAt`, so they don't claim authority over a peer's
+// explicit reorder.
 function normalizeNoteOrders() {
+  if (notes.length && notes.every(n => Number.isFinite(n.order))) return;
   notes.slice().sort(noteSortCmp).forEach((n, i) => { n.order = i; });
 }
 // Smallest order value currently in use (new notes go just above it → top).
@@ -36,7 +40,10 @@ function commitNoteReorder(pinnedFlag, fromIdx, toIdx) {
   const target   = pinnedFlag === '1' ? pinnedG : unpinG;
   const [moved]  = target.splice(fromIdx, 1);
   target.splice(toIdx, 0, moved);
-  pinnedG.concat(unpinG).forEach((n, i) => { n.order = i; });
+  // Stamp orderAt so this reorder propagates across devices independently of
+  // note content (sync resolves `order` by orderAt, not updatedAt).
+  const now = Date.now();
+  pinnedG.concat(unpinG).forEach((n, i) => { n.order = i; n.orderAt = now; });
   saveNotes();
   renderNotesList();
   renderMemoWidget();
@@ -373,7 +380,8 @@ function renderEditItems() {
 }
 function saveNoteFromEditor() {
   let n = (editingNoteId != null) ? notes.find(x => x.id === editingNoteId) : null;
-  if (!n) { n = { id: Date.now(), type: editDraftType, order: minNoteOrder() - 1 }; notes.push(n); }  // new notes land at the top of their group
+  // New notes land at the top of their group; orderAt lets that position sync.
+  if (!n) { n = { id: Date.now(), type: editDraftType, order: minNoteOrder() - 1, orderAt: Date.now() }; notes.push(n); }
   n.title = $('noteTitleInput').value.trim();
   n.type  = editDraftType;
   if (editDraftType === 'text') { n.text = $('noteTextInput') ? $('noteTextInput').value : ''; n.items = []; }

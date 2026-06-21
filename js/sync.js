@@ -57,16 +57,30 @@ function mergeTomb(a, b) {
   for (const k in r) { if (!(k in o) || r[k] > o[k]) o[k] = r[k]; }
   return o;
 }
-// Union notes by id (newest edit wins); drop ones deleted after their last edit.
+// Union notes by id. Content (title/text/items/pinned) resolves by updatedAt
+// newest-wins; list ORDER resolves independently by its own `orderAt` stamp, so
+// reordering on one device doesn't clobber a content edit on another (and vice
+// versa). Drops notes deleted after their last edit.
 function mergeNotes(local, remote, tmb) {
   local = local || []; remote = remote || []; tmb = tmb || {};
-  const map = new Map();
-  remote.forEach(n => map.set(n.id, n));
-  local.forEach(n => {
-    const ex = map.get(n.id);
-    if (!ex || (n.updatedAt || 0) >= (ex.updatedAt || 0)) map.set(n.id, n);
+  const lm = new Map(local.map(n => [n.id, n]));
+  const rm = new Map(remote.map(n => [n.id, n]));
+  const out = [];
+  new Set([...lm.keys(), ...rm.keys()]).forEach(id => {
+    const a = lm.get(id), b = rm.get(id);
+    let n;
+    if (a && b) {
+      n = Object.assign({}, (a.updatedAt || 0) >= (b.updatedAt || 0) ? a : b);
+      // Order: keep whichever side last reordered (newest orderAt wins).
+      const ord = (a.orderAt || 0) >= (b.orderAt || 0) ? a : b;
+      n.order   = ord.order;
+      n.orderAt = Math.max(a.orderAt || 0, b.orderAt || 0);
+    } else {
+      n = a || b;
+    }
+    out.push(n);
   });
-  return [...map.values()]
+  return out
     .filter(n => !(n.id in tmb) || (n.updatedAt || 0) > tmb[n.id])
     .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 }
@@ -283,7 +297,8 @@ function canonStudy(s) {
 function canonNotes(n) {
   return stableStr([...(n || [])].sort((a, b) => (a.id || 0) - (b.id || 0))
     .map(x => ({ id: x.id, title: x.title || '', type: x.type || 'text',
-                 text: x.text || '', items: x.items || [], pinned: !!x.pinned, pinnedAt: x.pinnedAt || 0 })));
+                 text: x.text || '', items: x.items || [], pinned: !!x.pinned, pinnedAt: x.pinnedAt || 0,
+                 order: Number.isFinite(x.order) ? x.order : null, orderAt: x.orderAt || 0 })));
 }
 function canonTomb(t) { return stableStr(t || {}); }
 
