@@ -888,6 +888,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   transform-origin: top right;
   box-shadow: 0 14px 34px rgba(0,0,0,0.55);
   animation: memoIn 0.2s cubic-bezier(0.2, 0.7, 0.2, 1);
+  touch-action: pan-y;   /* let vertical scroll through; we handle horizontal swipes */
 }
 .memo-card.memo-out { animation: memoOut 0.18s ease forwards; }
 @keyframes memoIn  { from { opacity: 0; transform: translateY(-10px) scaleY(0.9); }
@@ -923,7 +924,9 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   height: 84dvh; max-height: 84dvh;
   border-radius: 18px; border-top: 1px solid var(--bord2);
 }
-#memoBigBody { flex: 1; min-height: 0; overflow-y: auto; }
+#memoBigBody { flex: 1; min-height: 0; overflow-y: auto; touch-action: pan-y; }
+.memo-big-nav { display: flex; align-items: center; justify-content: center; gap: 16px;
+  padding-top: 10px; margin-top: 2px; border-top: 1px solid var(--border); }
 .memo-big-text { font-size: 17px; line-height: 1.75; color: var(--text);
   white-space: pre-wrap; word-break: break-word; }
 .memo-big-checks { display: flex; flex-direction: column; gap: 13px; }

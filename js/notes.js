@@ -93,49 +93,80 @@ function memoCardInner(n, list) {
           ${body}
           ${nav}`;
 }
-// Wire up the card's interactive elements. `n` and `list` describe the note
-// currently shown in the card.
-function bindMemoCard(n, list) {
-  memoWidget.querySelectorAll('.memo-check input').forEach(cb => {
-    cb.addEventListener('change', () => {
-      cancelMemoAutoCollapse();
-      n.items[+cb.dataset.i].done = cb.checked;
-      n.updatedAt = Date.now();
-      saveNotes();
-      memoShowNote(n.id);  // update in place; keep showing this note
-    });
+// Horizontal-swipe / tap gestures shared by the small card and the big view.
+// A horizontal drag past the threshold navigates (onSwipe); a near-still tap on
+// a checklist row toggles it (onToggle); vertical drags scroll normally. Toggles
+// go through onToggle rather than the native checkbox, so a swipe that begins on
+// an item never accidentally checks it.
+function attachNoteGestures(el, opts) {
+  let sx = 0, sy = 0, moved = false, checkEl = null, didSwipe = false;
+  el.addEventListener('pointerdown', e => {
+    if (opts.onDown) opts.onDown();
+    sx = e.clientX; sy = e.clientY; moved = false; didSwipe = false;
+    checkEl = e.target.closest('.memo-check, .memo-big-check');
   });
-  // Prev/next swap the card contents in place (no re-mount → no flicker/animation).
-  const go = d => {
-    cancelMemoAutoCollapse();
-    const cur = memoOrderedNotes();
-    if (cur.length < 2) return;
-    memoIndex = (memoIndex + d + cur.length) % cur.length;
-    const next = cur[memoIndex];
-    const card = memoWidget.querySelector('.memo-card');
-    card.innerHTML = memoCardInner(next, cur);
-    bindMemoCard(next, cur);
-  };
-  if ($('memoPrev')) $('memoPrev').addEventListener('click', () => go(-1));
-  if ($('memoNext')) $('memoNext').addEventListener('click', () => go(1));
+  el.addEventListener('pointermove', e => {
+    if (Math.abs(e.clientX - sx) > 8 || Math.abs(e.clientY - sy) > 8) moved = true;
+  });
+  el.addEventListener('pointerup', e => {
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (opts.canSwipe && opts.canSwipe() && Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+      didSwipe = true;
+      opts.onSwipe(dx < 0 ? 1 : -1);
+      return;
+    }
+    if (!moved && checkEl) {
+      const cb = checkEl.querySelector('input[type=checkbox]');
+      if (cb && opts.onToggle) opts.onToggle(+cb.dataset.i);
+    }
+  });
+  // Capture clicks: swallow the one synthesized after a swipe, and stop the
+  // native label→checkbox toggle (onToggle drives the state instead).
+  el.addEventListener('click', e => {
+    if (didSwipe) { e.preventDefault(); e.stopPropagation(); didSwipe = false; return; }
+    if (e.target.closest('.memo-check, .memo-big-check')) e.preventDefault();
+  }, true);
+}
+
+// Flip the small card to the prev/next note — swap contents in place so the
+// entrance animation doesn't replay.
+function goMemo(d) {
+  cancelMemoAutoCollapse();
+  const cur = memoOrderedNotes();
+  if (cur.length < 2) return;
+  memoIndex = (memoIndex + d + cur.length) % cur.length;
+  const card = memoWidget.querySelector('.memo-card');
+  if (!card) return;
+  card.innerHTML = memoCardInner(cur[memoIndex], cur);
+  bindMemoCard(card);
+}
+// Wire up the open card. The controls live inside the card and are re-bound on
+// every content swap; the swipe/tap gestures attach once per card element (they
+// read the current note dynamically, so they survive content swaps).
+function bindMemoCard(card) {
+  const cur = memoOrderedNotes();
+  const n = cur[memoIndex];
+  if (!n) return;
+  if ($('memoPrev')) $('memoPrev').addEventListener('click', () => goMemo(-1));
+  if ($('memoNext')) $('memoNext').addEventListener('click', () => goMemo(1));
   $('memoBig').addEventListener('click', () => { cancelMemoAutoCollapse(); openMemoBig(n.id); });
   $('memoEdit').addEventListener('click', () => { collapseMemo(); openNoteEditor(n.id); });
   $('memoOpen').addEventListener('click', () => { collapseMemo(); openNotes(); });
   $('memoCollapse').addEventListener('click', collapseMemo);
-  const card = memoWidget.querySelector('.memo-card');
-  card.addEventListener('pointerdown', cancelMemoAutoCollapse, { once: true });
-  // Horizontal swipe to flip between notes (swipe left → next, right → prev).
-  if (list.length > 1) {
-    let sx = 0, sy = 0, swiping = false;
-    card.addEventListener('pointerdown', e => {
-      if (e.target.closest('button, input, label')) return;  // don't hijack taps on controls
-      sx = e.clientX; sy = e.clientY; swiping = true;
-    });
-    card.addEventListener('pointerup', e => {
-      if (!swiping) return;
-      swiping = false;
-      const dx = e.clientX - sx, dy = e.clientY - sy;
-      if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.5) go(dx < 0 ? 1 : -1);
+  if (!card._gesturesBound) {
+    card._gesturesBound = true;
+    attachNoteGestures(card, {
+      onDown: cancelMemoAutoCollapse,
+      canSwipe: () => memoOrderedNotes().length > 1,
+      onSwipe: goMemo,
+      onToggle: i => {
+        const note = memoOrderedNotes()[memoIndex];
+        if (!note || note.type !== 'list' || !note.items[i]) return;
+        note.items[i].done = !note.items[i].done;
+        note.updatedAt = Date.now();
+        saveNotes();
+        memoShowNote(note.id);
+      },
     });
   }
 }
@@ -149,7 +180,7 @@ function memoShowNote(id) {
   const card = memoWidget.querySelector('.memo-card');
   if (!card) { renderMemoWidget(); return; }
   card.innerHTML = memoCardInner(cur[i], cur);
-  bindMemoCard(cur[i], cur);
+  bindMemoCard(card);
 }
 function renderMemoWidget() {
   const list = memoOrderedNotes();
@@ -162,7 +193,7 @@ function renderMemoWidget() {
   if (open) html += `<div class="memo-card">${memoCardInner(n, list)}</div>`;
   memoWidget.innerHTML = html;
   $('memoFab').addEventListener('click', () => memoWidget.classList.contains('open') ? collapseMemo() : expandMemo());
-  if (open) bindMemoCard(n, list);
+  if (open) bindMemoCard(memoWidget.querySelector('.memo-card'));
 }
 // User-initiated expand: stays open until the user closes it (no auto-collapse).
 function expandMemo() { cancelMemoAutoCollapse(); memoIndex = 0; memoWidget.classList.add('open'); renderMemoWidget(); }
@@ -187,34 +218,60 @@ function cancelMemoAutoCollapse() { clearTimeout(memoCollapseTimer); memoCollaps
 // Show the given note big (most of the screen). Checklists stay interactive and
 // edits persist; text notes are read-only here (use 편집 to change them).
 const memoBigModal = $('memoBigModal');
-let memoBigId = null;
+let memoBigList = [], memoBigIdx = 0;
 function openMemoBig(id) {
-  const n = notes.find(x => x.id === id);
-  if (!n) return;
-  memoBigId = id;
-  renderMemoBig(n);
+  memoBigList = memoOrderedNotes();
+  if (!memoBigList.length) return;
+  memoBigIdx = Math.max(0, memoBigList.findIndex(x => x.id === id));
+  renderMemoBig();
   memoBigModal.classList.add('open');
 }
-function renderMemoBig(n) {
+function goMemoBig(d) {
+  if (memoBigList.length < 2) return;
+  memoBigIdx = (memoBigIdx + d + memoBigList.length) % memoBigList.length;
+  renderMemoBig();
+}
+function renderMemoBig() {
+  const n = memoBigList[memoBigIdx];
+  if (!n) return;
   $('memoBigTitle').textContent = n.title || '메모';
   const body = $('memoBigBody');
-  if (n.type === 'list') {
-    body.innerHTML = `<div class="memo-big-checks">${(n.items || []).map((it, i) =>
-      `<label class="memo-big-check ${it.done ? 'done' : ''}"><input type="checkbox" data-i="${i}" ${it.done ? 'checked' : ''}><span>${escHtml(it.t || '')}</span></label>`
-    ).join('') || '<div class="memo-empty">항목 없음</div>'}</div>`;
-    body.querySelectorAll('.memo-big-check input').forEach(cb => {
-      cb.addEventListener('change', () => {
-        n.items[+cb.dataset.i].done = cb.checked;
-        n.updatedAt = Date.now();
-        saveNotes();
-        renderMemoBig(n);
-        memoShowNote(n.id);
-      });
-    });
+  body.innerHTML = n.type === 'list'
+    ? `<div class="memo-big-checks">${(n.items || []).map((it, i) =>
+        `<label class="memo-big-check ${it.done ? 'done' : ''}"><input type="checkbox" data-i="${i}" ${it.done ? 'checked' : ''}><span>${escHtml(it.t || '')}</span></label>`
+      ).join('') || '<div class="memo-empty">항목 없음</div>'}</div>`
+    : (n.text ? `<div class="memo-big-text">${escHtml(n.text)}</div>` : '<div class="memo-empty">내용 없음</div>');
+  // Prev/next nav (shown only when there's more than one note).
+  const nav = $('memoBigNav');
+  if (memoBigList.length > 1) {
+    nav.style.display = '';
+    nav.innerHTML =
+      `<button class="memo-mini-btn" id="memoBigPrev" title="이전">${ICONS.chevL}</button>
+       <span class="memo-nav-count">${memoBigIdx + 1} / ${memoBigList.length}</span>
+       <button class="memo-mini-btn" id="memoBigNext" title="다음">${ICONS.chevR}</button>`;
+    $('memoBigPrev').addEventListener('click', () => goMemoBig(-1));
+    $('memoBigNext').addEventListener('click', () => goMemoBig(1));
   } else {
-    body.innerHTML = n.text
-      ? `<div class="memo-big-text">${escHtml(n.text)}</div>`
-      : '<div class="memo-empty">내용 없음</div>';
+    nav.style.display = 'none';
+    nav.innerHTML = '';
+  }
+  // Gestures attach once to the persistent body element; they read the current
+  // note dynamically, so they keep working across content swaps.
+  if (!body._gesturesBound) {
+    body._gesturesBound = true;
+    attachNoteGestures(body, {
+      canSwipe: () => memoBigList.length > 1,
+      onSwipe: goMemoBig,
+      onToggle: i => {
+        const note = memoBigList[memoBigIdx];
+        if (!note || note.type !== 'list' || !note.items[i]) return;
+        note.items[i].done = !note.items[i].done;
+        note.updatedAt = Date.now();
+        saveNotes();
+        renderMemoBig();
+        memoShowNote(note.id);
+      },
+    });
   }
 }
 $('memoBigClose').addEventListener('click', () => memoBigModal.classList.remove('open'));
