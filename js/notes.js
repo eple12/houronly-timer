@@ -7,13 +7,39 @@ let memoIndex = 0;     // which note the widget is showing
 let editDraftItems = [];
 let editDraftType  = 'text';
 
-// Stable ordering: pinned first (in the order they were pinned, so editing a
-// note never reshuffles the pinned ones), then unpinned by most-recent edit.
+// Ordering: pinned first, then unpinned. Within each group the explicit `order`
+// field (set by drag-reordering and on creation) is the source of truth, so
+// editing a note never reshuffles the list. Notes that predate manual ordering
+// fall back to the old implicit rule (pin order, then most-recent edit).
 function noteSortCmp(a, b) {
   const pa = a.pinned ? 1 : 0, pb = b.pinned ? 1 : 0;
   if (pa !== pb) return pb - pa;
+  if (a.order != null && b.order != null && a.order !== b.order) return a.order - b.order;
   if (pa) return (a.pinnedAt || a.id || 0) - (b.pinnedAt || b.id || 0);
   return (b.updatedAt || 0) - (a.updatedAt || 0);
+}
+// Give every note an explicit `order` following the current display order, so
+// drag-reordering and new notes have a stable basis. Pinned notes keep smaller
+// values (they always sort above unpinned regardless).
+function normalizeNoteOrders() {
+  notes.slice().sort(noteSortCmp).forEach((n, i) => { n.order = i; });
+}
+// Smallest order value currently in use (new notes go just above it → top).
+function minNoteOrder() {
+  return notes.length ? Math.min(...notes.map(n => n.order || 0)) : 0;
+}
+// Apply a drag-reorder within one pinned/unpinned group, then persist.
+function commitNoteReorder(pinnedFlag, fromIdx, toIdx) {
+  const sorted   = notes.slice().sort(noteSortCmp);
+  const pinnedG  = sorted.filter(n => n.pinned);
+  const unpinG   = sorted.filter(n => !n.pinned);
+  const target   = pinnedFlag === '1' ? pinnedG : unpinG;
+  const [moved]  = target.splice(fromIdx, 1);
+  target.splice(toIdx, 0, moved);
+  pinnedG.concat(unpinG).forEach((n, i) => { n.order = i; });
+  saveNotes();
+  renderNotesList();
+  renderMemoWidget();
 }
 // Notes ordered for the main widget: pinned first, then most-recent.
 function memoOrderedNotes() {
@@ -51,6 +77,7 @@ function memoCardInner(n, list) {
             ${n.pinned ? '<span class="memo-pin-ic">'+icoSm('pin')+'</span>' : ''}
             <span class="memo-card-title">${escHtml(n.title || '메모')}</span>
             <div class="memo-card-actions">
+              <button class="memo-mini-btn" id="memoBig" title="크게 보기">${ICONS.expand}</button>
               <button class="memo-mini-btn" id="memoEdit" title="편집">${ICONS.pencil}</button>
               <button class="memo-mini-btn" id="memoOpen" title="메모장">${ICONS.list}</button>
               <button class="memo-mini-btn" id="memoCollapse" title="접기">${ICONS.close}</button>
@@ -84,6 +111,7 @@ function bindMemoCard(n, list) {
   };
   if ($('memoPrev')) $('memoPrev').addEventListener('click', () => go(-1));
   if ($('memoNext')) $('memoNext').addEventListener('click', () => go(1));
+  $('memoBig').addEventListener('click', () => { cancelMemoAutoCollapse(); openMemoBig(n.id); });
   $('memoEdit').addEventListener('click', () => { collapseMemo(); openNoteEditor(n.id); });
   $('memoOpen').addEventListener('click', () => { collapseMemo(); openNotes(); });
   $('memoCollapse').addEventListener('click', collapseMemo);
@@ -148,6 +176,43 @@ function collapseMemo() {
 function scheduleMemoAutoCollapse() { cancelMemoAutoCollapse(); memoCollapseTimer = setTimeout(collapseMemo, 2000); }
 function cancelMemoAutoCollapse() { clearTimeout(memoCollapseTimer); memoCollapseTimer = null; }
 
+// ── Large memo view ────────────────────────────────────────────
+// Show the given note big (most of the screen). Checklists stay interactive and
+// edits persist; text notes are read-only here (use 편집 to change them).
+const memoBigModal = $('memoBigModal');
+let memoBigId = null;
+function openMemoBig(id) {
+  const n = notes.find(x => x.id === id);
+  if (!n) return;
+  memoBigId = id;
+  renderMemoBig(n);
+  memoBigModal.classList.add('open');
+}
+function renderMemoBig(n) {
+  $('memoBigTitle').textContent = n.title || '메모';
+  const body = $('memoBigBody');
+  if (n.type === 'list') {
+    body.innerHTML = `<div class="memo-big-checks">${(n.items || []).map((it, i) =>
+      `<label class="memo-big-check ${it.done ? 'done' : ''}"><input type="checkbox" data-i="${i}" ${it.done ? 'checked' : ''}><span>${escHtml(it.t || '')}</span></label>`
+    ).join('') || '<div class="memo-empty">항목 없음</div>'}</div>`;
+    body.querySelectorAll('.memo-big-check input').forEach(cb => {
+      cb.addEventListener('change', () => {
+        n.items[+cb.dataset.i].done = cb.checked;
+        n.updatedAt = Date.now();
+        saveNotes();
+        renderMemoBig(n);
+        memoShowNote(n.id);
+      });
+    });
+  } else {
+    body.innerHTML = n.text
+      ? `<div class="memo-big-text">${escHtml(n.text)}</div>`
+      : '<div class="memo-empty">내용 없음</div>';
+  }
+}
+$('memoBigClose').addEventListener('click', () => memoBigModal.classList.remove('open'));
+memoBigModal.addEventListener('click', e => { if (e.target === memoBigModal) memoBigModal.classList.remove('open'); });
+
 // Notes manager
 function openNotes() { renderNotesList(); notesModal.classList.add('open'); }
 function renderNotesList() {
@@ -158,7 +223,8 @@ function renderNotesList() {
   }
   const sorted = notes.slice().sort(noteSortCmp);
   list.innerHTML = sorted.map(n =>
-    `<div class="note-row" data-id="${n.id}">
+    `<div class="note-row" data-id="${n.id}" data-pinned="${n.pinned ? '1' : '0'}">
+       <button class="note-drag-handle" title="끌어서 순서 변경">${ICONS.grip}</button>
        <div class="note-row-body">
          <div class="note-row-title">${n.pinned ? '<span class="note-pin-ic">'+icoSm('pin')+'</span> ' : ''}${n.type === 'list' ? icoSm('check')+' ' : ''}${escHtml(n.title || '메모')}</div>
          <div class="note-row-sub">${escHtml(notePreviewText(n))}</div>
@@ -166,8 +232,12 @@ function renderNotesList() {
        <button class="note-row-del" data-del="${n.id}">${ICONS.trash}</button>
      </div>`).join('');
   list.querySelectorAll('.note-row').forEach(r => {
-    r.addEventListener('click', e => { if (!e.target.closest('.note-row-del')) openNoteEditor(parseInt(r.dataset.id)); });
+    r.addEventListener('click', e => {
+      if (e.target.closest('.note-row-del') || e.target.closest('.note-drag-handle')) return;
+      openNoteEditor(parseInt(r.dataset.id));
+    });
   });
+  enableNoteDrag(list);
   list.querySelectorAll('.note-row-del').forEach(b => {
     b.addEventListener('click', () => {
       const delId = parseInt(b.dataset.del);
@@ -176,6 +246,56 @@ function renderNotesList() {
       saveNotes(); renderNotesList(); renderMemoWidget();
     });
   });
+}
+
+// Pointer-based drag reordering of note rows (works on touch). A row can only be
+// reordered within its own group — pinned among pinned, unpinned among unpinned.
+function enableNoteDrag(list) {
+  list.querySelectorAll('.note-drag-handle').forEach(handle =>
+    handle.addEventListener('pointerdown', e => beginNoteDrag(e, handle, list)));
+}
+function beginNoteDrag(e, handle, list) {
+  if (e.button != null && e.button !== 0) return;
+  e.preventDefault();
+  const row     = handle.closest('.note-row');
+  const pinned  = row.dataset.pinned;
+  const group   = [...list.querySelectorAll('.note-row')].filter(r => r.dataset.pinned === pinned);
+  const fromIdx = group.indexOf(row);
+  const rect    = row.getBoundingClientRect();
+  const gap     = parseFloat(getComputedStyle(list).rowGap) || 8;
+  const step    = rect.height + gap;
+  const startY  = e.clientY;
+  let toIdx     = fromIdx;
+
+  row.classList.add('note-dragging');
+  try { handle.setPointerCapture(e.pointerId); } catch (err) {}
+
+  function onMove(ev) {
+    const dy = ev.clientY - startY;
+    row.style.transform = `translateY(${dy}px)`;
+    const nt = Math.max(0, Math.min(group.length - 1, fromIdx + Math.round(dy / step)));
+    if (nt === toIdx) return;
+    toIdx = nt;
+    // Slide the other rows in the group to open a gap at the target slot.
+    group.forEach((r, i) => {
+      if (r === row) return;
+      let shift = 0;
+      if (fromIdx < toIdx && i > fromIdx && i <= toIdx) shift = -step;
+      else if (fromIdx > toIdx && i >= toIdx && i < fromIdx) shift = step;
+      r.style.transform = shift ? `translateY(${shift}px)` : '';
+    });
+  }
+  function onUp() {
+    document.removeEventListener('pointermove', onMove);
+    document.removeEventListener('pointerup', onUp);
+    document.removeEventListener('pointercancel', onUp);
+    group.forEach(r => { r.style.transform = ''; });
+    row.classList.remove('note-dragging');
+    if (toIdx !== fromIdx) commitNoteReorder(pinned, fromIdx, toIdx);
+  }
+  document.addEventListener('pointermove', onMove);
+  document.addEventListener('pointerup', onUp);
+  document.addEventListener('pointercancel', onUp);
 }
 
 // Note editor
@@ -253,7 +373,7 @@ function renderEditItems() {
 }
 function saveNoteFromEditor() {
   let n = (editingNoteId != null) ? notes.find(x => x.id === editingNoteId) : null;
-  if (!n) { n = { id: Date.now(), type: editDraftType }; notes.push(n); }
+  if (!n) { n = { id: Date.now(), type: editDraftType, order: minNoteOrder() - 1 }; notes.push(n); }  // new notes land at the top of their group
   n.title = $('noteTitleInput').value.trim();
   n.type  = editDraftType;
   if (editDraftType === 'text') { n.text = $('noteTextInput') ? $('noteTextInput').value : ''; n.items = []; }
@@ -272,6 +392,24 @@ function saveNoteFromEditor() {
   renderNotesList();
   renderMemoWidget();
 }
+// True when a brand-new note has nothing worth keeping (so leaving doesn't create junk).
+function noteEditorIsEmpty() {
+  const title = $('noteTitleInput').value.trim();
+  if (editDraftType === 'text') {
+    const t = $('noteTextInput') ? $('noteTextInput').value.trim() : '';
+    return !title && !t;
+  }
+  return !title && !editDraftItems.some(i => i.t.trim() !== '' || i.done);
+}
+// Leaving the editor (outside click / ✕) auto-saves, like a sticky note. An
+// empty new note is just discarded; use 삭제 to discard an existing one.
+function leaveNoteEditor() {
+  if (editingNoteId == null && noteEditorIsEmpty()) {
+    noteEditModal.classList.remove('open');
+    return;
+  }
+  saveNoteFromEditor();
+}
 function deleteEditingNote() {
   if (editingNoteId != null) {
     notes = notes.filter(n => n.id !== editingNoteId);
@@ -288,8 +426,8 @@ $('notesClose').addEventListener('click', () => notesModal.classList.remove('ope
 notesModal.addEventListener('click', e => { if (e.target === notesModal) notesModal.classList.remove('open'); });
 $('newTextNote').addEventListener('click', () => openNoteEditor(null, 'text'));
 $('newListNote').addEventListener('click', () => openNoteEditor(null, 'list'));
-$('noteEditClose').addEventListener('click', () => noteEditModal.classList.remove('open'));
-noteEditModal.addEventListener('click', e => { if (e.target === noteEditModal) noteEditModal.classList.remove('open'); });
+$('noteEditClose').addEventListener('click', leaveNoteEditor);
+noteEditModal.addEventListener('click', e => { if (e.target === noteEditModal) leaveNoteEditor(); });
 $('noteSave').addEventListener('click', saveNoteFromEditor);
 $('noteDelete').addEventListener('click', deleteEditingNote);
 // ArrowDown from the title drops into the body (first checklist item / memo text).
@@ -309,6 +447,7 @@ $('noteTitleInput').addEventListener('keydown', e => {
 loadGoals();
 loadStudy();
 loadNotes();
+normalizeNoteOrders();   // seed `order` for notes that predate manual reordering
 loadTomb();
 loadPomo();
 applyTheme();

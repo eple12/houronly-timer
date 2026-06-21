@@ -916,12 +916,36 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 .memo-check.done span { color: var(--dim); text-decoration: line-through; }
 .memo-empty { font-size: 12px; color: var(--dim); }
 
+/* Large memo view — centered, fills most of the screen but not edge-to-edge. */
+#memoBigModal { align-items: center; }
+#memoBigModal .modal.memo-big {
+  max-width: 760px; width: 92vw;
+  height: 84dvh; max-height: 84dvh;
+  border-radius: 18px; border-top: 1px solid var(--bord2);
+}
+#memoBigBody { flex: 1; min-height: 0; overflow-y: auto; }
+.memo-big-text { font-size: 17px; line-height: 1.75; color: var(--text);
+  white-space: pre-wrap; word-break: break-word; }
+.memo-big-checks { display: flex; flex-direction: column; gap: 13px; }
+.memo-big-check { display: flex; align-items: center; gap: 13px; font-size: 16px;
+  color: var(--text); cursor: pointer; }
+.memo-big-check input { width: 21px; height: 21px; accent-color: var(--accent); flex-shrink: 0; }
+.memo-big-check span { min-width: 0; word-break: break-word; }
+.memo-big-check.done span { color: var(--dim); text-decoration: line-through; }
+
 .notes-actions { display: flex; gap: 8px; }
 .notes-actions .acct-secondary { flex: 1; }
 #notesList { display: flex; flex-direction: column; gap: 8px; max-height: 58vh; overflow-y: auto; }
 .note-row { display: flex; align-items: center; gap: 10px; padding: 12px 14px;
-  background: var(--surf2); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; }
+  background: var(--surf2); border: 1px solid var(--border); border-radius: 10px; cursor: pointer;
+  transition: transform 0.16s cubic-bezier(0.2,0.7,0.2,1); }
 .note-row:active { background: var(--border); }
+.note-drag-handle { background: none; border: none; color: var(--dim); cursor: grab;
+  padding: 4px 2px; flex-shrink: 0; touch-action: none; -webkit-appearance: none;
+  display: inline-flex; align-items: center; justify-content: center; }
+.note-drag-handle:active { cursor: grabbing; color: var(--sub); }
+.note-row.note-dragging { transition: none; z-index: 5; position: relative;
+  background: var(--border); box-shadow: 0 10px 26px rgba(0,0,0,0.5); opacity: 0.96; }
 .note-row-body { flex: 1; min-width: 0; }
 .note-row-title { font-size: 14px; color: var(--text); font-weight: 500;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 6px; }
