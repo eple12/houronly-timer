@@ -221,38 +221,63 @@ $('memoBigClose').addEventListener('click', () => memoBigModal.classList.remove(
 memoBigModal.addEventListener('click', e => { if (e.target === memoBigModal) memoBigModal.classList.remove('open'); });
 
 // Notes manager
-function openNotes() { renderNotesList(); notesModal.classList.add('open'); }
+let noteReorderMode = false;  // when on, a drag pad slides in beside each row
+let confirmDeleteId = null;   // id of the row showing a delete confirmation
+function openNotes() {
+  // Always open in the calm default state (no reorder pad, no pending delete).
+  noteReorderMode = false;
+  confirmDeleteId = null;
+  const tg = $('notesReorderToggle');
+  if (tg) tg.classList.remove('on');
+  renderNotesList();
+  notesModal.classList.add('open');
+}
 function renderNotesList() {
   const list = $('notesList');
+  list.classList.toggle('reordering', noteReorderMode);
   if (!notes.length) {
     list.innerHTML = '<div class="notes-empty">아직 메모가 없습니다.<br>위 버튼으로 새 메모를 추가하세요.</div>';
     return;
   }
   const sorted = notes.slice().sort(noteSortCmp);
-  list.innerHTML = sorted.map(n =>
-    `<div class="note-row" data-id="${n.id}" data-pinned="${n.pinned ? '1' : '0'}">
-       <button class="note-drag-handle" title="끌어서 순서 변경">${ICONS.grip}</button>
+  list.innerHTML = sorted.map(n => {
+    const tail = (confirmDeleteId === n.id)
+      ? `<div class="note-row-confirm">
+           <span class="note-confirm-q">삭제할까요?</span>
+           <button class="note-confirm-yes" data-del="${n.id}">삭제</button>
+           <button class="note-confirm-no" data-cancel="${n.id}">취소</button>
+         </div>`
+      : `<button class="note-row-del" data-del="${n.id}" title="삭제">${ICONS.trash}</button>`;
+    return `<div class="note-row${confirmDeleteId === n.id ? ' confirming' : ''}" data-id="${n.id}" data-pinned="${n.pinned ? '1' : '0'}">
+       <button class="note-drag-handle" title="끌어서 순서 변경" tabindex="-1">${ICONS.grip}</button>
        <div class="note-row-body">
          <div class="note-row-title">${n.pinned ? '<span class="note-pin-ic">'+icoSm('pin')+'</span> ' : ''}${n.type === 'list' ? icoSm('check')+' ' : ''}${escHtml(n.title || '메모')}</div>
          <div class="note-row-sub">${escHtml(notePreviewText(n))}</div>
        </div>
-       <button class="note-row-del" data-del="${n.id}">${ICONS.trash}</button>
-     </div>`).join('');
+       ${tail}
+     </div>`;
+  }).join('');
   list.querySelectorAll('.note-row').forEach(r => {
     r.addEventListener('click', e => {
-      if (e.target.closest('.note-row-del') || e.target.closest('.note-drag-handle')) return;
+      if (e.target.closest('.note-row-del') || e.target.closest('.note-drag-handle') || e.target.closest('.note-row-confirm')) return;
+      if (noteReorderMode) return;                    // reorder mode: a row tap shouldn't open the editor
+      if (confirmDeleteId != null) { confirmDeleteId = null; renderNotesList(); return; }  // a stray tap cancels a pending delete
       openNoteEditor(parseInt(r.dataset.id));
     });
   });
-  enableNoteDrag(list);
-  list.querySelectorAll('.note-row-del').forEach(b => {
+  if (noteReorderMode) enableNoteDrag(list);
+  list.querySelectorAll('.note-row-del').forEach(b =>
+    b.addEventListener('click', () => { confirmDeleteId = parseInt(b.dataset.del); renderNotesList(); }));
+  list.querySelectorAll('.note-confirm-yes').forEach(b =>
     b.addEventListener('click', () => {
       const delId = parseInt(b.dataset.del);
       notes = notes.filter(n => n.id !== delId);
       tombstone(delId);
+      confirmDeleteId = null;
       saveNotes(); renderNotesList(); renderMemoWidget();
-    });
-  });
+    }));
+  list.querySelectorAll('.note-confirm-no').forEach(b =>
+    b.addEventListener('click', () => { confirmDeleteId = null; renderNotesList(); }));
 }
 
 // Pointer-based drag reordering of note rows (works on touch). A row can only be
@@ -315,6 +340,7 @@ function openNoteEditor(id, newType) {
   $('noteTitleInput').value = n.title || '';
   $('notePinInput').checked = !!n.pinned;
   $('noteDelete').style.display = (id != null) ? '' : 'none';
+  resetNoteDeleteBtn();
   editDraftType = n.type === 'list' ? 'list' : 'text';
   if (editDraftType === 'text') {
     $('noteEditBody').innerHTML = `<textarea id="noteTextInput" placeholder="내용">${escHtml(n.text || '')}</textarea>`;
@@ -424,9 +450,31 @@ function deleteEditingNote() {
     tombstone(editingNoteId);
     saveNotes();
   }
+  resetNoteDeleteBtn();
   noteEditModal.classList.remove('open');
   renderNotesList();
   renderMemoWidget();
+}
+// The editor's 삭제 button is two-tap: the first tap arms it (and re-labels),
+// the second within a few seconds actually deletes — guarding against misfires.
+let noteDeleteArmed = false, noteDeleteTimer = null;
+function resetNoteDeleteBtn() {
+  noteDeleteArmed = false;
+  clearTimeout(noteDeleteTimer);
+  const b = $('noteDelete');
+  if (b) { b.textContent = '삭제'; b.classList.remove('armed'); }
+}
+function noteDeleteClick() {
+  if (!noteDeleteArmed) {
+    noteDeleteArmed = true;
+    const b = $('noteDelete');
+    b.textContent = '한 번 더 누르면 삭제';
+    b.classList.add('armed');
+    clearTimeout(noteDeleteTimer);
+    noteDeleteTimer = setTimeout(resetNoteDeleteBtn, 3000);
+    return;
+  }
+  deleteEditingNote();
 }
 
 $('notesBtn').addEventListener('click', openNotes);
@@ -437,7 +485,13 @@ $('newListNote').addEventListener('click', () => openNoteEditor(null, 'list'));
 $('noteEditClose').addEventListener('click', leaveNoteEditor);
 noteEditModal.addEventListener('click', e => { if (e.target === noteEditModal) leaveNoteEditor(); });
 $('noteSave').addEventListener('click', saveNoteFromEditor);
-$('noteDelete').addEventListener('click', deleteEditingNote);
+$('noteDelete').addEventListener('click', noteDeleteClick);
+$('notesReorderToggle').addEventListener('click', () => {
+  noteReorderMode = !noteReorderMode;
+  confirmDeleteId = null;
+  $('notesReorderToggle').classList.toggle('on', noteReorderMode);
+  renderNotesList();
+});
 // ArrowDown from the title drops into the body (first checklist item / memo text).
 $('noteTitleInput').addEventListener('keydown', e => {
   if (e.key !== 'ArrowDown') return;

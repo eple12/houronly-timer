@@ -118,7 +118,7 @@ const ICONS = {
 };
 const icoSm = n => ICONS[n].replace('class="ico"', 'class="ico ico-sm"');
 // Swap the static button glyphs for the monochrome icons.
-['acctBtn:cloud','setBtn:gear','goalBtn:flag','emgBtn:warn','notesBtn:note','dashBtn:chart','calBtn:calendar','fsBtn:expand','pomoReset:refresh']
+['acctBtn:cloud','setBtn:gear','goalBtn:flag','emgBtn:warn','notesBtn:note','dashBtn:chart','calBtn:calendar','fsBtn:expand','pomoReset:refresh','notesReorderToggle:grip']
   .forEach(p => { const [id, name] = p.split(':'); const el = $(id); if (el) el.innerHTML = ICONS[name]; });
 const timeDisplay   = $('timeDisplay');
 const elapsedLabel  = $('elapsedLabel');

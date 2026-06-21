@@ -936,16 +936,40 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 .notes-actions { display: flex; gap: 8px; }
 .notes-actions .acct-secondary { flex: 1; }
 #notesList { display: flex; flex-direction: column; gap: 8px; max-height: 58vh; overflow-y: auto; }
-.note-row { display: flex; align-items: center; gap: 10px; padding: 12px 14px;
+.note-row { position: relative; display: flex; align-items: center; gap: 10px; padding: 12px 14px;
   background: var(--surf2); border: 1px solid var(--border); border-radius: 10px; cursor: pointer;
-  transition: transform 0.16s cubic-bezier(0.2,0.7,0.2,1); }
+  transition: transform 0.16s cubic-bezier(0.2,0.7,0.2,1), padding-left 0.22s cubic-bezier(0.2,0.7,0.2,1); }
 .note-row:active { background: var(--border); }
-.note-drag-handle { background: none; border: none; color: var(--dim); cursor: grab;
-  padding: 4px 2px; flex-shrink: 0; touch-action: none; -webkit-appearance: none;
-  display: inline-flex; align-items: center; justify-content: center; }
+/* Drag handle is an overlay pad on the left; hidden until reorder mode, then it
+   slides in while the row content shifts right to make room. */
+.note-drag-handle { position: absolute; left: 7px; top: 0; bottom: 0; width: 28px;
+  background: none; border: none; color: var(--dim); cursor: grab;
+  padding: 0; margin: 0; touch-action: none; -webkit-appearance: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  opacity: 0; transform: translateX(-10px); pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.22s cubic-bezier(0.2,0.7,0.2,1); }
 .note-drag-handle:active { cursor: grabbing; color: var(--sub); }
-.note-row.note-dragging { transition: none; z-index: 5; position: relative;
+#notesList.reordering .note-row { padding-left: 42px; cursor: default; }
+#notesList.reordering .note-drag-handle { opacity: 1; transform: none; pointer-events: auto; }
+.note-row.note-dragging { transition: none; z-index: 5;
   background: var(--border); box-shadow: 0 10px 26px rgba(0,0,0,0.5); opacity: 0.96; }
+/* Inline delete confirmation */
+.note-row.confirming { background: rgba(244,63,94,0.08); border-color: var(--danger); }
+.note-row-confirm { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
+.note-confirm-q { font-size: 12px; color: var(--sub); }
+.note-confirm-yes, .note-confirm-no { border-radius: 7px; font-size: 12px; font-weight: 600;
+  padding: 6px 11px; cursor: pointer; -webkit-appearance: none; border: 1px solid transparent; }
+.note-confirm-yes { background: var(--danger); color: #fff; }
+.note-confirm-yes:active { filter: brightness(0.9); }
+.note-confirm-no { background: var(--surface); color: var(--sub); border-color: var(--border); }
+.note-confirm-no:active { background: var(--border); }
+/* Reorder-mode toggle in the notes header */
+.notes-head-actions { display: flex; align-items: center; gap: 6px; }
+.note-reorder-toggle { background: none; border: 1px solid transparent; border-radius: 8px;
+  color: var(--dim); cursor: pointer; padding: 4px 6px; -webkit-appearance: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: color 0.15s, background 0.15s, border-color 0.15s; }
+.note-reorder-toggle.on { color: var(--accent); border-color: var(--accent); background: rgba(206,242,49,0.10); }
 .note-row-body { flex: 1; min-width: 0; }
 .note-row-title { font-size: 14px; color: var(--text); font-weight: 500;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 6px; }
@@ -958,7 +982,8 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 
 .note-pin-row { display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--sub); cursor: pointer; }
 .note-pin-row input { width: 17px; height: 17px; accent-color: var(--accent); }
-.note-delete { color: var(--danger); }
+.note-delete { color: var(--danger); transition: background 0.15s, color 0.15s, border-color 0.15s; }
+.note-delete.armed { background: var(--danger); color: #fff; border-color: var(--danger); }
 #noteEditBody textarea {
   width: 100%; min-height: 300px; max-height: 60vh; resize: vertical;
   background: var(--surface); border: 1px solid var(--bord2); border-radius: 10px;
