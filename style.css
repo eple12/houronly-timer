@@ -1196,6 +1196,10 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   padding: 9px 12px; cursor: pointer; -webkit-appearance: none;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   transition: background 0.1s;
+  /* Don't let many subjects flex-shrink the cells: that squeezes the box below
+     its padding+text height, pushing the label low (and clipping it). Keep each
+     cell its natural height and let the menu scroll instead. */
+  flex-shrink: 0;
 }
 .subj-dd-opt:hover  { background: var(--surf2); }
 .subj-dd-opt.sel    { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font-weight: 600; }
