@@ -150,10 +150,25 @@ function normalizeGoal(g) {
   g.id = String(g.id);
   if (typeof g.at !== 'number') g.at = Number(g.id) || 1;
   if (typeof g.sid !== 'string') g.sid = DEFAULT_SID;   // goals made before sessions
+  // Manual ordering, resolved on its own stamp like a note's (see mergeGoal),
+  // so reordering here and adding a goal there don't overwrite each other.
+  if (typeof g.orderAt !== 'number') g.orderAt = 0;
+  if (!Number.isFinite(g.order)) g.order = null;
   return g;
 }
-// The goals belonging to the session on screen.
-function sessionGoals() { return goals.filter(g => g.sid === curSessionId()); }
+// Goals sort by their manual order; ones never dragged fall back to when they
+// were created, which is the order they were added in.
+function goalSortCmp(a, b) {
+  const ao = Number.isFinite(a.order) ? a.order : Infinity;
+  const bo = Number.isFinite(b.order) ? b.order : Infinity;
+  if (ao !== bo) return ao - bo;
+  if ((a.at || 0) !== (b.at || 0)) return (a.at || 0) - (b.at || 0);
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+// The goals belonging to the session on screen, in display order.
+function sessionGoals() {
+  return goals.filter(g => g.sid === curSessionId()).sort(goalSortCmp);
+}
 
 function saveStudy() { try { localStorage.setItem(STUDY_KEY, JSON.stringify(study)); } catch(e) {} invalidateTotals(); syncTouch(); }
 function loadStudy() {

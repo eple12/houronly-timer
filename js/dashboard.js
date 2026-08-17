@@ -121,13 +121,17 @@ function sumLastDays(n) {
 }
 function todayDistractions() { return dayDistractions(studyDayKey(Date.now())); }
 
-function goalGaugeHTML(today) {
+// The daily goal is one target for the whole day, so it counts every session —
+// and matches the goal bar on the main screen. (The cards above it are
+// per-session; the title says so.)
+function goalGaugeHTML() {
   if (!study.dailyGoalSec) return '';
+  const today = todayStudySec();
   const pct = Math.min(100, today / study.dailyGoalSec * 100);
   const hit = today >= study.dailyGoalSec;
   return `
     <div class="chart-block">
-      <div class="chart-title"><span>오늘 목표 달성률</span></div>
+      <div class="chart-title"><span>오늘 목표 달성률</span><span class="legend-avg">전체 세션 합</span></div>
       <div class="goal-gauge ${hit ? 'hit' : ''}">
         <div class="gg-top">
           <span class="gg-pct">${Math.round(pct)}%</span>
@@ -335,17 +339,13 @@ function renderDashboard() {
   const gst   = studyStats();
   const today = sessionSecToday(sid);
 
-  // Reset-hour selector options
-  const hourOpts = Array.from({length:24}, (_,h) =>
-    `<option value="${h}" ${h===study.resetHour?'selected':''}>${pad(h)}:00</option>`).join('');
-
   if (gst.days === 0 && todayStudySec() < 1) {
     body.innerHTML = `
       <div class="dash-empty">아직 기록이 없어요.<br>공부 스톱워치를 시작해 보세요 ${icoSm('play')}</div>
       ${sessionCumulativeHTML()}
       ${sessionBreakHTML()}
       ${subjectBreakHTML()}
-      ${resetHourBlock(hourOpts)}`;
+      ${resetHourBlock()}`;
     bindResetHour();
     bindSubjectEdits();
     return;
@@ -448,7 +448,7 @@ function renderDashboard() {
       <div class="stat-card"><div class="stat-label">연속 일수</div><div class="stat-value">${st.streak}<small> 일</small></div></div>
     </div>
 
-    <div id="dashGoalGauge">${goalGaugeHTML(today)}</div>
+    <div id="dashGoalGauge">${goalGaugeHTML()}</div>
 
     <div class="stat-grid">
       <div class="stat-card"><div class="stat-label">최근 7일</div><div class="stat-value" id="dvWeek">${fmtHrs(sessionSumLastDays(sid, 7))}</div></div>
@@ -482,7 +482,7 @@ function renderDashboard() {
       ${focusCard}
     </div>
 
-    ${resetHourBlock(hourOpts)}
+    ${resetHourBlock()}
   `;
   bindResetHour();
   bindSubjectEdits();
@@ -511,7 +511,7 @@ function refreshDashboardLive() {
   set('dvMonth',  fmtHrs(sessionSumLastDays(sid, 30)));
   set('dvBest',   fmtHrs(st.best));
   const gg = $('dashGoalGauge');
-  if (gg) gg.innerHTML = goalGaugeHTML(today);
+  if (gg) gg.innerHTML = goalGaugeHTML();
 }
 
 function bindSubjectEdits() {
@@ -567,7 +567,13 @@ function bindSubjectEdits() {
   sadPlus.addEventListener('click',  () => applyAdj(900));
 }
 
-function resetHourBlock(hourOpts) {
+// Same custom dropdown as the subject "add time" row — a native <select>'s
+// popup can't be styled, so 24 hours of it looked out of place in the sheet.
+function resetHourBlock() {
+  const cur = pad(study.resetHour) + ':00';
+  const opts = Array.from({ length: 24 }, (_, h) =>
+    `<button type="button" class="subj-dd-opt${h === study.resetHour ? ' sel' : ''}" data-hour="${h}">${pad(h)}:00</button>`
+  ).join('');
   return `
     <div class="chart-block">
       <div class="chart-title"><span>스톱워치 리셋 기준</span></div>
@@ -577,21 +583,39 @@ function resetHourBlock(hourOpts) {
             <div class="rh-label">하루 시작 시각</div>
             <div class="rh-sub">이 시각에 공부 기록이 새 날로 넘어가요</div>
           </div>
-          <select class="reset-hour-select" id="resetHourSelect">${hourOpts}</select>
+          <div class="subj-dd rh-dd" id="rhDropdown" data-val="${study.resetHour}">
+            <button class="subj-dd-btn" id="rhDdBtn" type="button">
+              <span class="dd-label">${cur}</span>
+              <svg class="dd-caret" width="11" height="7" viewBox="0 0 11 7" fill="none"><path d="M1 1l4.5 4.5L10 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <div class="subj-dd-menu" id="rhDdMenu">${opts}</div>
+          </div>
         </div>
       </div>
     </div>`;
 }
 function bindResetHour() {
-  const sel = $('resetHourSelect');
-  if (!sel) return;
-  sel.addEventListener('change', () => {
-    study.resetHour = parseInt(sel.value) || 0;
-    touchSetting('resetHour'); saveStudy();
-    lastSeenStudyDay = studyDayKey(Date.now());
-    updateStudyUI();
-    renderDashboard();
+  const dd = $('rhDropdown'), btn = $('rhDdBtn'), menu = $('rhDdMenu');
+  if (!dd || !btn || !menu) return;
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    dd.classList.toggle('open');
+    // Bring the selected hour into view rather than always opening at 00:00.
+    const sel = menu.querySelector('.subj-dd-opt.sel');
+    if (dd.classList.contains('open') && sel) menu.scrollTop = Math.max(0, sel.offsetTop - menu.clientHeight / 2);
   });
+  menu.querySelectorAll('.subj-dd-opt').forEach(opt =>
+    opt.addEventListener('click', e => {
+      e.stopPropagation();
+      dd.classList.remove('open');
+      const h = parseInt(opt.dataset.hour) || 0;
+      if (h === study.resetHour) return;
+      study.resetHour = h;
+      touchSetting('resetHour'); saveStudy();
+      lastSeenStudyDay = studyDayKey(Date.now());
+      updateStudyUI();
+      renderDashboard();
+    }));
 }
 
 on('dashBtn', 'click', () => { requestNotifyPermission(); renderDashboard(); dashModal.classList.add('open'); });

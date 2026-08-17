@@ -51,16 +51,28 @@ function renderDayTicks() {
 }
 
 // ── Goals list ─────────────────────────────────────────────────
+let goalReorderMode = false;   // when on, each goal grows a drag pad
+
 function renderGoals() {
   const list = sessionGoals();
+  // Nothing to reorder below two goals — and the toggle is hidden there, so
+  // leaving the mode on would strand the drag pads with no way to dismiss them.
+  if (list.length < 2) goalReorderMode = false;
   if (list.length === 0) { goalsWrap.innerHTML = ''; return; }
   goalsWrap.innerHTML =
-    `<div class="goals-section-label">목표</div>` +
+    `<div class="goals-section-label">
+       <span>목표</span>
+       ${list.length > 1
+         ? `<button class="goal-reorder-toggle${goalReorderMode ? ' on' : ''}" id="goalsReorderToggle" title="순서 변경">${icoSm('grip')}</button>`
+         : ''}
+     </div>
+     <div class="goals-list${goalReorderMode ? ' reordering' : ''}" id="goalsList">` +
     list.map(g => {
       const rem      = Math.max(0, Math.floor((g.endEpoch - Date.now()) / 1000));
       const remText  = fmtGoalRem(g.endEpoch);
       const remClass = rem === 0 ? 'goal-rem done-c' : 'goal-rem';
       return `<div class="goal-item" data-gid="${g.id}">
+        <button class="goal-drag-handle" title="끌어서 순서 변경" tabindex="-1">${icoSm('grip')}</button>
         <div class="goal-stripe" style="--goal-c:${g.color}"></div>
         <div class="goal-body">
           <span class="goal-name">${escHtml(g.memo || '목표')}</span>
@@ -68,7 +80,13 @@ function renderGoals() {
         </div>
         <button class="goal-del" data-del="${g.id}">✕</button>
       </div>`;
-    }).join('');
+    }).join('') + '</div>';
+
+  const toggle = $('goalsReorderToggle');
+  if (toggle) toggle.addEventListener('click', () => {
+    goalReorderMode = !goalReorderMode;
+    renderGoals();
+  });
   goalsWrap.querySelectorAll('.goal-del').forEach(btn => {
     btn.addEventListener('click', () => {
       const delId = btn.dataset.del;
@@ -77,6 +95,68 @@ function renderGoals() {
       saveGoals(); renderGoals(); renderGoalFlags();
     });
   });
+  if (goalReorderMode) {
+    goalsWrap.querySelectorAll('.goal-drag-handle').forEach(h =>
+      h.addEventListener('pointerdown', e => beginGoalDrag(e, h)));
+  }
+}
+
+// Pointer-based drag reordering, the same mechanic as the note list: the row
+// follows the finger while its neighbours slide open a gap at the target slot.
+function beginGoalDrag(e, handle) {
+  if (e.button != null && e.button !== 0) return;
+  e.preventDefault();
+  const list    = $('goalsList');
+  const row     = handle.closest('.goal-item');
+  const rows    = [...list.querySelectorAll('.goal-item')];
+  const fromIdx = rows.indexOf(row);
+  const rect    = row.getBoundingClientRect();
+  const gap     = parseFloat(getComputedStyle(list).rowGap) || 6;
+  const step    = rect.height + gap;
+  const startY  = e.clientY;
+  let toIdx     = fromIdx;
+
+  row.classList.add('goal-dragging');
+  try { handle.setPointerCapture(e.pointerId); } catch (err) {}
+
+  function onMove(ev) {
+    const dy = ev.clientY - startY;
+    row.style.transform = `translateY(${dy}px)`;
+    const nt = Math.max(0, Math.min(rows.length - 1, fromIdx + Math.round(dy / step)));
+    if (nt === toIdx) return;
+    toIdx = nt;
+    rows.forEach((r, i) => {
+      if (r === row) return;
+      let shift = 0;
+      if (fromIdx < toIdx && i > fromIdx && i <= toIdx) shift = -step;
+      else if (fromIdx > toIdx && i >= toIdx && i < fromIdx) shift = step;
+      r.style.transform = shift ? `translateY(${shift}px)` : '';
+    });
+  }
+  function onUp() {
+    document.removeEventListener('pointermove', onMove);
+    document.removeEventListener('pointerup', onUp);
+    document.removeEventListener('pointercancel', onUp);
+    rows.forEach(r => { r.style.transform = ''; });
+    row.classList.remove('goal-dragging');
+    if (toIdx !== fromIdx) commitGoalReorder(fromIdx, toIdx);
+  }
+  document.addEventListener('pointermove', onMove);
+  document.addEventListener('pointerup', onUp);
+  document.addEventListener('pointercancel', onUp);
+}
+// Renumber this session's goals and stamp the move, so the new order syncs
+// without disturbing the goals themselves.
+function commitGoalReorder(fromIdx, toIdx) {
+  const list = sessionGoals();
+  const [moved] = list.splice(fromIdx, 1);
+  list.splice(toIdx, 0, moved);
+  const now = stamp();
+  list.forEach((g, i) => { g.order = i; g.orderAt = now; });
+  saveGoals();
+  renderGoals();
+  renderGoalFlags();
+  flushSyncSoon();
 }
 function updateGoalTimes() {
   sessionGoals().forEach(g => {

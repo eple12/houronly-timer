@@ -61,7 +61,7 @@ function observeBundle(b) {
     const t = b.timer[sid];
     if (t) { observeStamp(t.at); observeStamp(t.emgAt); }
   }
-  (b.goals || []).forEach(g => observeStamp(g.at));
+  (b.goals || []).forEach(g => { observeStamp(g.at); observeStamp(g.orderAt); });
   (b.notes || []).forEach(n => {
     observeStamp(n.updatedAt); observeStamp(n.pinAt); observeStamp(n.orderAt); observeStamp(n.itemsAt);
     (n.items || []).forEach(i => observeStamp(i.at));

@@ -120,6 +120,14 @@ function mergeTimers(a, b) {
   return out;
 }
 
+// A goal's position resolves on its own stamp, independently of the goal
+// itself — the same split notes use, so a drag-reorder on one device and a new
+// goal on another both survive.
+function mergeGoal(a, b) {
+  const base = newerBy(a, b, 'at');
+  const ord  = newerBy(a, b, 'orderAt');
+  return Object.assign({}, base, { order: ord.order, orderAt: ord.orderAt || 0 });
+}
 // Goals: union by id, newest version of each, minus anything deleted.
 function mergeGoals(a, b, tmb) {
   const m = new Map();
@@ -127,7 +135,7 @@ function mergeGoals(a, b, tmb) {
     if (!g || g.id == null) return;
     const id = String(g.id);
     const prev = m.get(id);
-    m.set(id, prev ? newerBy(prev, g, 'at') : g);
+    m.set(id, prev ? mergeGoal(prev, g) : g);
   });
   return [...m.values()]
     .filter(g => !(g.id in (tmb || {})))

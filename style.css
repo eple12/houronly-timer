@@ -448,8 +448,23 @@ svg.ico-sm { width: 1em; height: 1em; display: inline-block; vertical-align: -0.
   text-transform: uppercase;
   color: var(--dim);
   margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
+/* Reorder toggle beside the 목표 label — same affordance as the notes list. */
+.goal-reorder-toggle {
+  background: none; border: 1px solid transparent; border-radius: 7px;
+  color: var(--dim); cursor: pointer; padding: 2px 5px; -webkit-appearance: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+.goal-reorder-toggle.on { color: var(--accent); border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.goals-list { display: flex; flex-direction: column; gap: 6px; }
 .goal-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -458,7 +473,23 @@ svg.ico-sm { width: 1em; height: 1em; display: inline-block; vertical-align: -0.
   border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
+  transition: transform 0.16s cubic-bezier(0.2,0.7,0.2,1),
+              padding-left 0.22s cubic-bezier(0.2,0.7,0.2,1);
 }
+/* Handle is an overlay pad on the left, hidden until reorder mode is on. */
+.goal-drag-handle {
+  position: absolute; left: 4px; top: 0; bottom: 0; width: 26px;
+  background: none; border: none; color: var(--dim); cursor: grab;
+  padding: 0; margin: 0; touch-action: none; -webkit-appearance: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  opacity: 0; transform: translateX(-10px); pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.22s cubic-bezier(0.2,0.7,0.2,1);
+}
+.goal-drag-handle:active { cursor: grabbing; color: var(--sub); }
+.goals-list.reordering .goal-item { padding-left: 36px; }
+.goals-list.reordering .goal-drag-handle { opacity: 1; transform: none; pointer-events: auto; }
+.goal-item.goal-dragging { transition: none; z-index: 5; overflow: visible;
+  background: var(--surf2); box-shadow: 0 10px 26px rgba(0,0,0,0.5); opacity: 0.97; }
 .goal-stripe {
   width: 2px; height: 22px;
   border-radius: 1px;
@@ -1266,6 +1297,15 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 .sl-cur { color: var(--dim); font-size: 0.85em; margin-left: 6px; }
 .sess-legend { display: flex; flex-wrap: wrap; gap: 10px; margin: -2px 0 8px; }
 .sess-legend-item { display: inline-flex; align-items: center; font-size: 10.5px; color: var(--dim); }
+
+/* Dashboard: the sheet is long, so scroll the CONTENT and leave the title bar
+   (and its ✕) in place — same split the large memo view uses. */
+#dashModal .modal { overflow: hidden; }
+/* Scroll props only — #dashBody's own flex column and gap are set above. */
+#dashBody { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+
+/* Reset-hour picker: narrow enough to sit beside its label. */
+.rh-dd { flex: 0 0 auto; width: 108px; }
 
 /* Says which session the headline cards below are counting. */
 .dash-scope {
