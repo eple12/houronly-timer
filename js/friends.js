@@ -284,19 +284,24 @@ function fmtAgo(ms) {
   if (h < 24) return h + '시간 전';
   return Math.floor(h / 24) + '일 전';
 }
-// A member's row stays deliberately plain — name, whether they're studying
-// right now, today's total. Everything else lives behind the dashboard button.
-function memberRowHTML(m, rank) {
+// A member's row stays deliberately plain — name, today's total, and a button
+// to their dashboard. Studying right now is shown by colouring the row's border
+// and its time in the accent, rather than a separate badge.
+function memberRowHTML(m, rank, ownerUid) {
   const s = m.stats;
   const mine = m.uid === cloudUid;
   const fresh = s && isTodayish(s);
   const today = fresh ? (s.todaySec || 0) : 0;
-  const live = s && s.live && s.live.on;
-  return `<div class="fr-row${mine ? ' me' : ''}">
+  const live = !!(s && s.live && s.live.on);
+  const title = live
+    ? `${m.name} 님 · 지금 공부 중${s.live.subj ? ' (' + s.live.subj + ')' : ''}`
+    : m.name;
+  return `<div class="fr-row${mine ? ' me' : ''}${live ? ' live' : ''}" title="${escHtml(title)}">
     <span class="fr-rank">${rank}</span>
     <div class="fr-body">
-      <span class="fr-name">${escHtml(m.name)}${mine ? '<span class="fr-me-tag">나</span>' : ''}</span>
-      ${live ? `<span class="fr-live"><span class="fr-live-dot"></span>공부 중${s.live.subj ? ' · ' + escHtml(s.live.subj) : ''}</span>` : ''}
+      <span class="fr-name">${escHtml(m.name)}</span>
+      ${m.uid === ownerUid ? `<span class="fr-crown" title="방장">${icoSm('crown')}</span>` : ''}
+      ${mine ? '<span class="fr-me-tag">나</span>' : ''}
     </div>
     <span class="fr-today">${s ? fmtHrs(today) : '—'}</span>
     <button class="fr-dash-btn" data-dash="${escHtml(m.uid)}" title="${escHtml(m.name)} 님의 기록"
@@ -410,7 +415,7 @@ function renderFriends() {
       ${err}
       <button class="fr-back" id="frBackMember">${icoSm('chevL')} 멤버 목록</button>
       <div class="fr-group-title">${escHtml(m.name)}
-        ${live ? `<span class="fr-live"><span class="fr-live-dot"></span>공부 중${s.live.subj ? ' · ' + escHtml(s.live.subj) : ''}</span>` : ''}
+        ${live ? `<span class="fr-studying">공부 중${s.live.subj ? ' · ' + escHtml(s.live.subj) : ''}</span>` : ''}
       </div>
       ${memberDashHTML(m)}`;
     on('frBackMember', 'click', () => { openMemberUid = null; renderFriends(); });
@@ -430,7 +435,7 @@ function renderFriends() {
       ${err}
       <button class="fr-back" id="frBack">${icoSm('chevL')} 그룹 목록</button>
       <div class="fr-group-title">${escHtml((g && g.name) || '그룹')}<span class="fr-count">${groupMembers.length}명</span></div>
-      <div class="fr-list">${rows.map((m, i) => memberRowHTML(m, i + 1)).join('') || '<div class="acct-note">멤버가 없습니다.</div>'}</div>
+      <div class="fr-list">${rows.map((m, i) => memberRowHTML(m, i + 1, g && g.ownerUid)).join('') || '<div class="acct-note">멤버가 없습니다.</div>'}</div>
       <div class="modal-field">
         <span class="modal-field-label">닉네임으로 초대</span>
         <div class="subj-add-row">
@@ -534,12 +539,19 @@ async function guard(fn) {
   try {
     await fn();
   } catch (e) {
-    friendsErr = (e && e.message) ? e.message : friendlyErr(e);
+    const msg = (e && e.message) ? e.message : friendlyErr(e);
+    // Warnings about what you just did belong in a toast, not pinned to the top
+    // of the panel. A setup problem is different: it's a standing condition, so
+    // that one stays on screen — a toast would vanish and leave the whole
+    // screen quietly not working.
+    showToast(msg);
+    friendsErr = isSetupProblem(msg) ? msg : '';
     renderFriends();
   } finally {
     friendsBusy = false;
   }
 }
+const isSetupProblem = msg => /권한|firestore\.rules|Firebase/i.test(msg || '');
 
 async function openFriends() {
   friendsErr = '';

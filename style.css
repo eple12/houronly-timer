@@ -1424,13 +1424,20 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 .fr-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .fr-name { font-size: 14px; font-weight: 600; color: var(--text);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 9em; }
-.fr-me-tag { font-size: 9.5px; color: var(--accent); margin-left: 5px; letter-spacing: 0.04em; }
-.fr-live { display: inline-flex; align-items: center; gap: 5px;
-  font-size: 10.5px; color: var(--good); white-space: nowrap; }
-.fr-live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--good);
-  animation: frPulse 1.6s ease-in-out infinite; }
-@keyframes frPulse { 0%,100% { opacity: 1; transform: scale(1); }
-                     50% { opacity: 0.35; transform: scale(0.8); } }
+.fr-me-tag { font-size: 9.5px; color: var(--accent); letter-spacing: 0.04em; }
+/* Owner marker — a fixed gold, since it means "방장" rather than following the
+   user's accent (which the row already uses to mean "studying"). */
+.fr-crown { display: inline-flex; align-items: center; color: #f2c744; flex-shrink: 0; }
+.fr-crown .ico { width: 13px; height: 13px; }
+/* Studying now: the row's own border and its time light up in the accent —
+   this replaced a green blinking badge. */
+.fr-row.live { border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 7%, var(--surf2)); }
+.fr-row.live .fr-today { color: var(--accent); }
+.fr-row.me.live { border-color: var(--accent); }
+/* Same idea in the member dashboard's header. */
+.fr-studying { font-size: 11px; color: var(--accent); font-weight: 600;
+  white-space: nowrap; }
 .fr-subj { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
 .fr-subj.empty { font-size: 11px; color: var(--dim); }
 .fr-chip { font-size: 10.5px; color: var(--sub); background: var(--surface);

@@ -12,10 +12,10 @@ const RUNNING_VERSION = (() => {
   const m = src.match(/[?&]v=([^&]+)/);
   return m ? m[1] : null;
 })();
-// Coming back to the app checks immediately, which is when most people notice
-// it. This is the other path — for a copy left open and watched — so it wants
-// to be short enough that you don't sit in front of a stale build for long.
-const UPDATE_POLL_MS   = 5 * 60 * 1000;    // background re-check
+// Coming back to the app checks immediately, which is when most people notice a
+// new version anyway. This slower background poll is just the backstop for a
+// copy left open and watched — kept long so the app isn't fetching constantly.
+const UPDATE_POLL_MS   = 15 * 60 * 1000;   // background re-check
 const UPDATE_SNOOZE_MS = 60 * 60 * 1000;   // how long 나중에 keeps it quiet
 let updateSeen = null;        // version we've already told the user about
 let updateSnoozedUntil = 0;
