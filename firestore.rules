@@ -1,0 +1,85 @@
+rules_version = '2';
+
+// ─────────────────────────────────────────────────────────────────────────
+//  Firebase 콘솔 → Firestore Database → 규칙(Rules) 에 이 내용을 붙여넣고
+//  "게시"를 눌러야 그룹 기능이 동작합니다. 규칙을 올리지 않으면 앱은 평소대로
+//  동작하지만 그룹 화면에서 권한 오류가 납니다.
+//
+//  설계 원칙: 자기 문서는 자기만 쓴다.
+//   - 개인 데이터(users/{uid})는 예전 그대로 본인 전용입니다.
+//   - 그룹 통계는 각자 자기 칸에만 쓰고, 같은 그룹 멤버만 읽습니다.
+//     그래서 남의 기록을 조작할 방법이 없습니다.
+//   - 그룹 참여는 받은 초대장이 있어야만 가능합니다.
+// ─────────────────────────────────────────────────────────────────────────
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isMe(uid)  { return signedIn() && request.auth.uid == uid; }
+
+    // 개인 동기화 문서 — 기존과 동일하게 본인만.
+    match /users/{uid} {
+      allow read, write: if isMe(uid);
+    }
+
+    // 닉네임 → 계정 매핑. 초대 검색을 위해 로그인한 사용자는 읽을 수 있고,
+    // 자기 것만 만들 수 있으며, 이미 남이 쓰는 이름은 덮어쓸 수 없습니다.
+    match /usernames/{nameLower} {
+      allow read: if signedIn();
+      allow create: if isMe(request.resource.data.uid);
+      allow update, delete: if isMe(resource.data.uid)
+                            && isMe(request.resource.data.uid);
+    }
+
+    // 내가 속한 그룹 목록. 본인 전용이며, 이걸 쓰는 덕분에 콘솔에서 색인을
+    // 따로 만들 필요가 없습니다.
+    match /userGroups/{uid} {
+      allow read, write: if isMe(uid);
+    }
+
+    match /groups/{gid} {
+      function isMember() {
+        return signedIn() &&
+          exists(/databases/$(database)/documents/groups/$(gid)/members/$(request.auth.uid));
+      }
+      function invited() {
+        return exists(/databases/$(database)/documents/invites/$(gid + '__' + request.auth.uid));
+      }
+
+      allow get:    if isMember();
+      allow create: if isMe(request.resource.data.ownerUid);
+      allow update: if isMember() && request.resource.data.ownerUid == resource.data.ownerUid;
+      allow delete: if isMe(resource.data.ownerUid);
+
+      // 멤버 명단: 각자 자기 줄만 쓰고 지웁니다(= 스스로 나가기).
+      // 새로 들어오려면 자기 앞으로 온 초대장이 있어야 합니다.
+      match /members/{uid} {
+        allow read:   if isMember();
+        allow create: if isMe(uid) && (invited() ||
+                         get(/databases/$(database)/documents/groups/$(gid)).data.ownerUid == request.auth.uid);
+        allow update: if isMe(uid);
+        allow delete: if isMe(uid) ||
+                         get(/databases/$(database)/documents/groups/$(gid)).data.ownerUid == request.auth.uid;
+      }
+
+      // 공부 기록: 자기 칸에만 쓰고, 같은 그룹 멤버가 읽습니다.
+      match /stats/{uid} {
+        allow read:  if isMember();
+        allow write: if isMe(uid);
+      }
+    }
+
+    // 초대장. 문서 id는 "{gid}__{받는사람uid}" 로 고정해 두어야
+    // 위 members 규칙이 초대 여부를 확인할 수 있습니다.
+    match /invites/{inviteId} {
+      allow read:   if signedIn() &&
+                    (isMe(resource.data.toUid) || isMe(resource.data.fromUid));
+      allow create: if isMe(request.resource.data.fromUid)
+                    && inviteId == request.resource.data.gid + '__' + request.resource.data.toUid
+                    && exists(/databases/$(database)/documents/groups/$(request.resource.data.gid)/members/$(request.auth.uid));
+      allow delete: if signedIn() &&
+                    (isMe(resource.data.toUid) || isMe(resource.data.fromUid));
+    }
+  }
+}

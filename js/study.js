@@ -18,6 +18,7 @@ function toggleStopwatch() {
   updateStudyUI();
   // Propagate start/stop promptly instead of waiting out the debounce.
   flushSyncSoon();
+  shareStats(true);   // group members see 공부 중 flip right away
 }
 
 // Returning to the foreground: the ledger already holds the truth, so there is

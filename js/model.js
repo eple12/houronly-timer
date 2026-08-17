@@ -316,6 +316,7 @@ function setCurSubject(name) {
   study.curSubject = name;
   touchSetting('curSubject');
   invalidateTotals();
+  shareStats(true);   // the shared "공부 중 · 과목" line follows along
 }
 
 // ── Session registry ───────────────────────────────────────────

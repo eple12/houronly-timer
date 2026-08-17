@@ -396,6 +396,7 @@ function pushCloud() {
   return Promise.race([tx$, guard]).then(() => {
     pushRetry = 0;
     applyBundle(merged);          // adopt anything the cloud had that we didn't
+    shareStats(false);
     setSyncStatus('동기화됨', '');
     if (pushQueued) { pushQueued = false; schedulePush(); }
   }).catch(e => {
