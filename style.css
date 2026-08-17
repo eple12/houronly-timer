@@ -101,6 +101,24 @@ svg.ico-sm { width: 1em; height: 1em; display: inline-block; vertical-align: -0.
   text-transform: uppercase;
   color: var(--dim);
 }
+/* Active-session chip — the app's title slot, since which session you're in is
+   the most important thing to know at a glance. Tapping it opens the list. */
+.session-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: var(--surf2); border: 1px solid var(--border);
+  border-radius: 999px; padding: 5px 11px 5px 9px;
+  color: var(--text); font-family: 'Noto Sans KR', sans-serif;
+  font-size: 11.5px; font-weight: 600; letter-spacing: -0.2px;
+  cursor: pointer; -webkit-appearance: none; max-width: 58vw;
+  transition: background 0.13s, border-color 0.13s;
+}
+.session-chip:active { background: var(--bord2); }
+.session-chip .sess-dot {
+  width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+  box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 12%, transparent);
+}
+.session-chip .sess-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.session-chip .sess-caret { color: var(--dim); font-size: 9px; flex-shrink: 0; }
 .status-row { display: flex; align-items: center; gap: 8px; }
 .status-text {
   font-size: 10px;
@@ -908,8 +926,36 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 .memo-mini-btn:active { color: var(--text); }
 .memo-nav { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 2px; padding-top: 8px; border-top: 1px solid var(--border); }
 .memo-nav-count { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--dim); min-width: 3.5em; text-align: center; }
-.memo-text { font-size: 13px; color: var(--sub); line-height: 1.55; white-space: pre-wrap;
+.memo-text { font-size: 13px; color: var(--sub); line-height: 1.55;
   max-height: 26vh; overflow-y: auto; word-break: break-word; }
+
+/* ── Memo markup: paragraphs, content dividers, tables ────────── */
+/* Only the typed paragraphs keep their line breaks — the generated blocks
+   (dividers, tables) must not inherit pre-wrap or their markup indentation
+   would show up as stray whitespace. */
+.memo-para { white-space: pre-wrap; }
+.memo-para + .memo-para { margin-top: 0.5em; }
+.memo-hr { height: 1px; background: var(--bord2); border-radius: 1px;
+  margin: 1em 0; flex-shrink: 0; }
+.memo-hr.labeled { display: flex; align-items: center; gap: 9px;
+  height: auto; background: none; }
+.memo-hr.labeled .memo-hr-label { flex-shrink: 0; color: var(--dim);
+  font-size: 0.85em; font-weight: 600; letter-spacing: 0.02em; }
+.memo-hr.labeled i { flex: 1; height: 1px; background: var(--bord2); border-radius: 1px; }
+/* Wide tables scroll inside their own box instead of stretching the card. */
+/* pan-x is needed because the big view sets touch-action: pan-y on its body,
+   which would otherwise swallow the sideways drag that scrolls a wide table. */
+.memo-table-wrap { margin: 0.85em 0; overflow-x: auto; -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y; }
+/* max-content + min-width:100% = fills the box when it fits, scrolls when it
+   doesn't. Plain width:100% would instead crush the columns unreadably narrow. */
+.memo-table { border-collapse: collapse; width: max-content; min-width: 100%; font-size: 0.95em; }
+.memo-table th, .memo-table td {
+  border: 1px solid var(--border); padding: 6px 9px;
+  text-align: left; vertical-align: top; word-break: break-word; min-width: 3.5em;
+}
+.memo-table th { background: var(--surf2); color: var(--text); font-weight: 700; }
+.memo-table td { color: inherit; }
 .memo-checks { display: flex; flex-direction: column; gap: 7px; max-height: 30vh; overflow-y: auto; }
 .memo-check { display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--text); cursor: pointer; }
 .memo-check input { width: 17px; height: 17px; accent-color: var(--accent); flex-shrink: 0; }
@@ -928,7 +974,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 .memo-big-nav { display: flex; align-items: center; justify-content: center; gap: 16px;
   padding-top: 10px; margin-top: 2px; border-top: 1px solid var(--border); }
 .memo-big-text { font-size: 17px; line-height: 1.75; color: var(--text);
-  white-space: pre-wrap; word-break: break-word; }
+  word-break: break-word; }
 .memo-big-checks { display: flex; flex-direction: column; gap: 13px; }
 .memo-big-check { display: flex; align-items: center; gap: 13px; font-size: 16px;
   color: var(--text); cursor: pointer; }
@@ -987,6 +1033,24 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 .note-pin-row input { width: 17px; height: 17px; accent-color: var(--accent); }
 .note-delete { color: var(--danger); transition: background 0.15s, color 0.15s, border-color 0.15s; }
 .note-delete.armed { background: var(--danger); color: #fff; border-color: var(--danger); }
+/* Text-memo tool strip above the editor */
+.note-tools { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.note-tool {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--surf2); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--sub); font-family: 'Noto Sans KR', sans-serif; font-size: 12px;
+  padding: 6px 10px; cursor: pointer; -webkit-appearance: none;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.note-tool:active { background: var(--bord2); color: var(--text); }
+.note-tool.right { margin-left: auto; }
+.note-tool.on { border-color: var(--accent); color: var(--accent); }
+.note-preview {
+  width: 100%; min-height: 300px; max-height: 60vh; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--bord2); border-radius: 10px;
+  color: var(--sub); font-size: 14px; line-height: 1.6; padding: 12px;
+}
+
 #noteEditBody textarea {
   width: 100%; min-height: 300px; max-height: 60vh; resize: vertical;
   background: var(--surface); border: 1px solid var(--bord2); border-radius: 10px;
@@ -1153,6 +1217,60 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
   display: inline-block; border: 1px solid rgba(255,255,255,0.18);
 }
+/* ═══════════════════════ Sessions ════════════════════════════ */
+.sess-inline-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  display: inline-block; margin-right: 6px; vertical-align: baseline;
+}
+.sl-cur { color: var(--dim); font-size: 0.85em; margin-left: 6px; }
+.sess-legend { display: flex; flex-wrap: wrap; gap: 10px; margin: -2px 0 8px; }
+.sess-legend-item { display: inline-flex; align-items: center; font-size: 10.5px; color: var(--dim); }
+
+#sessList { display: flex; flex-direction: column; gap: 8px; }
+.sess-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 12px; border-radius: 11px;
+  background: var(--surf2); border: 1px solid var(--border);
+  cursor: pointer; transition: border-color 0.14s, background 0.14s;
+}
+.sess-row:active { background: var(--bord2); }
+.sess-row.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--surf2)); }
+.sess-row.editing { flex-direction: column; align-items: stretch; gap: 10px; cursor: default; }
+.sess-row-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+.sess-row-body { flex: 1; min-width: 0; }
+.sess-row-name { font-size: 13.5px; font-weight: 600; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sess-row-sub { font-size: 11px; color: var(--dim); margin-top: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sess-cur-tag { font-size: 9.5px; color: var(--accent); flex-shrink: 0; letter-spacing: 0.04em; }
+.sess-edit {
+  background: none; border: none; color: var(--dim); cursor: pointer;
+  padding: 4px 2px; flex-shrink: 0; -webkit-appearance: none; line-height: 1;
+}
+.sess-edit:active { color: var(--text); }
+.sess-name-input { width: 100%; }
+.sess-edit-colors { margin-top: 0; }
+.sess-edit-actions { display: flex; gap: 8px; }
+.sess-edit-actions .acct-secondary { flex: 0 0 auto; color: var(--danger); }
+.sess-edit-actions .modal-confirm { flex: 1; margin: 0; }
+/* "다른 세션에서 진행 중" note under the stopwatch's subject button */
+.sw-sess-note { display: flex; align-items: center; font-size: 10px; color: var(--dim);
+  margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Confirmation dialog */
+#confirmModal { align-items: center; }
+#confirmModal .modal.confirm-modal {
+  max-width: 400px; width: 88vw; border-radius: 18px;
+  border-top: 1px solid var(--bord2);
+}
+.confirm-msg { font-size: 13.5px; line-height: 1.65; color: var(--sub); }
+.confirm-msg b { color: var(--text); }
+.confirm-note { font-size: 12px; color: var(--dim); }
+.confirm-actions { display: flex; gap: 8px; margin-top: 4px; }
+.confirm-actions .acct-secondary { flex: 1; margin: 0; }
+.confirm-actions .modal-confirm { flex: 1.4; margin: 0; }
+.confirm-actions .modal-confirm.danger { background: var(--danger); color: #fff; }
+
 /* Color swatches row inside subject add modal */
 .subj-color-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
 .subj-cswatch {

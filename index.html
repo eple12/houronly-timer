@@ -24,7 +24,9 @@
 
 <!-- Header -->
 <div class="header">
-  <span class="header-title">타이머</span>
+  <button class="session-chip" id="sessionBtn" title="세션 전환">
+    <span class="sess-dot"></span><span class="sess-name">기본</span><span class="sess-caret">▾</span>
+  </button>
   <div class="status-row">
     <button class="acct-btn" id="setBtn" title="설정"></button>
     <button class="acct-btn" id="acctBtn" title="계정 / 동기화"></button>
@@ -74,6 +76,7 @@
     <button class="sw-toggle" id="swToggle">▶</button>
     <div class="sw-info">
       <button class="sw-subject" id="swSubjectBtn" title="과목 선택"></button>
+      <div class="sw-sess-note" id="swSessNote" style="display:none"></div>
       <div class="sw-time" id="swTime">00:00:00</div>
       <div class="sw-goalbar" id="swGoalBar" style="display:none"><i></i></div>
     </div>
@@ -190,6 +193,12 @@
       <button class="modal-close" id="goalModalClose">✕</button>
     </div>
     <div class="modal-field">
+      <div class="seg" id="goalModeSeg">
+        <button class="seg-btn active" data-gmode="dur" type="button">기간으로</button>
+        <button class="seg-btn" data-gmode="date" type="button">날짜로</button>
+      </div>
+    </div>
+    <div class="modal-field" id="goalDurField">
       <span class="modal-field-label">지금으로부터</span>
       <div class="goal-dur-row">
         <div class="input-group"><label>시간</label><input type="number" id="goalH" min="0" max="8760" placeholder="0" inputmode="numeric"></div>
@@ -198,6 +207,21 @@
         <div class="colon">:</div>
         <div class="input-group"><label>초</label><input type="number" id="goalS" min="0" max="59" placeholder="0" inputmode="numeric"></div>
       </div>
+    </div>
+    <div class="modal-field" id="goalDateField" style="display:none">
+      <span class="modal-field-label">목표 날짜</span>
+      <div class="cal-nav">
+        <button class="cal-arrow" id="gcalPrev" type="button">‹</button>
+        <span class="cal-month-label" id="gcalLabel"></span>
+        <button class="cal-arrow" id="gcalNext" type="button">›</button>
+      </div>
+      <div class="cal-grid" id="gcalGrid"></div>
+      <div class="goal-dur-row">
+        <div class="input-group"><label>시</label><input type="number" id="gcalH" min="0" max="23" placeholder="0" inputmode="numeric"></div>
+        <div class="colon">:</div>
+        <div class="input-group"><label>분</label><input type="number" id="gcalM" min="0" max="59" placeholder="0" inputmode="numeric"></div>
+      </div>
+      <div class="cal-hint" id="gcalHint"></div>
     </div>
     <div class="modal-field">
       <span class="modal-field-label">메모</span>
@@ -305,6 +329,41 @@
   </div>
 </div>
 
+<!-- Session manager -->
+<div class="modal-overlay" id="sessModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">세션</span>
+      <button class="modal-close" id="sessClose">✕</button>
+    </div>
+    <div class="acct-note">세션마다 메인 타이머·목표·공부 기록이 따로 쌓여요. 과목과 메모는 모든 세션이 함께 씁니다.</div>
+    <div id="sessList"></div>
+    <div class="modal-field">
+      <span class="modal-field-label">새 세션</span>
+      <div class="subj-add-row">
+        <input type="text" class="goal-memo-input" id="sessAddInput" placeholder="예: 수능 대비" maxlength="20">
+        <button class="modal-confirm" id="sessAddBtn">추가</button>
+      </div>
+      <div class="subj-color-row" id="sessColorSwatches"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Reusable confirmation dialog -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal confirm-modal">
+    <div class="modal-header">
+      <span class="modal-title" id="confirmTitle">확인</span>
+      <button class="modal-close" id="confirmClose">✕</button>
+    </div>
+    <div class="confirm-msg" id="confirmMsg"></div>
+    <div class="confirm-actions">
+      <button class="acct-secondary" id="confirmNo">취소</button>
+      <button class="modal-confirm" id="confirmYes">확인</button>
+    </div>
+  </div>
+</div>
+
 <!-- Settings modal -->
 <div class="modal-overlay" id="setModal">
   <div class="modal">
@@ -321,10 +380,12 @@
 
 <!-- App scripts — loaded in dependency order; all share the global scope. -->
 <script src="js/constants.js"></script>
+<script src="js/model.js"></script>
 <script src="js/storage.js"></script>
 <script src="js/study.js"></script>
 <script src="js/timer.js"></script>
 <script src="js/dashboard.js"></script>
+<script src="js/sessions.js"></script>
 <script src="js/sync.js"></script>
 <script src="js/notes.js"></script>
 </body>

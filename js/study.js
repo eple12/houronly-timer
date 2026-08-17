@@ -1,117 +1,30 @@
-// ── Stopwatch session (synced, conflict-free) ──────────────────
-// A run's elapsed time is a pure function of (startEpoch, now) so every device
-// — and every commit — computes the same value. Time is NOT accumulated per
-// tick; it's committed into `records` once on stop, keyed by runId so committing
-// twice is a no-op. A run only ends on an explicit stop: the timer keeps
-// counting while the device is locked/closed, and that wall-clock time is
-// credited in full when it's stopped (or seen again on any device).
-// NOTE: named swRunning (not isRunning) — isRunning() is the MAIN countdown
-// timer's state. They are independent; don't conflate them.
-function swRunning() { return !!(study.session && study.session.startEpoch); }
-
-// Live (not-yet-committed) seconds the active session contributes, split by
-// study-day. Starts from whatever has already been committed for this run so a
-// resumed/resurrected run is never counted twice.
-function sessionOverlay() {
-  const s = study.session;
-  if (!s || !s.startEpoch) return {};
-  const cap = Date.now();
-  const from = Math.max(s.startEpoch, (study.committedRuns && study.committedRuns[s.runId]) || 0);
-  const out = {};
-  let cur = from;
-  while (cur < cap) {
-    const key = studyDayKey(cur);
-    const boundary = nextStudyDayStart(cur);
-    const until = Math.min(cap, boundary);
-    const dt = (until - cur) / 1000;
-    if (dt > 0) out[key] = (out[key] || 0) + dt;
-    cur = boundary;
-  }
-  return out;
-}
-// Committed records with the live session overlaid — what the UI should show.
-function effRecords() {
-  const ov = sessionOverlay();
-  const out = Object.assign({}, study.records);
-  for (const k in ov) out[k] = (out[k] || 0) + ov[k];
-  return out;
-}
-function recSec(key) { return (study.records[key] || 0) + (sessionOverlay()[key] || 0); }
-
-// Fold the session's elapsed time (up to `cap`) into committed records. Picks
-// up from committedRuns[runId] so calling it repeatedly only adds new time.
-function commitSession(cap) {
-  const s = study.session;
-  if (!s || !s.startEpoch) return;
-  const from = Math.max(s.startEpoch, study.committedRuns[s.runId] || 0);
-  let cur = from;
-  while (cur < cap) {
-    const key = studyDayKey(cur);
-    const boundary = nextStudyDayStart(cur);
-    const until = Math.min(cap, boundary);
-    const dt = (until - cur) / 1000;
-    if (dt > 0) {
-      study.records[key] = (study.records[key] || 0) + dt;
-      if (study.curSubject) {
-        if (!study.subjects[key]) study.subjects[key] = {};
-        study.subjects[key][study.curSubject] = (study.subjects[key][study.curSubject] || 0) + dt;
-      }
-    }
-    cur = boundary;
-  }
-  study.committedRuns[s.runId] = Math.max(study.committedRuns[s.runId] || 0, cap);
-  pruneCommittedRuns();
-}
-function pruneCommittedRuns() {
-  const cut = Date.now() - 3 * 86400000;
-  const keep = study.session && study.session.runId;
-  for (const k in study.committedRuns) if (k !== keep && study.committedRuns[k] < cut) delete study.committedRuns[k];
-}
-function startSession() {
-  const now = Date.now();
-  study.session = { runId: DEVICE_ID + '-' + now, startEpoch: now, beatAt: now };
-  study.sessionAt = now;
-}
-function stopSession() {
-  commitSession(Date.now());
-  study.session = null;
-  study.sessionAt = Date.now();   // explicit stop: newest stamp wins over any peer
-}
-// Per-tick maintenance: keep the heartbeat fresh so peers periodically re-sync
-// the live session. Time is derived from startEpoch, so a missed beat (closed
-// tab, locked screen) never loses time — it's all credited on the next view/stop.
-function accountStopwatch() {
-  const s = study.session;
-  if (!s || !s.startEpoch) return;
-  if (document.visibilityState === 'visible') { s.beatAt = Date.now(); saveStudy(); }
-}
-// On load / returning to foreground: resume the live session's heartbeat.
-function reconcileSession() {
-  const s = study.session;
-  if (!s || !s.startEpoch) return;
-  if (document.visibilityState === 'visible') { s.beatAt = Date.now(); saveStudy(); }
-}
-
-// Seconds studied today for one subject ('' = total of all tagged).
-function todaySubjectSec(name) {
-  const key = studyDayKey(Date.now());
-  const day = study.subjects[key] || {};
-  let v = day[name] || 0;
-  if (swRunning() && study.curSubject && name === study.curSubject) v += (sessionOverlay()[key] || 0);
-  return Math.floor(v);
-}
+// ── Study stopwatch (ledger-backed, conflict-free) ─────────────
+// Starting the stopwatch appends an open run to the ledger; stopping closes it.
+// Nothing is written per tick — the elapsed time is derived from the wall clock
+// — so a locked screen, a closed tab or an offline device can neither lose nor
+// invent time, and the stopwatch running produces zero sync traffic.
+// See js/model.js for the ledger itself (startRun / stopRuns / runSegments).
+// NOTE: swRunning() is the STUDY stopwatch; isRunning() is the MAIN countdown.
+// They are independent — don't conflate them.
 
 function toggleStopwatch() {
   if (swRunning()) {
-    stopSession();
+    stopRuns();
   } else {
     requestNotifyPermission();
-    startSession();
+    startRun();
   }
   saveStudy();
   updateStudyUI();
-  // Propagate the start/stop promptly instead of waiting out the debounce.
-  if (cloudUid && syncReady) { lastPushedJson = null; schedulePush(); }
+  // Propagate start/stop promptly instead of waiting out the debounce.
+  flushSyncSoon();
+}
+
+// Returning to the foreground: the ledger already holds the truth, so there is
+// nothing to reconcile — just recompute what's on screen.
+function reconcileSession() {
+  invalidateTotals();
+  lastSeenStudyDay = studyDayKey(Date.now());
 }
 
 // ── Day rollover detection + notification ──────────────────────
@@ -124,8 +37,9 @@ function checkDayRollover() {
   }
 }
 function notifyDayEnd(dayKey) {
-  const sec = study.records[dayKey] || 0;
-  const others = Object.entries(study.records)
+  const R = effRecords();
+  const sec = R[dayKey] || 0;
+  const others = Object.entries(R)
     .filter(([k,v]) => k !== dayKey && v > 0.5).map(([,v]) => v);
   const avg = others.length ? others.reduce((a,b)=>a+b,0) / others.length : 0;
   const diff = sec - avg;
@@ -157,63 +71,43 @@ function showToast(msg) {
 }
 
 // ── Pomodoro (independent engine — runs alongside the main timer) ──
-const POMO_KEY  = 'timer_pomo_v1';
-let pomoPhase     = 'focus';   // 'focus' | 'short' | 'long'
-let pomoSet       = 0;         // completed focus blocks in the current cycle
-let pomoRemaining = 0;         // seconds left in the current phase
-let pomoEndEpoch  = null;      // epoch ms when the phase ends (null = not running)
-let pomoTimer     = null;      // setInterval handle
+// The runtime state lives in the synced document (study.pomoRun) and every
+// phase transition is derived from the phase's own end time, so two devices
+// always show the same phase and the same clock without negotiating.
+let pomoTimer = null;          // setInterval handle (display only)
 const pomoToggleBtn = $('pomoToggle');
 const pomoTimeEl    = $('pomoTime');
 
-function phaseSec(p) {
-  const m = p === 'focus' ? study.pomo.focus : p === 'short' ? study.pomo.short : study.pomo.long;
-  return Math.max(1, Math.round((parseFloat(m) || 0) * 60));
-}
 function phaseName(p) { return p === 'focus' ? '집중' : p === 'short' ? '짧은 휴식' : '긴 휴식'; }
-function pomoRunning() { return pomoEndEpoch !== null; }
 function fmtClock(secs) {
   secs = Math.max(0, Math.round(secs));
   const h = Math.floor(secs/3600), m = Math.floor((secs%3600)/60), s = secs%60;
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 }
-function savePomo() {
-  try { localStorage.setItem(POMO_KEY, JSON.stringify(
-    { phase: pomoPhase, set: pomoSet, remaining: pomoRemaining, endEpoch: pomoEndEpoch })); } catch(e) {}
-}
-function loadPomo() {
-  let p; try { p = JSON.parse(localStorage.getItem(POMO_KEY)); } catch(e) {}
-  if (p) {
-    pomoPhase     = (p.phase === 'short' || p.phase === 'long') ? p.phase : 'focus';
-    pomoSet       = p.set || 0;
-    pomoRemaining = (typeof p.remaining === 'number') ? p.remaining : phaseSec(pomoPhase);
-    pomoEndEpoch  = p.endEpoch || null;
-  } else {
-    pomoRemaining = phaseSec('focus');
-  }
-}
-
-// Pomodoro runs entirely on its own — it never touches the study stopwatch.
 
 function pomoStart() {
-  if (pomoRemaining <= 0) pomoRemaining = phaseSec(pomoPhase);
-  pomoEndEpoch = Date.now() + pomoRemaining * 1000;
+  const st = study.pomoRun;
+  if (!(st.remaining > 0)) st.remaining = pomoPhaseSec(st.phase);
+  st.endEpoch = Date.now() + st.remaining * 1000;
+  st.at = stamp();
   startPomoInterval();
   requestNotifyPermission();
-  savePomo(); renderPomo();
+  saveStudy(); renderPomo(); flushSyncSoon();
 }
 function pomoPause() {
   if (!pomoRunning()) return;
-  pomoRemaining = Math.max(0, Math.ceil((pomoEndEpoch - Date.now()) / 1000));
-  pomoEndEpoch = null;
+  const st = study.pomoRun;
+  st.remaining = Math.max(0, Math.ceil((st.endEpoch - Date.now()) / 1000));
+  st.endEpoch = null;
+  st.at = stamp();
   stopPomoInterval();
-  savePomo(); renderPomo();
+  saveStudy(); renderPomo(); flushSyncSoon();
 }
 function pomoReset() {
   stopPomoInterval();
-  pomoPhase = 'focus'; pomoSet = 0; pomoEndEpoch = null;
-  pomoRemaining = phaseSec('focus');
-  savePomo(); renderPomo();
+  study.pomoRun = { phase: 'focus', set: 0, endEpoch: null,
+                    remaining: pomoPhaseSec('focus'), at: stamp() };
+  saveStudy(); renderPomo(); flushSyncSoon();
 }
 function pomoToggle() { pomoRunning() ? pomoPause() : pomoStart(); }
 
@@ -222,45 +116,44 @@ function startPomoInterval() {
   pomoTimer = setInterval(pomoTick, 250);
 }
 function stopPomoInterval() { if (pomoTimer) { clearInterval(pomoTimer); pomoTimer = null; } }
-
+// Keeps the display in step and rolls the phase over when it ends. The rollover
+// is a pure function of the previous end time, so a peer computes the identical
+// next phase — the two never disagree, whichever one is awake.
 function pomoTick() {
-  if (!pomoRunning()) { stopPomoInterval(); return; }
-  const rem = (pomoEndEpoch - Date.now()) / 1000;
-  if (rem <= 0) { pomoAdvance(); return; }
-  pomoRemaining = rem;
-  renderPomoTime();
-}
-// A phase finished → notify and roll into the next one (keeps running).
-function pomoAdvance() {
-  if ('vibrate' in navigator) navigator.vibrate([300,150,300]);
-  let next;
-  if (pomoPhase === 'focus') {
-    pomoSet++;
-    const isLong = study.pomo.sets > 0 && pomoSet % study.pomo.sets === 0;
-    next = isLong ? 'long' : 'short';
-    notify('집중 완료', isLong ? '긴 휴식 시간이에요' : '잠깐 휴식하세요');
+  if (!pomoRunning()) { stopPomoInterval(); renderPomo(); return; }
+  const crossed = pomoCatchUp();
+  if (crossed) {
+    if ('vibrate' in navigator) navigator.vibrate([300,150,300]);
+    const st = study.pomoRun;
+    if (st.phase === 'focus') notify('휴식 끝', '다시 집중해 볼까요');
+    else notify('집중 완료', st.phase === 'long' ? '긴 휴식 시간이에요' : '잠깐 휴식하세요');
+    saveStudy(); renderPomo();
   } else {
-    next = 'focus';
-    notify('휴식 끝', '다시 집중해 볼까요');
+    renderPomoTime();
   }
-  pomoPhase = next;
-  pomoRemaining = phaseSec(next);
-  pomoEndEpoch = Date.now() + pomoRemaining * 1000;
-  savePomo(); renderPomo();
+}
+// On load / after a sync: roll forward through any boundaries missed while the
+// page was closed, quietly, then resume ticking if it's still running.
+function resumePomo(quiet) {
+  const crossed = pomoCatchUp();
+  if (crossed && !quiet) saveStudy();
+  if (pomoRunning()) startPomoInterval(); else stopPomoInterval();
+  renderPomo();
 }
 
-function renderPomoTime() { if (pomoTimeEl) pomoTimeEl.textContent = fmtClock(pomoRemaining); }
+function renderPomoTime() { if (pomoTimeEl) pomoTimeEl.textContent = fmtClock(pomoRemainingSec()); }
 function renderPomo() {
   const label = $('pomoPhaseLabel'), dots = $('pomoDots');
   if (!label) return;
+  const st = study.pomoRun;
   renderPomoTime();
-  label.textContent = phaseName(pomoPhase);
-  label.classList.toggle('brk', pomoPhase !== 'focus');
+  label.textContent = phaseName(st.phase);
+  label.classList.toggle('brk', st.phase !== 'focus');
   const sets = Math.max(1, study.pomo.sets || 4);
-  const doneInCycle = pomoSet % sets;
+  const doneInCycle = (st.set || 0) % sets;
   let d = '';
   for (let i = 0; i < sets; i++) {
-    const cls = (pomoPhase === 'focus' && i === doneInCycle) ? 'pomo-dot cur'
+    const cls = (st.phase === 'focus' && i === doneInCycle) ? 'pomo-dot cur'
               : (i < doneInCycle ? 'pomo-dot done' : 'pomo-dot');
     d += `<span class="${cls}"></span>`;
   }
@@ -281,12 +174,18 @@ function updateModeDots() {
   $('modeStudy').classList.toggle('live', swRunning() && m !== 'study');
   $('modePomo').classList.toggle('live', pomoRunning() && m !== 'pomo');
 }
-function setComboMode(m) {
+// Paint the mode without recording a change — used on load and after a sync, so
+// merely opening the app never stamps a "newer" setting over a peer's choice.
+function applyComboMode(m) {
   studyCard.dataset.mode = m;
   $('modeStudy').classList.toggle('active', m === 'study');
   $('modePomo').classList.toggle('active', m === 'pomo');
-  study.comboMode = m; touchSetting('comboMode'); saveStudy();
   updateModeDots();
+}
+function setComboMode(m) {
+  applyComboMode(m);
+  if (study.comboMode === m) return;
+  study.comboMode = m; touchSetting('comboMode'); saveStudy();
 }
 $('modeStudy').addEventListener('click', () => setComboMode('study'));
 $('modePomo').addEventListener('click', () => setComboMode('pomo'));

@@ -15,8 +15,11 @@ function noteSortCmp(a, b) {
   const pa = a.pinned ? 1 : 0, pb = b.pinned ? 1 : 0;
   if (pa !== pb) return pb - pa;
   if (a.order != null && b.order != null && a.order !== b.order) return a.order - b.order;
-  if (pa) return (a.pinnedAt || a.id || 0) - (b.pinnedAt || b.id || 0);
-  return (b.updatedAt || 0) - (a.updatedAt || 0);
+  if (pa) return (a.pinnedAt || a.createdAt || 0) - (b.pinnedAt || b.createdAt || 0);
+  if ((a.updatedAt || 0) !== (b.updatedAt || 0)) return (b.updatedAt || 0) - (a.updatedAt || 0);
+  // Ids are strings now, so fall back to a stable comparison — two devices must
+  // never draw the same list in a different order.
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
 // Give every note an explicit `order` following the current display order, so
 // drag-reordering and new notes have a stable basis. Pinned notes keep smaller
@@ -42,7 +45,7 @@ function commitNoteReorder(pinnedFlag, fromIdx, toIdx) {
   target.splice(toIdx, 0, moved);
   // Stamp orderAt so this reorder propagates across devices independently of
   // note content (sync resolves `order` by orderAt, not updatedAt).
-  const now = Date.now();
+  const now = stamp();
   pinnedG.concat(unpinG).forEach((n, i) => { n.order = i; n.orderAt = now; });
   saveNotes();
   renderNotesList();
@@ -56,12 +59,98 @@ function pinnedOrRecentNote() {
   const list = memoOrderedNotes();
   return list.length ? list[0] : null;
 }
+// Tick a checklist row. Only the row's own stamp moves — ticking item 3 here
+// while item 1 is ticked on another device keeps both, instead of the whole
+// note's last write winning.
+function toggleNoteItem(note, i) {
+  if (!note || note.type !== 'list' || !note.items || !note.items[i]) return false;
+  const it = note.items[i];
+  it.done = !it.done;
+  it.at = stamp();
+  saveNotes();
+  return true;
+}
+// ── Memo markup ────────────────────────────────────────────────
+// Text memos stay plain strings (which keeps them trivially syncable — see
+// mergeNote); the structure lives in a tiny line-based markup:
+//
+//   >>            내용 구분선
+//   >> 제목        제목이 붙은 구분선 (제목 옆으로 선이 이어짐)
+//   | a | b |     표 한 줄. 이어지는 줄들이 하나의 표가 되고,
+//   | --- | --- | 이 줄이 있으면 바로 윗줄이 표의 머리글이 됩니다.
+const RE_DIVIDER = /^\s*>>\s?(.*)$/;
+const RE_TABLE_ROW = /^\s*\|(.*)$/;
+const isTableRow = l => RE_TABLE_ROW.test(l) && l.trim().length > 1;
+const isSepRow   = cells => cells.length > 0 && cells.every(c => /^:?-{2,}:?$/.test(c.trim()));
+function splitTableRow(line) {
+  let s = line.trim().replace(/^\|/, '').replace(/\|$/, '');
+  return s.split('|').map(c => c.trim());
+}
+function dividerHTML(label) {
+  return label
+    ? `<div class="memo-hr labeled"><span class="memo-hr-label">${escHtml(label)}</span><i></i></div>`
+    : `<div class="memo-hr"></div>`;
+}
+function tableHTML(rows) {
+  const head = rows.length > 1 && isSepRow(rows[1]) ? rows[0] : null;
+  const body = rows.filter((r, i) => !(head && (i === 0 || i === 1)) && !isSepRow(r));
+  const width = rows.reduce((m, r) => Math.max(m, r.length), 0);
+  const cells = (r, tag) => {
+    let s = '';
+    for (let i = 0; i < width; i++) s += `<${tag}>${escHtml(r[i] || '')}</${tag}>`;
+    return s;
+  };
+  return `<div class="memo-table-wrap"><table class="memo-table">` +
+    (head ? `<thead><tr>${cells(head, 'th')}</tr></thead>` : '') +
+    `<tbody>${body.map(r => `<tr>${cells(r, 'td')}</tr>`).join('')}</tbody>` +
+    `</table></div>`;
+}
+// Turn a memo's raw text into HTML. Everything that isn't a divider or a table
+// stays exactly as typed (the paragraph blocks keep their line breaks).
+function renderNoteText(raw) {
+  const lines = String(raw || '').split('\n');
+  let out = '', para = [];
+  const flushPara = () => {
+    if (para.join('').trim()) out += `<div class="memo-para">${escHtml(para.join('\n'))}</div>`;
+    para = [];
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const div = lines[i].match(RE_DIVIDER);
+    if (div) { flushPara(); out += dividerHTML(div[1].trim()); continue; }
+    if (isTableRow(lines[i])) {
+      flushPara();
+      const rows = [];
+      while (i < lines.length && isTableRow(lines[i])) rows.push(splitTableRow(lines[i++]));
+      i--;
+      out += tableHTML(rows);
+      continue;
+    }
+    para.push(lines[i]);
+  }
+  flushPara();
+  return out;
+}
+// Markup stripped back to a single line, for the list row preview.
+function plainNoteText(raw) {
+  return String(raw || '')
+    .split('\n')
+    .map(l => {
+      const div = l.match(RE_DIVIDER);
+      if (div) return div[1].trim();
+      if (isTableRow(l)) {
+        const cells = splitTableRow(l);
+        return isSepRow(cells) ? '' : cells.join(' · ');
+      }
+      return l;
+    })
+    .join(' ').replace(/\s+/g, ' ').trim();
+}
 function notePreviewText(n) {
   if (n.type === 'list') {
     const items = n.items || [];
     return `체크리스트 · ${items.filter(i => i.done).length}/${items.length} 완료`;
   }
-  return (n.text || '').replace(/\s+/g, ' ').trim().slice(0, 60) || '내용 없음';
+  return plainNoteText(n.text).slice(0, 60) || '내용 없음';
 }
 
 // Main-screen memo widget. The fab is always in flow (fixed slot); the card is
@@ -72,7 +161,7 @@ function memoCardInner(n, list) {
     ? `<div class="memo-checks">${(n.items || []).map((it, i) =>
         `<label class="memo-check ${it.done ? 'done' : ''}"><input type="checkbox" data-i="${i}" ${it.done ? 'checked' : ''}><span>${escHtml(it.t || '')}</span></label>`
       ).join('') || '<div class="memo-empty">항목 없음</div>'}</div>`
-    : `<div class="memo-text">${n.text ? escHtml(n.text) : '<span class="memo-empty">내용 없음</span>'}</div>`;
+    : `<div class="memo-text">${renderNoteText(n.text) || '<span class="memo-empty">내용 없음</span>'}</div>`;
   const nav = list.length > 1
     ? `<div class="memo-nav">
          <button class="memo-mini-btn" id="memoPrev" title="이전">${ICONS.chevL}</button>
@@ -99,18 +188,22 @@ function memoCardInner(n, list) {
 // go through onToggle rather than the native checkbox, so a swipe that begins on
 // an item never accidentally checks it.
 function attachNoteGestures(el, opts) {
-  let sx = 0, sy = 0, moved = false, checkEl = null, didSwipe = false;
+  let sx = 0, sy = 0, moved = false, checkEl = null, didSwipe = false, inScroller = false;
   el.addEventListener('pointerdown', e => {
     if (opts.onDown) opts.onDown();
     sx = e.clientX; sy = e.clientY; moved = false; didSwipe = false;
     checkEl = e.target.closest('.memo-check, .memo-big-check');
+    // A drag that starts inside a table wide enough to scroll is scrolling the
+    // table, not flipping to the next memo.
+    const sc = e.target.closest('.memo-table-wrap');
+    inScroller = !!sc && sc.scrollWidth > sc.clientWidth + 1;
   });
   el.addEventListener('pointermove', e => {
     if (Math.abs(e.clientX - sx) > 8 || Math.abs(e.clientY - sy) > 8) moved = true;
   });
   el.addEventListener('pointerup', e => {
     const dx = e.clientX - sx, dy = e.clientY - sy;
-    if (opts.canSwipe && opts.canSwipe() && Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+    if (!inScroller && opts.canSwipe && opts.canSwipe() && Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.2) {
       didSwipe = true;
       opts.onSwipe(dx < 0 ? 1 : -1);
       return;
@@ -161,10 +254,7 @@ function bindMemoCard(card) {
       onSwipe: goMemo,
       onToggle: i => {
         const note = memoOrderedNotes()[memoIndex];
-        if (!note || note.type !== 'list' || !note.items[i]) return;
-        note.items[i].done = !note.items[i].done;
-        note.updatedAt = Date.now();
-        saveNotes();
+        if (!toggleNoteItem(note, i)) return;
         memoShowNote(note.id);
       },
     });
@@ -240,7 +330,9 @@ function renderMemoBig() {
     ? `<div class="memo-big-checks">${(n.items || []).map((it, i) =>
         `<label class="memo-big-check ${it.done ? 'done' : ''}"><input type="checkbox" data-i="${i}" ${it.done ? 'checked' : ''}><span>${escHtml(it.t || '')}</span></label>`
       ).join('') || '<div class="memo-empty">항목 없음</div>'}</div>`
-    : (n.text ? `<div class="memo-big-text">${escHtml(n.text)}</div>` : '<div class="memo-empty">내용 없음</div>');
+    : (renderNoteText(n.text)
+        ? `<div class="memo-big-text">${renderNoteText(n.text)}</div>`
+        : '<div class="memo-empty">내용 없음</div>');
   // Prev/next nav (shown only when there's more than one note).
   const nav = $('memoBigNav');
   if (memoBigList.length > 1) {
@@ -264,10 +356,7 @@ function renderMemoBig() {
       onSwipe: goMemoBig,
       onToggle: i => {
         const note = memoBigList[memoBigIdx];
-        if (!note || note.type !== 'list' || !note.items[i]) return;
-        note.items[i].done = !note.items[i].done;
-        note.updatedAt = Date.now();
-        saveNotes();
+        if (!toggleNoteItem(note, i)) return;
         renderMemoBig();
         memoShowNote(note.id);
       },
@@ -319,15 +408,15 @@ function renderNotesList() {
       if (e.target.closest('.note-row-del') || e.target.closest('.note-drag-handle') || e.target.closest('.note-row-confirm')) return;
       if (noteReorderMode) return;                    // reorder mode: a row tap shouldn't open the editor
       if (confirmDeleteId != null) { confirmDeleteId = null; renderNotesList(); return; }  // a stray tap cancels a pending delete
-      openNoteEditor(parseInt(r.dataset.id));
+      openNoteEditor(r.dataset.id);
     });
   });
   if (noteReorderMode) enableNoteDrag(list);
   list.querySelectorAll('.note-row-del').forEach(b =>
-    b.addEventListener('click', () => { confirmDeleteId = parseInt(b.dataset.del); renderNotesList(); }));
+    b.addEventListener('click', () => { confirmDeleteId = b.dataset.del; renderNotesList(); }));
   list.querySelectorAll('.note-confirm-yes').forEach(b =>
     b.addEventListener('click', () => {
-      const delId = parseInt(b.dataset.del);
+      const delId = b.dataset.del;
       notes = notes.filter(n => n.id !== delId);
       tombstone(delId);
       confirmDeleteId = null;
@@ -400,7 +489,15 @@ function openNoteEditor(id, newType) {
   resetNoteDeleteBtn();
   editDraftType = n.type === 'list' ? 'list' : 'text';
   if (editDraftType === 'text') {
-    $('noteEditBody').innerHTML = `<textarea id="noteTextInput" placeholder="내용">${escHtml(n.text || '')}</textarea>`;
+    $('noteEditBody').innerHTML =
+      `<div class="note-tools">
+         <button class="note-tool" type="button" data-ins="hr" title="내용 구분선">${icoSm('hr')}구분선</button>
+         <button class="note-tool" type="button" data-ins="hrTitle" title="제목이 붙은 구분선">${icoSm('hr')}제목 구분선</button>
+         <button class="note-tool" type="button" data-ins="table" title="표">${icoSm('table')}표</button>
+         <button class="note-tool right" type="button" id="notePreviewBtn" title="미리보기">${icoSm('eye')}미리보기</button>
+       </div>
+       <textarea id="noteTextInput" placeholder="내용">${escHtml(n.text || '')}</textarea>
+       <div class="note-preview" id="notePreview" style="display:none"></div>`;
     const ta = $('noteTextInput');
     // ArrowUp at the very start moves focus up to the title.
     ta.addEventListener('keydown', e => {
@@ -408,13 +505,63 @@ function openNoteEditor(id, newType) {
         e.preventDefault(); $('noteTitleInput').focus();
       }
     });
+    $('noteEditBody').querySelectorAll('.note-tool[data-ins]').forEach(b =>
+      b.addEventListener('click', () => insertNoteSnippet(b.dataset.ins)));
+    $('notePreviewBtn').addEventListener('click', toggleNotePreview);
   } else {
-    editDraftItems = (n.items || []).map(i => ({ t: i.t || '', done: !!i.done }));
-    if (!editDraftItems.length) editDraftItems.push({ t: '', done: false });  // start ready to type
+    // Item ids are carried through the editor so a row edited here can be
+    // matched with the same row edited on another device.
+    editDraftItems = (n.items || []).map(i => ({ id: i.id || uid(), t: i.t || '', done: !!i.done, at: i.at || 0 }));
+    if (!editDraftItems.length) editDraftItems.push(newDraftItem());  // start ready to type
     renderEditItems();
   }
   noteEditModal.classList.add('open');
 }
+// ── Text-memo editing tools ────────────────────────────────────
+// Drop a snippet in at the cursor, on its own line, and put the caret where
+// the user will want to type next (the divider's title, the first table cell).
+const NOTE_SNIPPETS = {
+  hr:      { text: '>>\n',                                  select: null },
+  hrTitle: { text: '>> 제목\n',                              select: '제목' },
+  table:   { text: '| 항목 | 내용 |\n| --- | --- |\n|  |  |\n', select: '항목' },
+};
+function insertNoteSnippet(kind) {
+  const ta = $('noteTextInput');
+  const snip = NOTE_SNIPPETS[kind];
+  if (!ta || !snip) return;
+  if ($('notePreview').style.display !== 'none') toggleNotePreview();  // back to editing
+  const v = ta.value;
+  let at = ta.selectionStart ?? v.length;
+  // Always start on a fresh line so the marker is at the start of one.
+  const head = v.slice(0, at), tail = v.slice(ta.selectionEnd ?? at);
+  const lead = (head === '' || head.endsWith('\n')) ? '' : '\n';
+  const body = lead + snip.text;
+  ta.value = head + body + tail;
+  const caret = snip.select
+    ? head.length + body.indexOf(snip.select)
+    : head.length + body.length;
+  ta.focus();
+  ta.setSelectionRange(caret, caret + (snip.select ? snip.select.length : 0));
+  ta.dispatchEvent(new Event('input'));
+}
+// Flip the editor between the raw text and how it will actually look. The
+// textarea stays in the DOM (just hidden) so saving still reads its value.
+function toggleNotePreview() {
+  const ta = $('noteTextInput'), pv = $('notePreview'), btn = $('notePreviewBtn');
+  if (!ta || !pv) return;
+  const showing = pv.style.display === 'none';
+  if (showing) {
+    pv.innerHTML = renderNoteText(ta.value) || '<span class="memo-empty">내용 없음</span>';
+    ta.style.display = 'none'; pv.style.display = '';
+  } else {
+    ta.style.display = ''; pv.style.display = 'none';
+    ta.focus();
+  }
+  btn.classList.toggle('on', showing);
+  btn.innerHTML = icoSm('eye') + (showing ? '편집' : '미리보기');
+}
+
+function newDraftItem() { return { id: uid(), t: '', done: false, at: 0 }; }
 function renderEditItems() {
   const body = $('noteEditBody');
   body.innerHTML =
@@ -435,7 +582,7 @@ function renderEditItems() {
       if (e.key === 'Enter') {
         // Enter adds a new item right below and focuses it.
         e.preventDefault();
-        editDraftItems.splice(i + 1, 0, { t: '', done: false });
+        editDraftItems.splice(i + 1, 0, newDraftItem());
         renderEditItems();
         const inputs = body.querySelectorAll('.note-item-edit input[type=text]');
         if (inputs[i + 1]) inputs[i + 1].focus();
@@ -455,7 +602,7 @@ function renderEditItems() {
   body.querySelectorAll('.note-item-del').forEach(b =>
     b.addEventListener('click', () => { editDraftItems.splice(+b.dataset.i, 1); renderEditItems(); }));
   $('noteAddItem').addEventListener('click', () => {
-    editDraftItems.push({ t: '', done: false });
+    editDraftItems.push(newDraftItem());
     renderEditItems();
     const inputs = body.querySelectorAll('.note-item-edit input[type=text]');
     if (inputs.length) inputs[inputs.length - 1].focus();
@@ -463,19 +610,42 @@ function renderEditItems() {
 }
 function saveNoteFromEditor() {
   let n = (editingNoteId != null) ? notes.find(x => x.id === editingNoteId) : null;
+  const now = stamp();
   // New notes land at the top of their group; orderAt lets that position sync.
-  if (!n) { n = { id: Date.now(), type: editDraftType, order: minNoteOrder() - 1, orderAt: Date.now() }; notes.push(n); }
+  if (!n) {
+    n = { id: uid(), createdAt: now, type: editDraftType, items: [],
+          order: minNoteOrder() - 1, orderAt: now, itemsAt: 0, pinAt: 0 };
+    notes.push(n);
+  }
   n.title = $('noteTitleInput').value.trim();
   n.type  = editDraftType;
-  if (editDraftType === 'text') { n.text = $('noteTextInput') ? $('noteTextInput').value : ''; n.items = []; }
-  else { n.items = editDraftItems.filter(i => i.t.trim() !== '' || i.done).map(i => ({ t: i.t, done: i.done })); n.text = ''; }
-  const now = Date.now();
-  if ($('notePinInput').checked) {
-    if (!n.pinned) n.pinnedAt = now;   // record pin order (keep prior value if already pinned)
-    n.pinned = true;
+  if (editDraftType === 'text') {
+    if (n.items && n.items.length) n.itemsAt = now;
+    n.text = $('noteTextInput') ? $('noteTextInput').value : '';
+    n.items = [];
   } else {
-    n.pinned = false;
-    n.pinnedAt = 0;
+    const kept = editDraftItems.filter(i => i.t.trim() !== '' || i.done);
+    const prevIds = (n.items || []).map(i => i.id);
+    const prev = new Map((n.items || []).map(i => [i.id, i]));
+    // Only rows whose text or tick actually changed get a fresh stamp, so
+    // re-saving a note doesn't outrank another device's edit to a row we
+    // didn't touch.
+    n.items = kept.map(i => {
+      const p = prev.get(i.id);
+      const changed = !p || p.t !== i.t || !!p.done !== !!i.done;
+      return { id: i.id, t: i.t, done: !!i.done, at: changed ? now : (p.at || 0) };
+    });
+    // itemsAt covers the structure (which rows exist, in what order).
+    const sameShape = n.items.length === prevIds.length
+                   && n.items.every((i, k) => i.id === prevIds[k]);
+    if (!sameShape) n.itemsAt = now;
+    n.text = '';
+  }
+  const wantPinned = $('notePinInput').checked;
+  if (wantPinned !== !!n.pinned) {
+    n.pinned = wantPinned;
+    n.pinnedAt = wantPinned ? now : 0;   // pin order
+    n.pinAt = now;                        // pin state's own stamp
   }
   n.updatedAt = now;
   saveNotes();
@@ -568,57 +738,42 @@ loadStudy();
 loadNotes();
 normalizeNoteOrders();   // seed `order` for notes that predate manual reordering
 loadTomb();
-loadPomo();
+loadTimer();
+observeBundle(localBundle());   // never issue a stamp older than our own data
 applyTheme();
+renderSessionChip();
 lastSeenStudyDay = studyDayKey(Date.now());
 
-// Resume a pomodoro phase that was running before reload (don't fast-forward
-// through phases missed while away — just resume, or stop at 0 if it expired).
-if (pomoEndEpoch) {
-  if (Date.now() < pomoEndEpoch) {
-    pomoRemaining = Math.ceil((pomoEndEpoch - Date.now()) / 1000);
-    startPomoInterval();
-  } else {
-    pomoEndEpoch = null;
-    pomoRemaining = 0;   // finished while the page was closed; tap to continue
-  }
-}
-renderPomo();
-setComboMode(study.comboMode === 'pomo' ? 'pomo' : 'study');
-// On restore, resume the live session — its full elapsed time (including time
-// spent with the tab closed or the screen locked) is credited.
+// Roll the pomodoro forward through any phase boundary that passed while the
+// page was closed. The roll-forward is derived from the phase's own end time,
+// so a device that was closed and one that stayed open land on the same phase.
+resumePomo(true);
+applyComboMode(study.comboMode === 'pomo' ? 'pomo' : 'study');
 reconcileSession();
 
 (function restore() {
-  let saved;
-  try { saved = JSON.parse(localStorage.getItem(STORE_KEY)); } catch(e) {}
+  const saved = loadTimer();
   if (!saved) { render(); renderGoals(); renderDayTicks(); renderGoalFlags(); updateStudyUI(); return; }
 
-  totalSeconds = saved.totalSeconds || 0;
-  startEpoch   = saved.startEpoch   || null;
-  emergency    = saved.emergency    || false;
-
   let restoreMsg = '';
-  if (saved.goalEpoch) {
-    const rem = Math.floor((saved.goalEpoch - Date.now()) / 1000);
+  if (goalEpoch) {
+    const rem = Math.floor((goalEpoch - Date.now()) / 1000);
     if (rem > 0) {
-      goalEpoch = saved.goalEpoch;
       restoreMsg = '세션 복원됨 — ' + fmt(rem) + ' 남음';
       startTick();
     } else {
+      // Ran out while the app was closed. Stamp the end with the moment it was
+      // due so every device agrees on it without a race.
       goalEpoch = null; pausedRemaining = 0;
       restoreMsg = '세션 복원됨 — 타이머가 종료되었습니다';
+      save(saved.goalEpoch);
     }
-  } else if (saved.pausedRemaining > 0) {
-    pausedRemaining = saved.pausedRemaining;
+  } else if (pausedRemaining > 0) {
     restoreMsg = '세션 복원됨 — ' + fmt(pausedRemaining) + ' (일시정지 상태)';
   }
 
   render(); renderGoals(); renderDayTicks(); renderGoalFlags(); updateStudyUI();
-  // Don't show the restore notice when the reload was triggered by a sync update.
-  let syncReload = false;
-  try { syncReload = sessionStorage.getItem('syncReload') === '1'; sessionStorage.removeItem('syncReload'); } catch(e) {}
-  if (restoreMsg && !syncReload) setTimeout(() => showToast(restoreMsg), 300);
+  if (restoreMsg) setTimeout(() => showToast(restoreMsg), 300);
 })();
 
 // Memo widget: show expanded on entry (if a memo exists), then auto-collapse.
@@ -628,3 +783,7 @@ if (pinnedOrRecentNote()) {
   renderMemoWidget();
   scheduleMemoAutoCollapse();
 }
+
+// Everything is defined and painted — from here a cloud snapshot can be applied
+// straight to the live UI.
+appReady = true;

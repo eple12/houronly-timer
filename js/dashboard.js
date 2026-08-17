@@ -15,18 +15,96 @@ function buildColorSwatches() {
     c.appendChild(btn);
   });
 }
+// ── Goal target: "지금으로부터 H:M:S" or an absolute date on a calendar ──
+let goalMode = 'dur';                    // 'dur' | 'date'
+let gcalYear, gcalMonth, gcalSel = null; // month on show + selected day
+
+function setGoalMode(m) {
+  goalMode = m;
+  $('goalDurField').style.display  = (m === 'dur')  ? '' : 'none';
+  $('goalDateField').style.display = (m === 'date') ? '' : 'none';
+  $('goalModeSeg').querySelectorAll('.seg-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.gmode === m));
+  if (m === 'date') renderGoalCal();
+}
+// The epoch the goal points at, or null when the input isn't usable yet.
+function goalTargetEpoch() {
+  if (goalMode === 'dur') {
+    const h = parseInt($('goalH').value)||0, m = parseInt($('goalM').value)||0, s = parseInt($('goalS').value)||0;
+    const total = h*3600 + m*60 + s;
+    return total ? Date.now() + total*1000 : null;
+  }
+  if (!gcalSel) return null;
+  const d = new Date(gcalSel);
+  d.setHours(parseInt($('gcalH').value)||0, parseInt($('gcalM').value)||0, 0, 0);
+  return d.getTime();
+}
+function renderGoalCal() {
+  $('gcalLabel').textContent = `${gcalYear}년 ${MONTHS[gcalMonth]}`;
+  const grid = $('gcalGrid');
+  grid.innerHTML = '';
+  DAYS.forEach(d => {
+    const el = document.createElement('div');
+    el.className = 'cal-dow'; el.textContent = d;
+    grid.appendChild(el);
+  });
+  const first = new Date(gcalYear, gcalMonth, 1).getDay();
+  const days  = new Date(gcalYear, gcalMonth + 1, 0).getDate();
+  const today = new Date(); today.setHours(0,0,0,0);
+  for (let i = 0; i < first; i++) grid.appendChild(document.createElement('div'));
+  for (let d = 1; d <= days; d++) {
+    const btn = document.createElement('button');
+    const day = new Date(gcalYear, gcalMonth, d);
+    btn.type = 'button';
+    btn.className = 'cal-day';
+    btn.textContent = d;
+    if (day.getTime() === today.getTime()) btn.classList.add('today');
+    if (gcalSel && day.getTime() === gcalSel.getTime()) btn.classList.add('sel-end');
+    btn.addEventListener('click', () => {
+      gcalSel = new Date(gcalYear, gcalMonth, d);
+      renderGoalCal();
+    });
+    grid.appendChild(btn);
+  }
+  updateGoalCalHint();
+}
+function updateGoalCalHint() {
+  const hint = $('gcalHint');
+  if (!hint) return;
+  const t = goalTargetEpoch();
+  if (!gcalSel) { hint.classList.remove('warn'); hint.textContent = '달력에서 목표 날짜를 선택하세요'; return; }
+  const rem = Math.floor((t - Date.now()) / 1000);
+  if (rem <= 0) { hint.classList.add('warn'); hint.textContent = '이미 지난 시각이에요'; return; }
+  hint.classList.remove('warn');
+  const d = Math.floor(rem / 86400), h = Math.floor((rem % 86400) / 3600), m = Math.floor((rem % 3600) / 60);
+  const parts = [d ? d + '일' : '', h ? h + '시간' : '', (!d && m) ? m + '분' : ''].filter(Boolean);
+  hint.textContent = `${fmtDate(t).replace('종료 ', '')} · ${parts.join(' ')} 후`;
+}
+
 $('goalBtn').addEventListener('click', () => {
   $('goalH').value=''; $('goalM').value=''; $('goalS').value=''; $('goalMemoInput').value='';
+  const now = new Date();
+  gcalYear = now.getFullYear(); gcalMonth = now.getMonth(); gcalSel = null;
+  $('gcalH').value = now.getHours(); $('gcalM').value = now.getMinutes();
+  setGoalMode('dur');
   buildColorSwatches(); goalModal.classList.add('open');
 });
+$('goalModeSeg').querySelectorAll('.seg-btn').forEach(b =>
+  b.addEventListener('click', () => setGoalMode(b.dataset.gmode)));
+$('gcalPrev').addEventListener('click', () => { gcalMonth--; if (gcalMonth < 0) { gcalMonth = 11; gcalYear--; } renderGoalCal(); });
+$('gcalNext').addEventListener('click', () => { gcalMonth++; if (gcalMonth > 11) { gcalMonth = 0; gcalYear++; } renderGoalCal(); });
+['gcalH','gcalM'].forEach(id => $(id).addEventListener('input', updateGoalCalHint));
 $('goalModalClose').addEventListener('click', () => goalModal.classList.remove('open'));
 goalModal.addEventListener('click', e => { if(e.target===goalModal) goalModal.classList.remove('open'); });
 $('goalConfirm').addEventListener('click', () => {
-  const h=parseInt($('goalH').value)||0, m=parseInt($('goalM').value)||0, s=parseInt($('goalS').value)||0;
-  const total = h*3600+m*60+s;
-  if (!total) { alert('시간을 입력해주세요.'); return; }
+  const target = goalTargetEpoch();
+  if (!target) {
+    alert(goalMode === 'dur' ? '시간을 입력해주세요.' : '목표 날짜를 선택해주세요.');
+    return;
+  }
+  if (target <= Date.now()) { alert('목표 시각이 지금보다 뒤여야 해요.'); return; }
   const memo = $('goalMemoInput').value.trim();
-  goals.push({ id: Date.now(), memo, endEpoch: Date.now()+total*1000, color: selectedColor });
+  goals.push({ id: uid(), at: stamp(), sid: curSessionId(), memo, endEpoch: target, color: selectedColor });
   saveGoals(); renderGoals(); renderGoalFlags();
   goalModal.classList.remove('open');
 });
@@ -41,7 +119,7 @@ function sumLastDays(n) {
   for (let i = 0; i < n; i++) t += R[studyDayKeyOffset(i)] || 0;
   return t;
 }
-function todayDistractions() { return study.distractions[studyDayKey(Date.now())] || 0; }
+function todayDistractions() { return dayDistractions(studyDayKey(Date.now())); }
 
 function goalGaugeHTML(today) {
   if (!study.dailyGoalSec) return '';
@@ -60,9 +138,7 @@ function goalGaugeHTML(today) {
     </div>`;
 }
 
-function subjectColor(name) {
-  return (study.subjectColors && study.subjectColors[name]) || null;
-}
+function subjectColor(name) { return subjectColorMap[name] || null; }
 // Just the per-subject bar rows (the part that changes live while studying).
 // Kept separate so refreshDashboardLive() can rebuild only this, leaving the
 // "add time" dropdown intact.
@@ -72,11 +148,11 @@ function subjectBreakRowsHTML() {
   const total  = todayStudySec();
 
   // Sort: by effective seconds desc; zero-time subjects from subjectList go last
-  const allNames = Array.from(new Set([...Object.keys(effMap), ...study.subjectList]));
+  const allNames = Array.from(new Set([...Object.keys(effMap), ...subjectList]));
   allNames.sort((a, b) => {
     const va = effMap[a] || 0, vb = effMap[b] || 0;
     if (va !== vb) return vb - va;
-    return (study.subjectList.indexOf(a) ?? 99) - (study.subjectList.indexOf(b) ?? 99);
+    return (subjectList.indexOf(a) ?? 99) - (subjectList.indexOf(b) ?? 99);
   });
 
   const taggedSec   = allNames.reduce((s, n) => s + (effMap[n] || 0), 0);
@@ -85,7 +161,7 @@ function subjectBreakRowsHTML() {
   const displayTotal = Math.max(total, taggedSec);
 
   const paletteColor = name => {
-    const i = study.subjectList.indexOf(name);
+    const i = subjectList.indexOf(name);
     return SUBJECT_COLORS[(i >= 0 ? i : allNames.indexOf(name)) % SUBJECT_COLORS.length];
   };
 
@@ -120,12 +196,12 @@ function subjectBreakHTML() {
   // Custom dropdown (native <select> popups can't be rounded/styled). The chosen
   // subject is held in `sadSubject`; default to the first subject if unset/stale.
   // '기타' is always appended after named subjects so untagged time is adjustable.
-  const allOpts = [...study.subjectList, '기타'];
-  const cur = allOpts.includes(sadSubject) ? sadSubject : (study.subjectList[0] || '기타');
+  const allOpts = [...subjectList, '기타'];
+  const cur = allOpts.includes(sadSubject) ? sadSubject : (subjectList[0] || '기타');
   const opts = allOpts.map(n =>
     `<button type="button" class="subj-dd-opt${n === cur ? ' sel' : ''}" data-val="${escHtml(n)}">${escHtml(n)}</button>`
   ).join('');
-  const addRow = (study.subjectList.length || todayStudySec() >= 1) ? `
+  const addRow = (subjectList.length || todayStudySec() >= 1) ? `
     <div class="subj-add-time-wrap">
       <div class="subj-add-time-row">
         <div class="subj-dd" id="sadDropdown" data-val="${escHtml(cur)}">
@@ -146,6 +222,42 @@ function subjectBreakHTML() {
     </div>
     <div class="subj-break" id="subjBreakRows">${rowsHTML}</div>
     ${addRow}
+  </div>`;
+}
+
+// ── Session breakdown (colour-indexed) ─────────────────────────
+// Rows in each session's own index colour. Hours recorded under a session that
+// has since been deleted are kept and shown together as 삭제된 세션, so the
+// parts always add up to the day/period total.
+function sessionRowsHTML(map) {
+  const total = Object.values(map).reduce((s, v) => s + v, 0);
+  if (total < 1) return '';
+  const rows = sessions
+    .map(s => ({ id: s.id, name: s.name, color: s.color, sec: map[s.id] || 0 }))
+    .filter(r => r.sec >= 1 || r.id === curSessionId());
+  if (map[''] >= 1) rows.push({ id: '', name: '삭제된 세션', color: 'var(--dim)', sec: map[''] });
+  rows.sort((a, b) => b.sec - a.sec);
+  return rows.map(r => {
+    const pct = total > 0 ? Math.min(100, r.sec / total * 100) : 0;
+    return `<div class="subj-line${r.sec < 1 ? ' zero' : ''}">
+      <div class="subj-line-top">
+        <span class="sl-name"><span class="sess-inline-dot" style="background:${r.color}"></span>${escHtml(r.name)}${r.id === curSessionId() ? '<span class="sl-cur">사용 중</span>' : ''}</span>
+        <div class="sl-right"><span class="sl-val">${fmt(r.sec).slice(0, 5)}</span></div>
+      </div>
+      <div class="subj-line-bar"><i style="width:${pct.toFixed(1)}%;background:${r.color}"></i></div>
+    </div>`;
+  }).join('');
+}
+function sessionBreakHTML() {
+  const today = sessionTotalsLastDays(1);
+  const rows  = sessionRowsHTML(today);
+  if (!rows) return '';
+  const week = sessionRowsHTML(sessionTotalsLastDays(7));
+  return `<div class="chart-block" id="sessBreakBlock">
+    <div class="chart-title"><span>오늘 세션별</span></div>
+    <div class="subj-break" id="sessBreakRows">${rows}</div>
+    ${week ? `<div class="chart-title" style="margin-top:12px"><span>최근 7일 세션별</span></div>
+              <div class="subj-break">${week}</div>` : ''}
   </div>`;
 }
 
@@ -198,6 +310,7 @@ function renderDashboard() {
   if (st.days === 0 && today < 1) {
     body.innerHTML = `
       <div class="dash-empty">아직 기록이 없어요.<br>공부 스톱워치를 시작해 보세요 ${icoSm('play')}</div>
+      ${sessionBreakHTML()}
       ${subjectBreakHTML()}
       ${resetHourBlock(hourOpts)}`;
     bindResetHour();
@@ -223,17 +336,34 @@ function renderDashboard() {
   const bw = plotW / N;
   const avgY = padT + plotH - (st.avg / maxSec) * plotH;
 
+  // Each day's bar is split into its sessions, in the session's index colour,
+  // so the chart reads as "how much of this went where".
+  const bySess = totals().bySess;
+  const order  = sessions.map(s => s.id);
   const bars = data.map((d,i) => {
     const bh = (d.sec / maxSec) * plotH;
     const x  = padL + i*bw + bw*0.18;
-    const y  = padT + plotH - bh;
     const w  = bw*0.64;
-    const isToday = i === N-1;
-    // Today: full accent. Past days with study: a subdued shade of the chosen
-    // accent (like the heatmap). Empty days: the theme track colour.
-    const fill = isToday ? 'var(--accent)'
-               : (d.sec > 0 ? 'color-mix(in srgb, var(--accent) 45%, var(--surf2))' : 'var(--surf2)');
-    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(0,bh).toFixed(1)}" rx="2" fill="${fill}"></rect>`;
+    if (d.sec <= 0 || bh <= 0) {
+      return `<rect x="${x.toFixed(1)}" y="${(padT+plotH-2).toFixed(1)}" width="${w.toFixed(1)}" height="2" rx="1" fill="var(--surf2)"></rect>`;
+    }
+    const dayMap = bySess[d.key] || {};
+    // Live sessions in list order, then anything left over (deleted sessions).
+    const parts = order.map(id => ({ id, sec: dayMap[id] || 0 })).filter(p => p.sec > 0);
+    const known = parts.reduce((s, p) => s + p.sec, 0);
+    const rest  = Math.max(0, d.sec - known);
+    if (rest > 0.5) parts.push({ id: null, sec: rest });
+    if (!parts.length) parts.push({ id: order[0], sec: d.sec });
+
+    let yCur = padT + plotH;   // stack upwards from the baseline
+    return parts.map((p, k) => {
+      const ph = (p.sec / d.sec) * bh;
+      yCur -= ph;
+      const fill = p.id ? sessionColor(p.id) : 'var(--dim)';
+      // Round only the top-most segment so the stack reads as one bar.
+      const isTop = k === parts.length - 1;
+      return `<rect x="${x.toFixed(1)}" y="${yCur.toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(0.5, ph).toFixed(1)}" rx="${isTop ? 2 : 0}" fill="${fill}" opacity="${i === N-1 ? 1 : 0.72}"></rect>`;
+    }).join('');
   }).join('');
 
   // x labels: show every other to avoid crowding
@@ -288,6 +418,8 @@ function renderDashboard() {
 
     ${projHTML}
 
+    ${sessionBreakHTML()}
+
     ${subjectBreakHTML()}
 
     <div class="chart-block">
@@ -295,6 +427,8 @@ function renderDashboard() {
         <span>최근 14일</span>
         <span class="legend-avg"><span class="legend-dash"></span>평균 ${fmtHrs(st.avg)}</span>
       </div>
+      ${sessions.length > 1 ? `<div class="sess-legend">${sessions.map(s =>
+        `<span class="sess-legend-item"><span class="sess-inline-dot" style="background:${s.color}"></span>${escHtml(s.name)}</span>`).join('')}</div>` : ''}
       <svg class="chart-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
         ${avgLine}${bars}${labels}
       </svg>
@@ -320,6 +454,7 @@ function renderDashboard() {
 function refreshDashboardLive() {
   if (!$('subjBreakRows') || !$('dvToday')) { renderDashboard(); return; }
   $('subjBreakRows').innerHTML = subjectBreakRowsHTML();
+  if ($('sessBreakRows')) $('sessBreakRows').innerHTML = sessionRowsHTML(sessionTotalsLastDays(1));
 
   const st    = studyStats();
   const today = todayStudySec();
@@ -364,27 +499,23 @@ function bindSubjectEdits() {
     });
   });
 
+  // Corrections are appended to the ledger as deltas rather than written as a
+  // new total: a "+15분" on the phone and a "-15분" on the laptop both land,
+  // where overwriting a total would silently discard one of them.
   const applyAdj = delta => {
     const name = dd.dataset.val;
     if (!name) return;
     if (name === '기타') {
-      // Adjust total without touching any named subject
+      // Adjust the day total without touching any named subject.
       const effMap = effectiveSubjectsForDay(dayKey);
       const taggedSec = Object.values(effMap).reduce((s, v) => s + v, 0);
       const untaggedSec = Math.max(0, todayStudySec() - taggedSec);
-      const actualDelta = delta > 0 ? delta : Math.max(delta, -untaggedSec);
-      if (actualDelta !== 0) {
-        setDayOverride(dayKey, Math.max(0, (study.records[dayKey] || 0) + actualDelta));
-      }
+      const d = delta > 0 ? delta : Math.max(delta, -untaggedSec);
+      if (d) adjustDayTotal(dayKey, d);
     } else {
-      const cur  = effectiveSubjectSec(dayKey, name);
-      const next = Math.max(0, cur + delta);
-      const actualDelta = next - cur;
-      setSubjectOverride(dayKey, name, next);
-      if (actualDelta !== 0) {
-        const totalCur = study.records[dayKey] || 0;
-        setDayOverride(dayKey, Math.max(0, totalCur + actualDelta));
-      }
+      const cur = effectiveSubjectSec(dayKey, name);
+      const d = delta > 0 ? delta : Math.max(delta, -cur);
+      if (d) adjustSubject(dayKey, name, d);   // moves the subject and the day total
     }
     refreshDashboardLive();   // updates bars/numbers in place, keeps dropdown
   };
@@ -451,8 +582,8 @@ function buildSubjColorSwatches() {
 function renderSubjChips() {
   const wrap = $('subjChips');
   const chips = [`<button class="subj-chip ${study.curSubject==='' ? 'active' : ''}" data-subj="">전체</button>`];
-  study.subjectList.forEach(name => {
-    const color = (study.subjectColors && study.subjectColors[name]) || SUBJECT_COLORS[study.subjectList.indexOf(name) % SUBJECT_COLORS.length];
+  subjectList.forEach(name => {
+    const color = subjectColorMap[name] || SUBJECT_COLORS[subjectList.indexOf(name) % SUBJECT_COLORS.length];
     chips.push(
       `<button class="subj-chip ${study.curSubject===name ? 'active' : ''}" data-subj="${escHtml(name)}">
          <span class="subj-color-dot" style="background:${color}"></span>
@@ -463,8 +594,9 @@ function renderSubjChips() {
   wrap.querySelectorAll('.subj-chip').forEach(btn => {
     btn.addEventListener('click', e => {
       if (e.target.closest('.subj-x') || e.target.closest('.subj-color-dot')) return;
-      study.curSubject = btn.dataset.subj || '';
-      touchSetting('curSubject'); saveStudy(); updateStudyUI();
+      // Switching mid-run splits the run so each stretch keeps its own subject.
+      setCurSubject(btn.dataset.subj || '');
+      saveStudy(); updateStudyUI();
       subjModal.classList.remove('open');
     });
   });
@@ -472,10 +604,11 @@ function renderSubjChips() {
     x.addEventListener('click', e => {
       e.stopPropagation();
       const name = x.dataset.del;
-      study.subjectList = study.subjectList.filter(s => s !== name);
-      if (study.subjectColors) delete study.subjectColors[name];
-      if (study.curSubject === name) { study.curSubject = ''; touchSetting('curSubject'); }
-      touchSetting('subjectList'); saveStudy(); renderSubjChips(); updateStudyUI();
+      // A deletion is recorded, not just removed from a list — otherwise another
+      // device that still has the subject would add it straight back.
+      subjectRemove(name);
+      if (study.curSubject === name) setCurSubject('');
+      saveStudy(); renderSubjChips(); updateStudyUI();
     });
   });
   buildSubjColorSwatches();
@@ -484,21 +617,13 @@ function addSubject() {
   const inp = $('subjAddInput');
   const name = (inp.value || '').trim().slice(0, 16);
   if (!name) return;
-  if (!study.subjectList.includes(name)) {
-    study.subjectList.push(name);
-    touchSetting('subjectList');
-    // Assign the currently selected color (or auto-assign from palette)
-    if (!study.subjectColors) study.subjectColors = {};
-    const autoColor = SUBJECT_COLORS[(study.subjectList.length - 1) % SUBJECT_COLORS.length];
-    study.subjectColors[name] = selectedSubjColor || autoColor;
-    touchSetting('subjectColors');
-  }
-  study.curSubject = name;
+  if (!subjectList.includes(name)) subjectAdd(name, selectedSubjColor);
   inp.value = '';
   // Advance selectedSubjColor to the next in the palette for the next add
   const ni = (SUBJECT_COLORS.indexOf(selectedSubjColor) + 1) % SUBJECT_COLORS.length;
   selectedSubjColor = SUBJECT_COLORS[ni];
-  touchSetting('curSubject'); saveStudy(); renderSubjChips(); updateStudyUI();
+  setCurSubject(name);
+  saveStudy(); renderSubjChips(); updateStudyUI();
 }
 $('swSubjectBtn').addEventListener('click', () => { renderSubjChips(); subjModal.classList.add('open'); });
 $('subjClose').addEventListener('click', () => subjModal.classList.remove('open'));
@@ -583,7 +708,7 @@ function renderSettings() {
   const bindPomo = (id, key, min, max) => $(id).addEventListener('change', e => {
     study.pomo[key] = Math.max(min, Math.min(max, parseInt(e.target.value) || min));
     e.target.value = study.pomo[key];
-    touchSetting('pomo'); saveStudy(); if (!pomoPhase) renderPomo();
+    touchSetting('pomo'); saveStudy(); renderPomo();
   });
   bindPomo('pomoFocus','focus',1,180); bindPomo('pomoShort','short',1,60);
   bindPomo('pomoLong','long',1,60);    bindPomo('pomoSets','sets',1,12);
@@ -619,14 +744,15 @@ let focusLeftCount = 0;
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
     if (study.focusMode && swRunning()) {
-      const key = studyDayKey(Date.now());
-      study.distractions[key] = (study.distractions[key] || 0) + 1;
+      // Counted per device and summed, so two devices counting at the same
+      // time can't swallow one another's increment.
+      addDistraction(studyDayKey(Date.now()));
       focusLeftCount++;
       saveStudy();
     }
   } else if (focusLeftCount > 0) {
     const key = studyDayKey(Date.now());
-    showToast(`집중 모드 · 오늘 ${study.distractions[key] || focusLeftCount}회 이탈했어요`);
+    showToast(`집중 모드 · 오늘 ${dayDistractions(key) || focusLeftCount}회 이탈했어요`);
     if ('vibrate' in navigator) navigator.vibrate(120);
   }
 });

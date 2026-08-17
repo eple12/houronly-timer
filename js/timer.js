@@ -11,7 +11,8 @@ function renderGoalFlags() {
   progressTrack.querySelectorAll('.goal-flag').forEach(f => f.remove());
   const r = refRange();
   if (!r) return;
-  goals.forEach(g => {
+  // Only this session's goals — each session's progress bar shows its own.
+  sessionGoals().forEach(g => {
     const pct = ((g.endEpoch - r.refStart) / r.span) * 100;
     if (pct < 0 || pct > 100) return;
     const wrap = document.createElement('div');
@@ -51,10 +52,11 @@ function renderDayTicks() {
 
 // ── Goals list ─────────────────────────────────────────────────
 function renderGoals() {
-  if (goals.length === 0) { goalsWrap.innerHTML = ''; return; }
+  const list = sessionGoals();
+  if (list.length === 0) { goalsWrap.innerHTML = ''; return; }
   goalsWrap.innerHTML =
     `<div class="goals-section-label">목표</div>` +
-    goals.map(g => {
+    list.map(g => {
       const rem      = Math.max(0, Math.floor((g.endEpoch - Date.now()) / 1000));
       const remText  = fmtGoalRem(g.endEpoch);
       const remClass = rem === 0 ? 'goal-rem done-c' : 'goal-rem';
@@ -69,7 +71,7 @@ function renderGoals() {
     }).join('');
   goalsWrap.querySelectorAll('.goal-del').forEach(btn => {
     btn.addEventListener('click', () => {
-      const delId = parseInt(btn.dataset.del);
+      const delId = btn.dataset.del;
       goals = goals.filter(g => g.id !== delId);
       tombstone(delId);
       saveGoals(); renderGoals(); renderGoalFlags();
@@ -77,7 +79,7 @@ function renderGoals() {
   });
 }
 function updateGoalTimes() {
-  goals.forEach(g => {
+  sessionGoals().forEach(g => {
     const el = goalsWrap.querySelector(`[data-rem="${g.id}"]`);
     if (!el) return;
     const rem = Math.max(0, Math.floor((g.endEpoch - Date.now()) / 1000));
@@ -144,6 +146,18 @@ function updateSubjectLabel() {
   const tagged = !!study.curSubject;
   btn.classList.toggle('tagged', tagged);
   btn.innerHTML = `${icoSm('tag')}<span class="subj-name">${tagged ? escHtml(study.curSubject) : '과목 선택'}</span><span class="subj-caret">▾</span>`;
+  // A run stays with the session that started it, so say so plainly when you're
+  // looking at a different one — otherwise a ticking clock next to another
+  // session's total would just look wrong.
+  const note = $('swSessNote');
+  if (!note) return;
+  const runSid = activeRunSid();
+  const elsewhere = runSid && runSid !== curSessionId();
+  note.style.display = elsewhere ? '' : 'none';
+  if (elsewhere) {
+    note.innerHTML = `<span class="sess-inline-dot" style="background:${sessionColor(runSid)}"></span>` +
+                     `${escHtml(sessionName(runSid))}에서 진행 중`;
+  }
 }
 
 function updateGoalBar(sec) {
@@ -226,20 +240,33 @@ function startTick() {
   rafId = setInterval(() => {
     render();
     if (getRem() === 0 && goalEpoch !== null) {
+      const endedAt = goalEpoch;
       goalEpoch = null;
       if ('vibrate' in navigator) navigator.vibrate([400,200,400,200,400]);
-      render(); save();
+      // Stamp the finish with the moment it was due, not "now": every device
+      // then derives an identical end state instead of racing to claim it.
+      render(); save(endedAt);
       clearInterval(rafId); rafId = null;
     }
   }, 250);
 }
+// Bring the tick in line with the current state — used after a sync adopts a
+// timer another device started, paused or reset. v1 reloaded the page here.
+function restartTick() {
+  if (rafId) { clearInterval(rafId); rafId = null; }
+  lastDisplayed = -1; lastLocked = null;
+  if (isRunning() && getRem() > 0) startTick();
+}
 
 // ── 1-second housekeeping (always running) ─────────────────────
+// Nothing here writes state — the stopwatch's elapsed time is derived from the
+// ledger, so a running stopwatch produces no storage writes and no sync traffic.
 setInterval(() => {
-  accountStopwatch();
   checkDayRollover();
   updateStudyUI();
   if (goals.length && !rafId) { updateGoalTimes(); }
+  // Keep the session list's clocks live while it's open.
+  if ($('sessModal').classList.contains('open')) renderSessionList();
   // Keep the dashboard numbers/bars live while the stopwatch is running.
   // Surgical update (not a full re-render) so an open subject dropdown stays open.
   if (swRunning() && dashModal.classList.contains('open')) {
@@ -319,7 +346,17 @@ startBtn.addEventListener('click', () => {
   totalSeconds = t; pausedRemaining = t;
   doStart();
 });
-resetBtn.addEventListener('click', doReset);
+// Reset wipes the session's countdown, so it asks first — it used to fire on a
+// single stray tap, right next to 시작/일시정지.
+resetBtn.addEventListener('click', () => {
+  if (isIdle() && totalSeconds === 0) { doReset(); return; }   // nothing to lose
+  const rem = getRem();
+  askConfirm('타이머 초기화',
+    `<b>${escHtml(curSession().name)}</b> 세션의 타이머를 초기화할까요?` +
+    (rem > 0 ? `<br><span class="confirm-note">${fmt(rem)} 남은 타이머가 사라집니다.</span>` : '') +
+    `<br><span class="confirm-note">공부 기록과 목표는 지워지지 않아요.</span>`,
+    doReset, { yes: '초기화', danger: true });
+});
 
 document.querySelectorAll('.preset-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -335,7 +372,7 @@ document.querySelectorAll('.preset-btn').forEach(btn => {
     const t = h*3600+m*60+s; if (t) setDuration(t);
   });
 });
-emgBtn.addEventListener('click', () => { emergency = !emergency; render(); save(); });
+emgBtn.addEventListener('click', () => { emergency = !emergency; render(); saveEmergency(); });
 swToggle.addEventListener('click', toggleStopwatch);
 
 // ── Fullscreen ─────────────────────────────────────────────────

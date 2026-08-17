@@ -1,6 +1,4 @@
 // ── Formatters ─────────────────────────────────────────────────
-const pad = n => String(n).padStart(2,'0');
-
 function fmt(secs) {
   secs = Math.max(0, Math.floor(secs));
   const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), s = secs % 60;
@@ -31,7 +29,7 @@ function fmtHrs(sec) {
   return (Math.round(h * 10) / 10) + 'h';
 }
 function escHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 // ── Timer helpers ──────────────────────────────────────────────
@@ -53,94 +51,153 @@ function dDayNum() {
 }
 
 // ── Persistence ────────────────────────────────────────────────
-function save() {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify({ goalEpoch, startEpoch, pausedRemaining, totalSeconds, emergency })); } catch(e) {}
+// The main countdown syncs as one stamped object. `at` marks the last state
+// change (start / pause / reset / expiry) and `emgAt` the emergency toggle, so
+// pausing on one device can't undo an emergency toggle on another.
+function timerState() {
+  return { goalEpoch, startEpoch, pausedRemaining, totalSeconds, emergency,
+           at: timerAt, emgAt: timerEmgAt };
+}
+// Every save writes the globals back into the active session's slot, so the map
+// is always current and switching sessions is just a read.
+function persistTimer() {
+  timers[curSessionId()] = timerState();
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(timers)); } catch(e) {}
   syncTouch();
 }
-function clearSave() { try { localStorage.removeItem(STORE_KEY); } catch(e) {} syncTouch(); }
-function saveGoals() { try { localStorage.setItem(GOALS_KEY, JSON.stringify(goals)); } catch(e) {} syncTouch(); }
-function loadGoals() { try { goals = JSON.parse(localStorage.getItem(GOALS_KEY)) || []; } catch(e) { goals = []; } }
-function saveStudy() { try { localStorage.setItem(STUDY_KEY, JSON.stringify(study)); } catch(e) {} syncTouch(); }
-function touchSetting(field) { if (!study.settingsAt) study.settingsAt = {}; study.settingsAt[field] = Date.now(); }
-// Manually correct a day's study record. The correction propagates across devices
-// even when it lowers the value, overriding max-merge for that day.
-function setDayOverride(dayKey, sec) {
-  sec = Math.max(0, sec);
-  if (!study.recordsOverride) study.recordsOverride = {};
-  study.records[dayKey] = sec;
-  study.recordsOverride[dayKey] = { sec, at: Date.now() };
-  saveStudy();
-  updateStudyUI();
+const EMPTY_TIMER = { goalEpoch: null, startEpoch: null, pausedRemaining: null,
+                      totalSeconds: 0, emergency: false, at: 0, emgAt: 0 };
+// Point the live globals at one session's countdown.
+function adoptTimer(sid) {
+  const t = timers[sid] || EMPTY_TIMER;
+  goalEpoch       = typeof t.goalEpoch === 'number' ? t.goalEpoch : null;
+  startEpoch      = typeof t.startEpoch === 'number' ? t.startEpoch : null;
+  pausedRemaining = typeof t.pausedRemaining === 'number' ? t.pausedRemaining : null;
+  totalSeconds    = t.totalSeconds || 0;
+  emergency       = !!t.emergency;
+  timerAt         = t.at || 0;
+  timerEmgAt      = t.emgAt || 0;
 }
-// Returns the effective (committed + live session) seconds for one subject on a day.
-// Respects subjectsOverride: override.sec + any time accumulated after the override.
-function effectiveSubjectSec(dayKey, name) {
-  let accumulated = (study.subjects[dayKey] || {})[name] || 0;
-  if (swRunning() && study.curSubject === name) accumulated += (sessionOverlay()[dayKey] || 0);
-  const ov = (study.subjectsOverride[dayKey] || {})[name];
-  if (!ov) return Math.floor(accumulated);
-  return Math.max(0, Math.floor(ov.sec + Math.max(0, accumulated - ov.base)));
+// Seconds left on a session's countdown without disturbing the live globals
+// (the session list shows every session's clock at once).
+function timerRemainingOf(sid) {
+  const t = timers[sid];
+  if (!t) return null;
+  if (typeof t.goalEpoch === 'number') return Math.max(0, Math.floor((t.goalEpoch - Date.now()) / 1000));
+  if (typeof t.pausedRemaining === 'number') return t.pausedRemaining;
+  return null;
 }
-// Manually set a subject's study time for a given day.
-// Stores an override that "wins" over any accumulated value unless new time is added later.
-function setSubjectOverride(dayKey, name, sec) {
-  sec = Math.max(0, sec);
-  const accumulated = (study.subjects[dayKey] || {})[name] || 0;
-  if (!study.subjectsOverride[dayKey]) study.subjectsOverride[dayKey] = {};
-  study.subjectsOverride[dayKey][name] = { sec, at: Date.now(), base: accumulated };
-  saveStudy();
-  updateStudyUI();
+function timerRunningOf(sid) { return typeof (timers[sid] || {}).goalEpoch === 'number'; }
+// `at` may be given explicitly for transitions that happen at a known moment
+// (a countdown reaching zero) — stamping those with their logical time keeps
+// every device's copy identical instead of racing on Date.now().
+function save(at) {
+  timerAt = at || stamp();
+  persistTimer();
 }
-// Returns a map { subjectName → effectiveSec } for the given day,
-// covering all subjects in subjectList + any recorded in subjects[dayKey].
-// Delegates to effectiveSubjectSec so the session overlay is counted exactly once.
-function effectiveSubjectsForDay(dayKey) {
-  const raw = study.subjects[dayKey] || {};
-  const allNames = new Set([...Object.keys(raw), ...study.subjectList]);
+function saveEmergency() {
+  timerEmgAt = stamp();
+  persistTimer();
+}
+// Reset writes an explicit idle state rather than deleting the key: an absence
+// would lose to any peer that still has a timer, resurrecting what was cleared.
+function clearSave() { save(); }
+function loadTimer() {
+  let raw = null;
+  try { raw = JSON.parse(localStorage.getItem(STORE_KEY)); } catch(e) {}
+  timers = normalizeTimers(raw);
+  adoptTimer(curSessionId());
+  return timers[curSessionId()] || null;
+}
+// Accepts both shapes: the current { sessionId: timer } map, and the single
+// timer object stored before sessions existed (which becomes the default
+// session's countdown).
+function normalizeTimers(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  if ('goalEpoch' in raw || 'pausedRemaining' in raw || 'totalSeconds' in raw) {
+    return { [DEFAULT_SID]: raw };
+  }
   const out = {};
-  allNames.forEach(name => { out[name] = effectiveSubjectSec(dayKey, name); });
+  for (const sid in raw) if (raw[sid] && typeof raw[sid] === 'object') out[sid] = raw[sid];
   return out;
 }
+// Switch which session the app is showing: the active timer is already saved in
+// the map, so this just re-points the globals and repaints.
+function switchSession(sid) {
+  if (sid === curSessionId()) return;
+  persistTimer();              // make sure the outgoing session's slot is current
+  setCurSession(sid);
+  saveStudy();
+  adoptTimer(curSessionId());
+  restartTick();
+  render();
+  renderGoals(); renderDayTicks(); renderGoalFlags();
+  updateStudyUI();
+  renderSessionChip();
+  flushSyncSoon();
+}
+
+function saveGoals() { try { localStorage.setItem(GOALS_KEY, JSON.stringify(goals)); } catch(e) {} syncTouch(); }
+function loadGoals() {
+  try { goals = JSON.parse(localStorage.getItem(GOALS_KEY)) || []; } catch(e) { goals = []; }
+  if (!Array.isArray(goals)) goals = [];
+  goals = goals.map(normalizeGoal);
+}
+// Ids became device-prefixed strings (two devices could otherwise mint the same
+// Date.now() id and have their items merged into one). Old numeric ids are kept
+// — just as strings — so existing data and its tombstones still line up.
+function normalizeGoal(g) {
+  g.id = String(g.id);
+  if (typeof g.at !== 'number') g.at = Number(g.id) || 1;
+  if (typeof g.sid !== 'string') g.sid = DEFAULT_SID;   // goals made before sessions
+  return g;
+}
+// The goals belonging to the session on screen.
+function sessionGoals() { return goals.filter(g => g.sid === curSessionId()); }
+
+function saveStudy() { try { localStorage.setItem(STUDY_KEY, JSON.stringify(study)); } catch(e) {} invalidateTotals(); syncTouch(); }
+function loadStudy() {
+  let s = null;
+  try { s = JSON.parse(localStorage.getItem(STUDY_KEY)); } catch(e) {}
+  study = (s && typeof s === 'object' && !Array.isArray(s)) ? s : {};
+  normalizeStudy();
+}
+
 function saveNotes() { try { localStorage.setItem(NOTES_KEY, JSON.stringify(notes)); } catch(e) {} syncTouch(); }
-function loadNotes() { try { notes = JSON.parse(localStorage.getItem(NOTES_KEY)) || []; } catch(e) { notes = []; } if (!Array.isArray(notes)) notes = []; }
+function loadNotes() {
+  try { notes = JSON.parse(localStorage.getItem(NOTES_KEY)) || []; } catch(e) { notes = []; }
+  if (!Array.isArray(notes)) notes = [];
+  notes = notes.map(normalizeNote);
+}
+// Fill in the per-part stamps and checklist item ids that the merge needs.
+// Missing stamps default to the note's updatedAt (or 0), never to "now" — a
+// load must never look like a fresh edit or it would outrank a real one.
+function normalizeNote(n) {
+  n.id = String(n.id);
+  const u = n.updatedAt || 0;
+  if (typeof n.createdAt !== 'number') n.createdAt = Number(n.id) || u;
+  if (typeof n.pinAt   !== 'number') n.pinAt   = n.pinned ? (n.pinnedAt || u) : 0;
+  if (typeof n.orderAt !== 'number') n.orderAt = 0;
+  if (typeof n.itemsAt !== 'number') n.itemsAt = u;
+  if (!Array.isArray(n.items)) n.items = [];
+  n.items = n.items.map((it, i) => ({
+    id: it.id ? String(it.id) : (n.id + '#' + i),
+    t: it.t || '', done: !!it.done, at: it.at || u,
+  }));
+  return n;
+}
+
 function saveTomb()  { try { localStorage.setItem(TOMB_KEY, JSON.stringify(tomb)); } catch(e) {} syncTouch(); }
 function loadTomb()  { try { tomb = JSON.parse(localStorage.getItem(TOMB_KEY)) || {}; } catch(e) { tomb = {}; } if (!tomb || typeof tomb !== 'object') tomb = {}; }
 // Record a deletion so it propagates to other devices instead of resurrecting.
-function tombstone(id) { tomb[id] = Date.now(); saveTomb(); }
-function loadStudy() {
-  try {
-    const s = JSON.parse(localStorage.getItem(STUDY_KEY));
-    if (s) study = Object.assign(study, s);
-  } catch(e) {}
-  if (!study.records) study.records = {};
-  ensureSettings();
-}
+function tombstone(id) { tomb[String(id)] = stamp(); saveTomb(); }
 
-// ── Settings / extended study state defaults ───────────────────
-const DEFAULT_POMO = { focus: 25, short: 5, long: 15, sets: 4 };
-const ACCENTS = ['#cef231','#5ed3a8','#7aa2f7','#f7a23a','#f76b6b','#c47cff','#36d1dc'];
-function ensureSettings() {
-  if (!study.subjects     || typeof study.subjects !== 'object')     study.subjects = {};
-  if (!study.distractions || typeof study.distractions !== 'object') study.distractions = {};
-  if (!Array.isArray(study.subjectList)) study.subjectList = [];
-  if (typeof study.curSubject !== 'string')   study.curSubject = '';
-  if (typeof study.dailyGoalSec !== 'number') study.dailyGoalSec = 0;
-  if (study.theme !== 'light' && study.theme !== 'dark') study.theme = 'dark';
-  if (typeof study.accent !== 'string')  study.accent = '#cef231';
-  if (typeof study.focusMode !== 'boolean') study.focusMode = false;
-  if (study.comboMode !== 'pomo' && study.comboMode !== 'study') study.comboMode = 'study';
-  study.pomo = Object.assign({}, DEFAULT_POMO, (study.pomo && typeof study.pomo === 'object') ? study.pomo : {});
-  if (!study.settingsAt      || typeof study.settingsAt      !== 'object') study.settingsAt      = {};
-  if (!study.recordsOverride || typeof study.recordsOverride !== 'object') study.recordsOverride = {};
-  if (!study.committedRuns   || typeof study.committedRuns   !== 'object') study.committedRuns   = {};
-  if (!study.subjectColors   || typeof study.subjectColors   !== 'object') study.subjectColors   = {};
-  if (!study.subjectsOverride|| typeof study.subjectsOverride!== 'object') study.subjectsOverride= {};
-  if (typeof study.sessionAt !== 'number') study.sessionAt = 0;
-  if (study.session && typeof study.session !== 'object') study.session = null;
-  // Migrate the old device-local run-state (swRunning/swLastTick) — just drop it;
-  // any unsaved time from before the upgrade was already in records.
-  delete study.swRunning; delete study.swLastTick;
-}
+// ── Manual record corrections ──────────────────────────────────
+// Both of these append to the adjustment ledger (see addAdjustment): a delta is
+// safe to merge from several devices, whereas "set the total to N" silently
+// discards whatever the other device recorded.
+function adjustDayTotal(dayKey, deltaSec) { addAdjustment(dayKey, '', deltaSec); updateStudyUI(); }
+function adjustSubject(dayKey, name, deltaSec) { addAdjustment(dayKey, name, deltaSec); updateStudyUI(); }
 
 // Apply the chosen theme + accent colour to the document.
 function applyTheme() {
@@ -148,25 +205,4 @@ function applyTheme() {
   document.documentElement.style.setProperty('--accent', study.accent || '#cef231');
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', study.theme === 'light' ? '#f3f4f6' : '#080808');
-}
-
-// ── Study day keying (respects configurable resetHour) ─────────
-function studyDayKey(ms) {
-  const d = new Date(ms - study.resetHour * 3600 * 1000);
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-}
-// Key for the study day that is `n` days before the current one.
-function studyDayKeyOffset(n) {
-  const base = new Date(Date.now() - study.resetHour * 3600 * 1000);
-  base.setDate(base.getDate() - n);
-  return `${base.getFullYear()}-${pad(base.getMonth()+1)}-${pad(base.getDate())}`;
-}
-function todayStudySec() { return Math.floor(recSec(studyDayKey(Date.now()))); }
-
-// Returns the epoch ms when the study day containing 'ms' ends and the next begins.
-function nextStudyDayStart(ms) {
-  const d = new Date(ms - study.resetHour * 3600 * 1000);
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + 1);
-  return d.getTime() + study.resetHour * 3600 * 1000;
 }
