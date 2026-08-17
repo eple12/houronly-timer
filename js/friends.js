@@ -107,10 +107,13 @@ async function createGroup(rawName) {
   return ref.id;
 }
 async function leaveGroup(gid) {
-  await db.collection('groups').doc(gid).collection('members').doc(cloudUid).delete();
-  await db.collection('groups').doc(gid).collection('stats').doc(cloudUid).delete().catch(() => {});
-  await rememberGroup(gid, false);
+  // Detach the live listeners FIRST. They're allowed to read only while we're a
+  // member, so deleting the membership with them still attached makes them fail
+  // with permission-denied — which is why leaving worked but showed an error.
   if (openGroupId === gid) closeGroupView();
+  await db.collection('groups').doc(gid).collection('stats').doc(cloudUid).delete().catch(() => {});
+  await db.collection('groups').doc(gid).collection('members').doc(cloudUid).delete();
+  await rememberGroup(gid, false);
   await loadMyGroups();
 }
 
@@ -135,6 +138,20 @@ async function loadMyInvites() {
   if (!fsReady()) { myInvites = []; return; }
   const q = await db.collection('invites').where('toUid', '==', cloudUid).get();
   myInvites = q.docs.map(d => Object.assign({ id: d.id }, d.data()));
+}
+// Watch for invites arriving while the app is open, so the badge appears the
+// moment a friend sends one instead of on the next reload.
+let inviteUnsub = null;
+function watchInvites() {
+  if (inviteUnsub) { try { inviteUnsub(); } catch (e) {} inviteUnsub = null; }
+  if (!fsReady()) return;
+  inviteUnsub = db.collection('invites').where('toUid', '==', cloudUid)
+    .onSnapshot(snap => {
+      myInvites = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+      renderFriendsBadge();
+      // Only repaint the list view; a group or member view shouldn't jump away.
+      if (isModalOpen('friendsModal') && !openGroupId) renderFriends();
+    }, e => { /* rules not deployed yet, or offline — badge just stays put */ });
 }
 async function acceptInvite(inv) {
   if (!myName) throw new Error('먼저 닉네임을 정해 주세요');
@@ -552,11 +569,12 @@ function renderFriendsBadge() {
 if (fbReady && fbAuth) {
   fbAuth.onAuthStateChanged(async user => {
     myGroups = []; myInvites = []; closeGroupView();
-    if (!user) { renderFriendsBadge(); renderFriends(); return; }
+    if (!user) { watchInvites(); renderFriendsBadge(); renderFriends(); return; }
     try {
       await loadMyName();
       await Promise.all([loadMyGroups(), loadMyInvites()]);
       renderFriendsBadge();
+      watchInvites();
       if (isModalOpen('friendsModal')) renderFriends();
       publishGroupStats(true);
       startStatsHeartbeat();

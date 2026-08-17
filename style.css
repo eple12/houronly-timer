@@ -1364,12 +1364,16 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   display: inline-block; border: 1px solid rgba(255,255,255,0.18);
 }
 /* ═══════════════════ 함께 공부 (groups) ══════════════════════ */
-/* Unread-invite dot on the header button. */
-.acct-btn.has-invite { position: relative; color: var(--accent); }
+/* Unread-invite dot, top-right of the group button. The ring in the page
+   colour keeps it legible where it overlaps the icon's strokes. */
+.acct-btn.has-invite { position: relative; color: var(--accent); overflow: visible; }
 .acct-btn.has-invite::after {
-  content: ''; position: absolute; top: 1px; right: 1px;
-  width: 6px; height: 6px; border-radius: 50%; background: var(--danger);
+  content: ''; position: absolute; top: -1px; right: -1px;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--danger); box-shadow: 0 0 0 2px var(--bg);
+  animation: frBadgePop 0.28s cubic-bezier(0.2,0.9,0.3,1.3);
 }
+@keyframes frBadgePop { from { transform: scale(0); } to { transform: scale(1); } }
 /* The body had no layout of its own, so its sections sat flush against each
    other. Give the whole sheet a roomier rhythm than the denser panels. */
 #friendsBody { display: flex; flex-direction: column; gap: 26px; }
