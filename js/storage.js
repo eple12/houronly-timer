@@ -229,6 +229,9 @@ function normalizeNote(n) {
   n.items = n.items.map((it, i) => ({
     id: it.id ? String(it.id) : (n.id + '#' + i),
     t: it.t || '', done: !!it.done, at: it.at || u,
+    // `sep` marks a divider row rather than a task. It has to be listed here:
+    // this rebuilds each item, so a field left out would be dropped on load.
+    sep: it.sep ? 1 : 0,
   }));
   return n;
 }

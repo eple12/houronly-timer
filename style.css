@@ -1211,7 +1211,21 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 }
 #noteEditBody textarea:focus { border-color: var(--accent); }
 .note-items { display: flex; flex-direction: column; gap: 8px; max-height: 40vh; overflow-y: auto; }
-.note-item-edit { display: flex; align-items: center; gap: 8px; }
+.note-item-edit { display: flex; align-items: center; gap: 8px;
+  transition: transform 0.16s cubic-bezier(0.2,0.7,0.2,1); }
+/* Rows are draggable straight away here — the editor is already an edit mode,
+   so the pad is always visible rather than behind a toggle. */
+.note-drag-pad { background: none; border: none; color: var(--dim); cursor: grab;
+  padding: 0 1px; flex-shrink: 0; touch-action: none; -webkit-appearance: none;
+  display: inline-flex; align-items: center; }
+.note-drag-pad:active { cursor: grabbing; color: var(--sub); }
+.note-item-edit.row-dragging { transition: none; opacity: 0.97; }
+/* Divider row: no checkbox, and its text is the optional title. */
+.note-item-edit.sep .note-sep-ic { color: var(--dim); display: inline-flex; flex-shrink: 0; }
+.note-item-edit.sep input[type=text] { border-style: dashed; color: var(--sub); }
+.note-item-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.note-item-actions .note-add-item { margin-top: 0; align-self: auto;
+  display: inline-flex; align-items: center; gap: 5px; }
 .note-item-edit input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); flex-shrink: 0; }
 .note-item-edit input[type=text] {
   flex: 1; min-width: 0; background: var(--surface); border: 1px solid var(--bord2); border-radius: 8px;

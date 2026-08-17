@@ -65,6 +65,7 @@ function pinnedOrRecentNote() {
 function toggleNoteItem(note, i) {
   if (!note || note.type !== 'list' || !note.items || !note.items[i]) return false;
   const it = note.items[i];
+  if (it.sep) return false;
   it.done = !it.done;
   it.at = stamp();
   saveNotes();
@@ -147,7 +148,7 @@ function plainNoteText(raw) {
 }
 function notePreviewText(n) {
   if (n.type === 'list') {
-    const items = n.items || [];
+    const items = checkItems(n);
     return `체크리스트 · ${items.filter(i => i.done).length}/${items.length} 완료`;
   }
   return plainNoteText(n.text).slice(0, 60) || '내용 없음';
@@ -158,8 +159,9 @@ function notePreviewText(n) {
 // Inner HTML of the open card for a given note.
 function memoCardInner(n, list) {
   const body = n.type === 'list'
-    ? `<div class="memo-checks">${(n.items || []).map((it, i) =>
-        `<label class="memo-check ${it.done ? 'done' : ''}"><input type="checkbox" data-i="${i}" ${it.done ? 'checked' : ''}><span>${escHtml(it.t || '')}</span></label>`
+    ? `<div class="memo-checks">${(n.items || []).map((it, i) => it.sep
+        ? dividerHTML(it.t)
+        : `<label class="memo-check ${it.done ? 'done' : ''}"><input type="checkbox" data-i="${i}" ${it.done ? 'checked' : ''}><span>${escHtml(it.t || '')}</span></label>`
       ).join('') || '<div class="memo-empty">항목 없음</div>'}</div>`
     : `<div class="memo-text">${renderNoteText(n.text) || '<span class="memo-empty">내용 없음</span>'}</div>`;
   const nav = list.length > 1
@@ -327,8 +329,9 @@ function renderMemoBig() {
   $('memoBigTitle').textContent = n.title || '메모';
   const body = $('memoBigBody');
   body.innerHTML = n.type === 'list'
-    ? `<div class="memo-big-checks">${(n.items || []).map((it, i) =>
-        `<label class="memo-big-check ${it.done ? 'done' : ''}"><input type="checkbox" data-i="${i}" ${it.done ? 'checked' : ''}><span>${escHtml(it.t || '')}</span></label>`
+    ? `<div class="memo-big-checks">${(n.items || []).map((it, i) => it.sep
+        ? dividerHTML(it.t)
+        : `<label class="memo-big-check ${it.done ? 'done' : ''}"><input type="checkbox" data-i="${i}" ${it.done ? 'checked' : ''}><span>${escHtml(it.t || '')}</span></label>`
       ).join('') || '<div class="memo-empty">항목 없음</div>'}</div>`
     : (renderNoteText(n.text)
         ? `<div class="memo-big-text">${renderNoteText(n.text)}</div>`
@@ -513,7 +516,7 @@ function openNoteEditor(id, newType) {
   } else {
     // Item ids are carried through the editor so a row edited here can be
     // matched with the same row edited on another device.
-    editDraftItems = (n.items || []).map(i => ({ id: i.id || uid(), t: i.t || '', done: !!i.done, at: i.at || 0 }));
+    editDraftItems = (n.items || []).map(i => ({ id: i.id || uid(), t: i.t || '', done: !!i.done, at: i.at || 0, sep: i.sep ? 1 : 0 }));
     if (!editDraftItems.length) editDraftItems.push(newDraftItem());  // start ready to type
     renderEditItems();
   }
@@ -660,17 +663,33 @@ function toggleNotePreview() {
 }
 
 function newDraftItem() { return { id: uid(), t: '', done: false, at: 0 }; }
+// A checklist can carry divider rows too: same item shape, sep flag set, and
+// its text is the divider's optional title.
+function newDraftSep()  { return { id: uid(), t: '', done: false, at: 0, sep: 1 }; }
+// Only real rows count towards "n/m 완료" — dividers aren't tasks.
+const checkItems = n => (n.items || []).filter(i => !i.sep);
 function renderEditItems() {
   const body = $('noteEditBody');
   body.innerHTML =
-    `<div class="note-items">` +
-    editDraftItems.map((it, i) =>
-      `<div class="note-item-edit">
-         <input type="checkbox" data-i="${i}" ${it.done ? 'checked' : ''}>
-         <input type="text" data-i="${i}" value="${escHtml(it.t)}" placeholder="할 일">
-         <button class="note-item-del" data-i="${i}">✕</button>
-       </div>`).join('') +
-    `</div><button class="note-add-item" id="noteAddItem">+ 항목 추가</button>`;
+    `<div class="note-items" id="noteItems">` +
+    editDraftItems.map((it, i) => it.sep
+      ? `<div class="note-item-edit sep" data-i="${i}">
+           <button class="note-drag-pad" title="끌어서 순서 변경" tabindex="-1">${icoSm('grip')}</button>
+           <span class="note-sep-ic">${icoSm('hr')}</span>
+           <input type="text" data-i="${i}" value="${escHtml(it.t)}" placeholder="구분선 제목 (선택)">
+           <button class="note-item-del" data-i="${i}">✕</button>
+         </div>`
+      : `<div class="note-item-edit" data-i="${i}">
+           <button class="note-drag-pad" title="끌어서 순서 변경" tabindex="-1">${icoSm('grip')}</button>
+           <input type="checkbox" data-i="${i}" ${it.done ? 'checked' : ''}>
+           <input type="text" data-i="${i}" value="${escHtml(it.t)}" placeholder="할 일">
+           <button class="note-item-del" data-i="${i}">✕</button>
+         </div>`).join('') +
+    `</div>
+     <div class="note-item-actions">
+       <button class="note-add-item" id="noteAddItem">+ 항목 추가</button>
+       <button class="note-add-item" id="noteAddSep">${icoSm('hr')} 구분선</button>
+     </div>`;
   body.querySelectorAll('.note-item-edit input[type=checkbox]').forEach(cb =>
     cb.addEventListener('change', () => { editDraftItems[+cb.dataset.i].done = cb.checked; }));
   body.querySelectorAll('.note-item-edit input[type=text]').forEach(tx => {
@@ -705,6 +724,24 @@ function renderEditItems() {
     const inputs = body.querySelectorAll('.note-item-edit input[type=text]');
     if (inputs.length) inputs[inputs.length - 1].focus();
   });
+  $('noteAddSep').addEventListener('click', () => {
+    editDraftItems.push(newDraftSep());
+    renderEditItems();
+    const inputs = body.querySelectorAll('.note-item-edit.sep input[type=text]');
+    if (inputs.length) inputs[inputs.length - 1].focus();
+  });
+  // Rows are draggable straight away — this is already an editing surface, so
+  // there's no separate reorder mode to switch into.
+  const list = $('noteItems');
+  list.querySelectorAll('.note-drag-pad').forEach(h =>
+    h.addEventListener('pointerdown', e => {
+      const rows = [...list.querySelectorAll('.note-item-edit')];
+      beginRowDrag(e, h, '.note-item-edit', rows, list, (from, to) => {
+        const [moved] = editDraftItems.splice(from, 1);
+        editDraftItems.splice(to, 0, moved);
+        renderEditItems();
+      });
+    }));
 }
 function saveNoteFromEditor() {
   let n = (editingNoteId != null) ? notes.find(x => x.id === editingNoteId) : null;
@@ -722,7 +759,7 @@ function saveNoteFromEditor() {
     n.text = $('noteTextInput') ? $('noteTextInput').value : '';
     n.items = [];
   } else {
-    const kept = editDraftItems.filter(i => i.t.trim() !== '' || i.done);
+    const kept = editDraftItems.filter(i => i.sep || i.t.trim() !== '' || i.done);
     const prevIds = (n.items || []).map(i => i.id);
     const prev = new Map((n.items || []).map(i => [i.id, i]));
     // Only rows whose text or tick actually changed get a fresh stamp, so
@@ -730,8 +767,8 @@ function saveNoteFromEditor() {
     // didn't touch.
     n.items = kept.map(i => {
       const p = prev.get(i.id);
-      const changed = !p || p.t !== i.t || !!p.done !== !!i.done;
-      return { id: i.id, t: i.t, done: !!i.done, at: changed ? now : (p.at || 0) };
+      const changed = !p || p.t !== i.t || !!p.done !== !!i.done || !!p.sep !== !!i.sep;
+      return { id: i.id, t: i.t, done: !!i.done, sep: i.sep ? 1 : 0, at: changed ? now : (p.at || 0) };
     });
     // itemsAt covers the structure (which rows exist, in what order).
     const sameShape = n.items.length === prevIds.length
