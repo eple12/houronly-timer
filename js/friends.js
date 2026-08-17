@@ -8,7 +8,8 @@
 //   usernames/{nameLower}      { uid, name }
 //   groups/{gid}               { name, ownerUid, createdAt }
 //   groups/{gid}/members/{uid} { name, joinedAt }
-//   groups/{gid}/stats/{uid}   { name, day, todaySec, weekSec, subjects, live, at }
+//   groups/{gid}/stats/{uid}   { name, day, todaySec, weekSec, subjects,
+//                                days, subj30, live, at }
 //   invites/{gid}__{toUid}     { gid, gname, fromUid, fromName, toUid, toName, at }
 const PROFILE_KEY = 'timer_profile_v1';   // { name } cached for instant display
 
@@ -17,6 +18,7 @@ let myName = (() => { try { return (JSON.parse(localStorage.getItem(PROFILE_KEY)
 let myGroups = [];          // [{ id, name, ownerUid }]
 let myInvites = [];         // [{ id, gid, gname, fromName }]
 let openGroupId = null;     // group whose detail view is showing
+let openMemberUid = null;   // member whose dashboard is showing, if any
 let groupMembers = [];      // [{ uid, name, stats }] for the open group
 let groupUnsubs = [];       // live listeners for the open group
 let friendsErr = '';        // last permission/network problem, shown inline
@@ -149,17 +151,35 @@ async function declineInvite(inv) {
 }
 
 // ── Publishing my numbers ──────────────────────────────────────
-// What gets shared, and nothing else: today's and this week's total, the
-// per-subject split, and whether the stopwatch is running right now. Session
-// names, memos, goals and todos stay private.
+// What gets shared, and nothing else: daily totals for the last 90 days (what
+// a member's dashboard is drawn from), the per-subject split for today and the
+// last 30 days, and whether the stopwatch is running right now. Session names,
+// memos, goals and todos stay private. ~2KB at full history.
+const SHARE_DAYS = 90;   // history depth behind a member's dashboard
 function myShareableStats() {
   const day = studyDayKey(Date.now());
   const t = totals();
   const subjects = {};
   const raw = t.sub[day] || {};
   Object.keys(raw).forEach(n => { const v = Math.floor(raw[n] || 0); if (v > 0) subjects[n] = v; });
+
+  // Daily totals so members can see each other's dashboard. Same kind of
+  // information as before (hours and subjects) — just more days of it.
+  const days = {};
   let weekSec = 0;
-  for (let i = 0; i < 7; i++) weekSec += t.rec[studyDayKeyOffset(i)] || 0;
+  for (let i = 0; i < SHARE_DAYS; i++) {
+    const k = studyDayKeyOffset(i);
+    const v = Math.floor(t.rec[k] || 0);
+    if (v > 0) days[k] = v;
+    if (i < 7) weekSec += v;
+  }
+  const subj30 = {};
+  for (let i = 0; i < 30; i++) {
+    const m = t.sub[studyDayKeyOffset(i)] || {};
+    for (const n in m) subj30[n] = (subj30[n] || 0) + Math.floor(m[n] || 0);
+  }
+  Object.keys(subj30).forEach(n => { if (subj30[n] < 1) delete subj30[n]; });
+
   const runSid = activeRunSid();
   return {
     name: myName || '이름 없음',
@@ -167,6 +187,8 @@ function myShareableStats() {
     todaySec: Math.floor(t.rec[day] || 0),
     weekSec: Math.floor(weekSec),
     subjects,
+    days,
+    subj30,
     live: { on: !!runSid, since: runSid ? activeRunStart() : 0, subj: study.curSubject || '' },
     at: Date.now(),
   };
@@ -198,6 +220,7 @@ function closeGroupView() {
   groupUnsubs.forEach(u => { try { u(); } catch (e) {} });
   groupUnsubs = [];
   openGroupId = null;
+  openMemberUid = null;
   groupMembers = [];
 }
 function openGroupView(gid) {
@@ -244,31 +267,111 @@ function fmtAgo(ms) {
   if (h < 24) return h + '시간 전';
   return Math.floor(h / 24) + '일 전';
 }
+// A member's row stays deliberately plain — name, whether they're studying
+// right now, today's total. Everything else lives behind the dashboard button.
 function memberRowHTML(m, rank) {
   const s = m.stats;
   const mine = m.uid === cloudUid;
-  const fresh = s && s.day === studyDayKey(Date.now());
+  const fresh = s && isTodayish(s);
   const today = fresh ? (s.todaySec || 0) : 0;
   const live = s && s.live && s.live.on;
-  const subj = s ? Object.entries(s.subjects || {}).sort((a, b) => b[1] - a[1]).slice(0, 4) : [];
   return `<div class="fr-row${mine ? ' me' : ''}">
     <span class="fr-rank">${rank}</span>
     <div class="fr-body">
-      <div class="fr-top">
-        <span class="fr-name">${escHtml(m.name)}${mine ? '<span class="fr-me-tag">나</span>' : ''}</span>
-        ${live ? `<span class="fr-live"><span class="fr-live-dot"></span>공부 중${s.live.subj ? ' · ' + escHtml(s.live.subj) : ''}</span>` : ''}
-      </div>
-      ${subj.length
-        ? `<div class="fr-subj">${subj.map(([n, v]) =>
-            `<span class="fr-chip">${escHtml(n)} ${fmtHrs(v)}</span>`).join('')}</div>`
-        : `<div class="fr-subj empty">${s ? (fresh ? '아직 기록 없음' : '오늘 기록 없음') : '기록을 기다리는 중'}</div>`}
+      <span class="fr-name">${escHtml(m.name)}${mine ? '<span class="fr-me-tag">나</span>' : ''}</span>
+      ${live ? `<span class="fr-live"><span class="fr-live-dot"></span>공부 중${s.live.subj ? ' · ' + escHtml(s.live.subj) : ''}</span>` : ''}
     </div>
-    <div class="fr-nums">
-      <span class="fr-today">${fmtHrs(today)}</span>
-      <span class="fr-week">주 ${s ? fmtHrs(s.weekSec || 0) : '—'}</span>
-      ${s && s.at ? `<span class="fr-ago">${fmtAgo(s.at)}</span>` : ''}
-    </div>
+    <span class="fr-today">${s ? fmtHrs(today) : '—'}</span>
+    <button class="fr-dash-btn" data-dash="${escHtml(m.uid)}" title="${escHtml(m.name)} 님의 기록"
+            ${s ? '' : 'disabled'}>${icoSm('chart')}</button>
   </div>`;
+}
+// Treat a published day as "today" when it matches either calendar today or our
+// own study day — covers friends running a different reset hour.
+function isTodayish(s) {
+  const now = new Date();
+  const plain = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  return s.day === plain || s.day === studyDayKey(Date.now());
+}
+function dayKeyMinus(anchor, n) {
+  const d = dayKeyToDate(anchor);
+  d.setDate(d.getDate() - n);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+// ── One member's dashboard ─────────────────────────────────────
+// Built entirely from what they published; days are counted back from THEIR
+// reported day so a different reset hour doesn't shift the whole chart.
+function memberDashHTML(m) {
+  const s = m.stats;
+  if (!s) return '<div class="acct-note">아직 공유된 기록이 없어요.</div>';
+  const anchor = s.day;
+  const days = s.days || {};
+  const at = k => Math.floor(days[k] || 0);
+  const sumLast = n => { let t = 0; for (let i = 0; i < n; i++) t += at(dayKeyMinus(anchor, i)); return t; };
+
+  const today = isTodayish(s) ? (s.todaySec || 0) : 0;
+  const week = sumLast(7), month = sumLast(30);
+  const recorded = Object.values(days).filter(v => v > 0.5);
+  const total = recorded.reduce((a, v) => a + v, 0);
+  const best = recorded.reduce((mx, v) => Math.max(mx, v), 0);
+  let streak = 0;
+  for (let i = (at(anchor) > 0.5 ? 0 : 1); at(dayKeyMinus(anchor, i)) > 0.5; i++) streak++;
+
+  // 14-day bars, oldest to newest.
+  const N = 14, data = [];
+  for (let i = N - 1; i >= 0; i--) {
+    const k = dayKeyMinus(anchor, i), p = k.split('-');
+    data.push({ k, sec: at(k), label: `${+p[1]}/${+p[2]}` });
+  }
+  const maxSec = Math.max(...data.map(d => d.sec), 1);
+  const W = 440, H = 140, padL = 4, padR = 4, padT = 10, padB = 20;
+  const plotW = W - padL - padR, plotH = H - padT - padB, bw = plotW / N;
+  const bars = data.map((d, i) => {
+    const bh = (d.sec / maxSec) * plotH;
+    const x = padL + i * bw + bw * 0.18, w = bw * 0.64;
+    if (d.sec <= 0) return `<rect x="${x.toFixed(1)}" y="${(padT+plotH-2).toFixed(1)}" width="${w.toFixed(1)}" height="2" rx="1" fill="var(--surf2)"></rect>`;
+    return `<rect x="${x.toFixed(1)}" y="${(padT + plotH - bh).toFixed(1)}" width="${w.toFixed(1)}" height="${bh.toFixed(1)}" rx="2" fill="${i === N-1 ? 'var(--accent)' : 'color-mix(in srgb, var(--accent) 45%, var(--surf2))'}"></rect>`;
+  }).join('');
+  const labels = data.map((d, i) => i % 2 !== (N-1) % 2 ? '' :
+    `<text x="${(padL + i*bw + bw/2).toFixed(1)}" y="${H-6}" fill="var(--dim)" font-size="9" text-anchor="middle" font-family="Space Mono">${d.label}</text>`).join('');
+
+  const subjToday = Object.entries(s.subjects || {}).sort((a, b) => b[1] - a[1]);
+  const subj30 = Object.entries(s.subj30 || {}).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const subjBars = list => {
+    const top = list.reduce((mx, [, v]) => Math.max(mx, v), 1);
+    return list.map(([n, v], i) => `
+      <div class="subj-line">
+        <div class="subj-line-top"><span class="sl-name">${escHtml(n)}</span>
+          <div class="sl-right"><span class="sl-val">${fmt(v).slice(0,5)}</span></div></div>
+        <div class="subj-line-bar"><i style="width:${(v/top*100).toFixed(1)}%;background:${SUBJECT_COLORS[i % SUBJECT_COLORS.length]}"></i></div>
+      </div>`).join('');
+  };
+
+  return `
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-label">오늘</div><div class="stat-value">${fmtHrs(today)}<small> ${fmt(today).slice(0,5)}</small></div></div>
+      <div class="stat-card"><div class="stat-label">연속 일수</div><div class="stat-value">${streak}<small> 일</small></div></div>
+      <div class="stat-card"><div class="stat-label">최근 7일</div><div class="stat-value">${fmtHrs(week)}</div></div>
+      <div class="stat-card"><div class="stat-label">최근 30일</div><div class="stat-value">${fmtHrs(month)}</div></div>
+    </div>
+    <div class="chart-block">
+      <div class="chart-title"><span>최근 14일</span></div>
+      <svg class="chart-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${bars}${labels}</svg>
+    </div>
+    ${subjToday.length ? `<div class="chart-block">
+      <div class="chart-title"><span>오늘 과목별</span></div>
+      <div class="subj-break">${subjBars(subjToday)}</div>
+    </div>` : ''}
+    ${subj30.length ? `<div class="chart-block">
+      <div class="chart-title"><span>최근 30일 과목별</span></div>
+      <div class="subj-break">${subjBars(subj30)}</div>
+    </div>` : ''}
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-label">하루 최대</div><div class="stat-value">${fmtHrs(best)}</div></div>
+      <div class="stat-card"><div class="stat-label">기록 합계</div><div class="stat-value">${fmtHrs(total)}</div></div>
+    </div>
+    <div class="fr-hint">${escHtml(m.name)} 님이 공유한 기록 · ${fmtAgo(s.at)} 갱신</div>`;
 }
 function renderFriends() {
   const body = $('friendsBody');
@@ -279,6 +382,23 @@ function renderFriends() {
     return;
   }
   const err = friendsErr ? `<div class="fr-err">${escHtml(friendsErr)}</div>` : '';
+
+  // ── one member's dashboard ──
+  if (openGroupId && openMemberUid) {
+    const m = groupMembers.find(x => x.uid === openMemberUid);
+    if (!m) { openMemberUid = null; renderFriends(); return; }
+    const s = m.stats;
+    const live = s && s.live && s.live.on;
+    body.innerHTML = `
+      ${err}
+      <button class="fr-back" id="frBackMember">${icoSm('chevL')} 멤버 목록</button>
+      <div class="fr-group-title">${escHtml(m.name)}
+        ${live ? `<span class="fr-live"><span class="fr-live-dot"></span>공부 중${s.live.subj ? ' · ' + escHtml(s.live.subj) : ''}</span>` : ''}
+      </div>
+      ${memberDashHTML(m)}`;
+    on('frBackMember', 'click', () => { openMemberUid = null; renderFriends(); });
+    return;
+  }
 
   // ── group detail ──
   if (openGroupId) {
@@ -318,6 +438,8 @@ function renderFriends() {
     };
     on('frInviteBtn', 'click', doInvite);
     on('frInviteInput', 'keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doInvite(); } });
+    body.querySelectorAll('[data-dash]').forEach(b =>
+      b.addEventListener('click', () => { openMemberUid = b.dataset.dash; renderFriends(); }));
     return;
   }
 

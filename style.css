@@ -1432,9 +1432,21 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 .fr-chip { font-size: 10.5px; color: var(--sub); background: var(--surface);
   border: 1px solid var(--border); border-radius: 999px; padding: 3px 9px; }
 .fr-nums { display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; gap: 2px; }
-.fr-today { font-family: 'Space Mono', monospace; font-size: 16px; font-weight: 700; color: var(--text); }
+.fr-today { font-family: 'Space Mono', monospace; font-size: 16px; font-weight: 700;
+  color: var(--text); flex-shrink: 0; }
 .fr-week { font-size: 10.5px; color: var(--dim); white-space: nowrap; }
 .fr-ago  { font-size: 9.5px; color: var(--dim); opacity: 0.7; white-space: nowrap; }
+/* Opens that member's dashboard. */
+.fr-dash-btn {
+  background: none; border: 1px solid var(--bord2); border-radius: 9px;
+  color: var(--sub); cursor: pointer; padding: 7px 9px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  -webkit-appearance: none; transition: color 0.14s, border-color 0.14s;
+}
+.fr-dash-btn:active { color: var(--accent); border-color: var(--accent); }
+.fr-dash-btn:disabled { opacity: 0.35; cursor: default; }
+/* The member row is one line now, so it centres rather than stacking. */
+.fr-row .fr-body { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
 .fr-leave { color: var(--danger); margin-top: 2px; }
 
 .fr-invite { display: flex; align-items: center; gap: 10px;
