@@ -248,6 +248,33 @@ function sessionRowsHTML(map) {
     </div>`;
   }).join('');
 }
+// Total and daily average per session, each counted from that session's own
+// start date — a session begun last week shouldn't be averaged over months.
+function sessionCumulativeHTML() {
+  const rows = sessions
+    .map(s => ({ ...s, total: sessionSecAllTime(s.id), days: sessionDaysElapsed(s.id),
+                 start: sessionStartDayKey(s.id) }))
+    .filter(r => r.total >= 1 || r.id === curSessionId());
+  if (!rows.length) return '';
+  rows.sort((a, b) => b.total - a.total);
+  const md = k => { const p = String(k).split('-'); return `${+p[1]}/${+p[2]}`; };
+  return `<div class="chart-block">
+    <div class="chart-title"><span>세션별 누적</span><span class="legend-avg">시작일 기준</span></div>
+    <div class="sess-cum">${rows.map(r => `
+      <div class="sess-cum-row">
+        <span class="sess-inline-dot" style="background:${r.color}"></span>
+        <div class="scr-body">
+          <div class="scr-name">${escHtml(r.name)}${r.id === curSessionId() ? '<span class="sl-cur">사용 중</span>' : ''}</div>
+          <div class="scr-since">${md(r.start)}부터 · ${r.days}일째</div>
+        </div>
+        <div class="scr-nums">
+          <span class="scr-total">${fmtHrs(r.total)}</span>
+          <span class="scr-avg">일 평균 ${fmtHrs(r.total / r.days)}</span>
+        </div>
+      </div>`).join('')}</div>
+  </div>`;
+}
+
 function sessionBreakHTML() {
   const today = sessionTotalsLastDays(1);
   const rows  = sessionRowsHTML(today);
@@ -310,6 +337,7 @@ function renderDashboard() {
   if (st.days === 0 && today < 1) {
     body.innerHTML = `
       <div class="dash-empty">아직 기록이 없어요.<br>공부 스톱워치를 시작해 보세요 ${icoSm('play')}</div>
+      ${sessionCumulativeHTML()}
       ${sessionBreakHTML()}
       ${subjectBreakHTML()}
       ${resetHourBlock(hourOpts)}`;
@@ -417,6 +445,8 @@ function renderDashboard() {
     </div>
 
     ${projHTML}
+
+    ${sessionCumulativeHTML()}
 
     ${sessionBreakHTML()}
 

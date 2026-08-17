@@ -347,10 +347,13 @@ function sessionColor(id) { const s = sessionById(id); return s ? s.color : 'var
 // existed, so it reads as the default one.
 function sidOf(x) { return (x && x.sid) || DEFAULT_SID; }
 
+// `startedAt` is real wall-clock time, not a stamp, and every later edit
+// carries it through — renaming a session must not restart its calendar.
 function sessionAdd(name, color) {
   const maxOrd = Object.keys(study.sess).reduce((m, id) => Math.max(m, study.sess[id].ord || 0), -1);
   const id = uid();
   study.sess[id] = { at: stamp(), del: 0, name: name || '세션', ord: maxOrd + 1,
+                     startedAt: Date.now(),
                      color: color || SESSION_COLORS[(maxOrd + 1) % SESSION_COLORS.length] };
   rebuildSessionCache();
   return id;
@@ -358,6 +361,7 @@ function sessionAdd(name, color) {
 function sessionUpdate(id, name, color) {
   const prev = study.sess[id] || {};
   study.sess[id] = { at: stamp(), del: prev.del || 0, ord: prev.ord || 0,
+                     startedAt: prev.startedAt || 0,
                      name: name != null ? name : (prev.name || '세션'),
                      color: color || prev.color || SESSION_COLORS[0] };
   rebuildSessionCache();
@@ -367,6 +371,7 @@ function sessionUpdate(id, name, color) {
 function sessionRemove(id) {
   const prev = study.sess[id] || {};
   study.sess[id] = { at: stamp(), del: 1, ord: prev.ord || 0,
+                     startedAt: prev.startedAt || 0,
                      name: prev.name || '세션', color: prev.color || '' };
   rebuildSessionCache();
   if (study.curSession === id) setCurSession(curSessionId());
@@ -551,6 +556,37 @@ function sessionSecAllTime(sid) {
   for (const d in by) t += by[d][sid] || 0;
   return Math.floor(t);
 }
+
+// ── Per-session calendars ──────────────────────────────────────
+// Day keys are zero-padded 'YYYY-MM-DD', so they sort and parse directly.
+function dayKeyToDate(k) {
+  const [y, m, d] = String(k).split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+}
+function firstRecordedDay(sid) {
+  const by = totals().bySess;
+  let min = null;
+  for (const d in by) if ((by[d][sid] || 0) > 0.5 && (min === null || d < min)) min = d;
+  return min;
+}
+// The day a session's calendar starts: when it was created, or — for the
+// default session, whose records predate sessions entirely — the first day it
+// has time on. Whichever is earlier, so no recorded day falls outside it.
+function sessionStartDayKey(sid) {
+  const rec = study.sess[sid] || {};
+  const created = rec.startedAt ? studyDayKey(rec.startedAt) : null;
+  const first = firstRecordedDay(sid);
+  if (created && first) return created < first ? created : first;
+  return created || first || studyDayKey(Date.now());
+}
+// Calendar days from the session's start through today, inclusive — this is
+// the denominator for its daily average, so an idle day still counts.
+function sessionDaysElapsed(sid) {
+  const from = dayKeyToDate(sessionStartDayKey(sid));
+  const to   = dayKeyToDate(studyDayKey(Date.now()));
+  return Math.max(1, Math.round((to - from) / 86400000) + 1);
+}
+function sessionDailyAvg(sid) { return sessionSecAllTime(sid) / sessionDaysElapsed(sid); }
 
 // ── Distractions ───────────────────────────────────────────────
 // One counter per device, summed for display: two devices can both count a

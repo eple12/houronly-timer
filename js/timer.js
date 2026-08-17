@@ -266,7 +266,7 @@ setInterval(() => {
   updateStudyUI();
   if (goals.length && !rafId) { updateGoalTimes(); }
   // Keep the session list's clocks live while it's open.
-  if (isModalOpen('sessModal')) renderSessionList();
+  if (isModalOpen('sessModal')) refreshSessionTimes();
   // Keep the dashboard numbers/bars live while the stopwatch is running.
   // Surgical update (not a full re-render) so an open subject dropdown stays open.
   if (swRunning() && isModalOpen('dashModal')) {

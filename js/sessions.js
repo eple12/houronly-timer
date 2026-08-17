@@ -56,6 +56,19 @@ function sessionSubtitle(s) {
   bits.push(`오늘 ${fmtHrs(sessionSecToday(s.id))}`);
   return bits.join(' · ');
 }
+// Refresh only the live clock text. Re-rendering the whole list once a second
+// (which is what this replaced) tore out the row being edited every tick: the
+// focused input was destroyed, so the phone's keyboard dropped and any typed
+// name or picked colour was reset before it could be saved.
+function refreshSessionTimes() {
+  const wrap = $('sessList');
+  if (!wrap) return;
+  wrap.querySelectorAll('.sess-row:not(.editing)').forEach(row => {
+    const s = sessionById(row.dataset.sid);
+    const sub = row.querySelector('.sess-row-sub');
+    if (s && sub) sub.textContent = sessionSubtitle(s);
+  });
+}
 function renderSessionList() {
   const wrap = $('sessList');
   if (!wrap) return;

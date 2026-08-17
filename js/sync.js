@@ -417,7 +417,9 @@ function applyLive(notesChanged) {
   if (isOpen('notesModal')) renderNotesList();
   if (isOpen('setModal'))   renderSettings();
   if (isOpen('subjModal'))  renderSubjChips();
-  if (isOpen('sessModal'))  renderSessionList();
+  // Same care as the once-a-second refresh: never rebuild a row the user is
+  // typing into just because a sync landed.
+  if (isOpen('sessModal')) { if (sessEditingId) refreshSessionTimes(); else renderSessionList(); }
   renderAcct();
 }
 

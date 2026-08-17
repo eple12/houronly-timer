@@ -1264,6 +1264,18 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 .sess-legend { display: flex; flex-wrap: wrap; gap: 10px; margin: -2px 0 8px; }
 .sess-legend-item { display: inline-flex; align-items: center; font-size: 10.5px; color: var(--dim); }
 
+/* Per-session totals, each on its own calendar (see sessionStartDayKey). */
+.sess-cum { display: flex; flex-direction: column; gap: 10px; }
+.sess-cum-row { display: flex; align-items: center; gap: 4px; }
+.sess-cum-row .sess-inline-dot { margin-right: 5px; }
+.scr-body { flex: 1; min-width: 0; }
+.scr-name { font-size: 12.5px; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.scr-since { font-size: 10.5px; color: var(--dim); margin-top: 1px; }
+.scr-nums { display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; }
+.scr-total { font-family: 'Space Mono', monospace; font-size: 13px; color: var(--text); font-weight: 700; }
+.scr-avg { font-size: 10.5px; color: var(--dim); margin-top: 1px; white-space: nowrap; }
+
 #sessList { display: flex; flex-direction: column; gap: 8px; }
 .sess-row {
   display: flex; align-items: center; gap: 10px;
@@ -1288,9 +1300,17 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 .sess-edit:active { color: var(--text); }
 .sess-name-input { width: 100%; }
 .sess-edit-colors { margin-top: 0; }
-.sess-edit-actions { display: flex; gap: 8px; }
-.sess-edit-actions .acct-secondary { flex: 0 0 auto; color: var(--danger); }
-.sess-edit-actions .modal-confirm { flex: 1; margin: 0; }
+.sess-edit-actions { display: flex; gap: 8px; align-items: stretch; }
+/* .acct-secondary is width:100% by default, which on a narrow (portrait) sheet
+   squeezed 저장 down to a sliver. Size 삭제 to its text and let 저장 take the rest. */
+.sess-edit-actions .acct-secondary {
+  flex: 0 1 auto; width: auto; white-space: nowrap;
+  padding: 13px 16px; color: var(--danger);
+}
+.sess-edit-actions .modal-confirm {
+  flex: 1 1 auto; width: auto; min-width: 0; margin: 0;
+  padding: 13px 16px; white-space: nowrap;
+}
 /* "다른 세션에서 진행 중" note under the stopwatch's subject button */
 .sw-sess-note { display: flex; align-items: center; font-size: 10px; color: var(--dim);
   margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
