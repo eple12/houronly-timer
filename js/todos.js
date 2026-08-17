@@ -1,18 +1,31 @@
 // ── Session todo list ──────────────────────────────────────────
-// Sits under the goal list in the side panel and takes over the space when the
-// goals are folded away. Todos belong to a session, the same as goals and the
-// countdown above them, so switching sessions swaps the list.
+// Sits above the goal list in the side panel; both fold away, and whichever
+// stays open takes the freed space. Todos belong to a session, the same as
+// goals and the countdown, so switching sessions swaps the list.
 const todosSection = $('todosSection');
 let todoAdding = false;      // the inline "new todo" field is open
 let todoDraft  = '';         // survives a re-render while typing
+let todoCommitting = false;  // guards the blur that a re-render triggers
+let todoReorderMode = false; // when on, undone rows grow a drag pad
+let todosFolded = (() => { try { return localStorage.getItem(TODOS_FOLD_KEY) === '1'; } catch (e) { return false; } })();
+
+function setTodosFolded(v) {
+  todosFolded = !!v;
+  try { localStorage.setItem(TODOS_FOLD_KEY, todosFolded ? '1' : '0'); } catch (e) {}
+  if (todosFolded) { todoReorderMode = false; todoAdding = false; }
+  renderTodos();
+}
 
 function renderTodos() {
   if (!todosSection) return;
   const list = sessionTodos();
   const doneCount = list.filter(t => t.done).length;
+  const openCount = list.length - doneCount;
+  if (list.length < 2) todoReorderMode = false;
 
   const rows = list.map(t => `
-    <div class="todo-row${t.done ? ' done' : ''}" data-tid="${escHtml(t.id)}">
+    <div class="todo-row${t.done ? ' done' : ''}" data-tid="${escHtml(t.id)}" data-done="${t.done ? '1' : '0'}">
+      ${!t.done ? `<button class="todo-drag-handle" title="끌어서 순서 변경" tabindex="-1">${icoSm('grip')}</button>` : ''}
       <button class="todo-check" data-toggle="${escHtml(t.id)}" aria-label="완료">
         <span class="todo-box">${t.done ? ICONS.tick : ''}</span>
       </button>
@@ -21,13 +34,19 @@ function renderTodos() {
     </div>`).join('');
 
   todosSection.innerHTML = `
-    <div class="todo-head">
-      <span class="todo-title">할 일</span>
-      ${list.length ? `<span class="todo-count${doneCount === list.length ? ' all' : ''}">${doneCount}/${list.length}</span>` : ''}
-      ${doneCount ? `<button class="todo-clear" id="todoClear">완료 지우기</button>` : ''}
+    <div class="list-head">
+      <button class="list-fold${todosFolded ? ' folded' : ''}" id="todosFold"
+              title="${todosFolded ? '펼치기' : '접기'}">
+        ${icoSm('chevD')}<span>할 일</span>
+        ${list.length ? `<span class="list-count${doneCount === list.length ? ' all' : ''}">${doneCount}/${list.length}</span>` : ''}
+      </button>
+      ${!todosFolded && doneCount ? `<button class="todo-clear" id="todoClear">완료 지우기</button>` : ''}
+      ${!todosFolded && openCount > 1
+        ? `<button class="list-reorder-toggle${todoReorderMode ? ' on' : ''}" id="todoReorder" title="순서 변경">${icoSm('grip')}</button>`
+        : ''}
       <button class="todo-add-btn" id="todoAddBtn" title="할 일 추가">${icoSm('plus')}</button>
     </div>
-    <div class="todo-list">
+    <div class="todo-list${todoReorderMode ? ' reordering' : ''}${todosFolded ? ' folded' : ''}" id="todoList">
       ${rows || (todoAdding ? '' : '<div class="todo-empty">+ 를 눌러 할 일을 추가하세요</div>')}
       ${todoAdding ? `<div class="todo-row adding">
           <span class="todo-box ghost"></span>
@@ -37,14 +56,22 @@ function renderTodos() {
         </div>` : ''}
     </div>`;
 
+  const fold = $('todosFold');
+  if (fold) fold.addEventListener('click', () => setTodosFolded(!todosFolded));
   const addBtn = $('todoAddBtn');
   if (addBtn) addBtn.addEventListener('click', () => {
+    if (todosFolded) setTodosFolded(false);      // adding into a folded list would hide the result
     todoAdding = !todoAdding; todoDraft = '';
     renderTodos();
-    if (todoAdding && $('todoInput')) $('todoInput').focus();
+    const inp = $('todoInput');
+    if (inp) inp.focus();
   });
+  if (todosFolded) return;
+
   const clear = $('todoClear');
   if (clear) clear.addEventListener('click', clearDoneTodos);
+  const reorder = $('todoReorder');
+  if (reorder) reorder.addEventListener('click', () => { todoReorderMode = !todoReorderMode; renderTodos(); });
 
   todosSection.querySelectorAll('[data-toggle]').forEach(b =>
     b.addEventListener('click', () => toggleTodo(b.dataset.toggle)));
@@ -52,34 +79,56 @@ function renderTodos() {
     b.addEventListener('click', () => removeTodo(b.dataset.del)));
   // Tapping the label toggles too — the checkbox alone is a small target.
   todosSection.querySelectorAll('.todo-text').forEach(el =>
-    el.addEventListener('click', () => toggleTodo(el.closest('.todo-row').dataset.tid)));
+    el.addEventListener('click', () => {
+      if (todoReorderMode) return;
+      toggleTodo(el.closest('.todo-row').dataset.tid);
+    }));
+  if (todoReorderMode) {
+    todosSection.querySelectorAll('.todo-drag-handle').forEach(h =>
+      h.addEventListener('pointerdown', e => beginTodoDrag(e, h)));
+  }
 
   const input = $('todoInput');
   if (input) {
     input.addEventListener('input', () => { todoDraft = input.value; });
     input.addEventListener('keydown', e => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        // Keep the field open so a list can be typed straight through.
-        if (addTodo(input.value)) { todoDraft = ''; renderTodos(); $('todoInput').focus(); }
-      } else if (e.key === 'Escape') {
-        todoAdding = false; todoDraft = ''; renderTodos();
-      }
+      if (e.key === 'Enter') { e.preventDefault(); commitTodoInput(input, true); }
+      else if (e.key === 'Escape') { todoAdding = false; todoDraft = ''; renderTodos(); }
     });
+    // Leaving the field commits what's in it and closes. Re-rendering detaches
+    // this input, which fires blur on the way out — todoCommitting keeps that
+    // from adding the same text a second time.
     input.addEventListener('blur', () => {
-      // Leaving an empty field closes it; text is kept and committed.
-      if (input.value.trim()) { addTodo(input.value); todoDraft = ''; }
-      todoAdding = false;
-      setTimeout(renderTodos, 0);
+      if (todoCommitting) return;
+      commitTodoInput(input, false);
     });
   }
+  const cancel = $('todoAddCancel');
+  if (cancel) cancel.addEventListener('mousedown', e => {
+    e.preventDefault();                       // don't blur-commit before we close
+    todoAdding = false; todoDraft = ''; renderTodos();
+  });
+}
+
+// `keepOpen` is Enter: add and leave a fresh field focused so a list can be
+// typed straight through. Otherwise (blur) add and close.
+function commitTodoInput(input, keepOpen) {
+  const text = input.value;
+  todoCommitting = true;
+  input.value = '';                 // belt and braces: nothing left for blur to re-add
+  todoDraft = '';
+  const added = addTodo(text);
+  if (!keepOpen) todoAdding = false;
+  if (keepOpen && !added) { todoCommitting = false; return; }   // empty Enter: no-op
+  renderTodos();
+  todoCommitting = false;
+  if (keepOpen) { const next = $('todoInput'); if (next) next.focus(); }
 }
 
 function addTodo(text) {
   const t = (text || '').trim().slice(0, 80);
   if (!t) return false;
-  const mine = sessionTodos();
-  const maxOrd = mine.reduce((m, x) => Math.max(m, Number.isFinite(x.order) ? x.order : -1), -1);
+  const maxOrd = sessionTodos().reduce((m, x) => Math.max(m, Number.isFinite(x.order) ? x.order : -1), -1);
   const now = stamp();
   todos.push({ id: uid(), sid: curSessionId(), t, done: false,
                at: now, doneAt: 0, order: maxOrd + 1, orderAt: now });
@@ -117,4 +166,21 @@ function clearDoneTodos() {
       flushSyncSoon();
     },
     { yes: '지우기', danger: true });
+}
+
+// Only the unfinished rows are draggable — ticked ones sit at the bottom by
+// rule, so letting one be dragged above them would just snap back.
+function beginTodoDrag(e, handle) {
+  const list = $('todoList');
+  const rows = [...list.querySelectorAll('.todo-row[data-done="0"]')];
+  beginRowDrag(e, handle, '.todo-row', rows, list, (fromIdx, toIdx) => {
+    const open = sessionTodos().filter(t => !t.done);
+    const [moved] = open.splice(fromIdx, 1);
+    open.splice(toIdx, 0, moved);
+    const now = stamp();
+    open.forEach((t, i) => { t.order = i; t.orderAt = now; });
+    saveTodos();
+    renderTodos();
+    flushSyncSoon();
+  });
 }

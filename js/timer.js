@@ -70,13 +70,13 @@ function renderGoals() {
   if (list.length < 2) goalReorderMode = false;
   if (list.length === 0) { wrap.innerHTML = ''; return; }
   wrap.innerHTML =
-    `<div class="goals-section-label">
-       <button class="goals-fold${goalsFolded ? ' folded' : ''}" id="goalsFold"
+    `<div class="list-head">
+       <button class="list-fold${goalsFolded ? ' folded' : ''}" id="goalsFold"
                title="${goalsFolded ? '펼치기' : '접기'}">
-         ${icoSm('chevD')}<span>목표</span><span class="goals-count">${list.length}</span>
+         ${icoSm('chevD')}<span>목표</span><span class="list-count">${list.length}</span>
        </button>
        ${!goalsFolded && list.length > 1
-         ? `<button class="goal-reorder-toggle${goalReorderMode ? ' on' : ''}" id="goalsReorderToggle" title="순서 변경">${icoSm('grip')}</button>`
+         ? `<button class="list-reorder-toggle${goalReorderMode ? ' on' : ''}" id="goalsReorderToggle" title="순서 변경">${icoSm('grip')}</button>`
          : ''}
      </div>
      <div class="goals-list${goalReorderMode ? ' reordering' : ''}${goalsFolded ? ' folded' : ''}" id="goalsList">` +
@@ -117,49 +117,9 @@ function renderGoals() {
   }
 }
 
-// Pointer-based drag reordering, the same mechanic as the note list: the row
-// follows the finger while its neighbours slide open a gap at the target slot.
 function beginGoalDrag(e, handle) {
-  if (e.button != null && e.button !== 0) return;
-  e.preventDefault();
-  const list    = $('goalsList');
-  const row     = handle.closest('.goal-item');
-  const rows    = [...list.querySelectorAll('.goal-item')];
-  const fromIdx = rows.indexOf(row);
-  const rect    = row.getBoundingClientRect();
-  const gap     = parseFloat(getComputedStyle(list).rowGap) || 6;
-  const step    = rect.height + gap;
-  const startY  = e.clientY;
-  let toIdx     = fromIdx;
-
-  row.classList.add('goal-dragging');
-  try { handle.setPointerCapture(e.pointerId); } catch (err) {}
-
-  function onMove(ev) {
-    const dy = ev.clientY - startY;
-    row.style.transform = `translateY(${dy}px)`;
-    const nt = Math.max(0, Math.min(rows.length - 1, fromIdx + Math.round(dy / step)));
-    if (nt === toIdx) return;
-    toIdx = nt;
-    rows.forEach((r, i) => {
-      if (r === row) return;
-      let shift = 0;
-      if (fromIdx < toIdx && i > fromIdx && i <= toIdx) shift = -step;
-      else if (fromIdx > toIdx && i >= toIdx && i < fromIdx) shift = step;
-      r.style.transform = shift ? `translateY(${shift}px)` : '';
-    });
-  }
-  function onUp() {
-    document.removeEventListener('pointermove', onMove);
-    document.removeEventListener('pointerup', onUp);
-    document.removeEventListener('pointercancel', onUp);
-    rows.forEach(r => { r.style.transform = ''; });
-    row.classList.remove('goal-dragging');
-    if (toIdx !== fromIdx) commitGoalReorder(fromIdx, toIdx);
-  }
-  document.addEventListener('pointermove', onMove);
-  document.addEventListener('pointerup', onUp);
-  document.addEventListener('pointercancel', onUp);
+  const list = $('goalsList');
+  beginRowDrag(e, handle, '.goal-item', [...list.querySelectorAll('.goal-item')], list, commitGoalReorder);
 }
 // Renumber this session's goals and stamp the move, so the new order syncs
 // without disturbing the goals themselves.

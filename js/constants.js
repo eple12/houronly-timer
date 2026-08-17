@@ -7,6 +7,7 @@ const TOMB_KEY  = 'timer_tomb_v1';   // deletion tombstones: { id: deletedAt }
 // Whether the goal list is folded away. A view preference, so it stays on this
 // device rather than syncing — collapsing here shouldn't fold it on your phone.
 const GOALS_FOLD_KEY = 'timer_goals_folded';
+const TODOS_FOLD_KEY = 'timer_todos_folded';
 
 // Zero-padding helper (used by the day-key functions in model.js, so it has to
 // be defined before anything that runs at load time).
@@ -141,6 +142,53 @@ const missingEls = [];
 // Null-safe "is this modal open?" — called from the once-a-second loop, where a
 // missing element would otherwise throw on every tick.
 const isModalOpen = id => { const m = $(id); return !!m && m.classList.contains('open'); };
+
+// ── Shared pointer-drag reordering ─────────────────────────────
+// Used by the goal and todo lists. The dragged row follows the finger while its
+// neighbours slide to open a gap at the target slot; on release the caller
+// renumbers. `rows` is the draggable group in display order — passing a subset
+// is how a row is stopped from crossing into another group (e.g. a todo can't
+// be dragged past the finished ones, which sit at the bottom by rule).
+function beginRowDrag(e, handle, rowSel, rows, listEl, onDrop) {
+  if (e.button != null && e.button !== 0) return;
+  e.preventDefault();
+  const row = handle.closest(rowSel);
+  const fromIdx = rows.indexOf(row);
+  if (fromIdx < 0) return;
+  const gap = parseFloat(getComputedStyle(listEl).rowGap) || 6;
+  const step = row.getBoundingClientRect().height + gap;
+  const startY = e.clientY;
+  let toIdx = fromIdx;
+
+  row.classList.add('row-dragging');
+  try { handle.setPointerCapture(e.pointerId); } catch (err) {}
+
+  function onMove(ev) {
+    const dy = ev.clientY - startY;
+    row.style.transform = `translateY(${dy}px)`;
+    const nt = Math.max(0, Math.min(rows.length - 1, fromIdx + Math.round(dy / step)));
+    if (nt === toIdx) return;
+    toIdx = nt;
+    rows.forEach((r, i) => {
+      if (r === row) return;
+      let shift = 0;
+      if (fromIdx < toIdx && i > fromIdx && i <= toIdx) shift = -step;
+      else if (fromIdx > toIdx && i >= toIdx && i < fromIdx) shift = step;
+      r.style.transform = shift ? `translateY(${shift}px)` : '';
+    });
+  }
+  function onUp() {
+    document.removeEventListener('pointermove', onMove);
+    document.removeEventListener('pointerup', onUp);
+    document.removeEventListener('pointercancel', onUp);
+    rows.forEach(r => { r.style.transform = ''; });
+    row.classList.remove('row-dragging');
+    if (toIdx !== fromIdx) onDrop(fromIdx, toIdx);
+  }
+  document.addEventListener('pointermove', onMove);
+  document.addEventListener('pointerup', onUp);
+  document.addEventListener('pointercancel', onUp);
+}
 
 // ── Monochrome line/area icons (currentColor, transparent bg) ──
 const ICONS = {

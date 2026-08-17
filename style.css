@@ -437,47 +437,51 @@ svg.ico-sm { width: 1em; height: 1em; display: inline-block; vertical-align: -0.
 }
 .goals-wrap::-webkit-scrollbar { display: none; }
 .goals-wrap:empty { padding: 0; }   /* still grows (pins controls to bottom), just no padding */
-.goals-section-label {
+/* Shared section header for the 할 일 / 목표 lists in the side panel. */
+.list-head {
   position: sticky;
   top: 0;
   background: var(--bg);
   padding: 10px 0 4px;
   z-index: 1;
-  font-size: 9px;
-  letter-spacing: 0.22em;
+  font-size: 11px;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--dim);
+  color: var(--sub);
   margin-bottom: 2px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 7px;
 }
-/* Fold control: the whole "목표 (n)" label is the hit target. */
-.goals-fold {
-  display: inline-flex; align-items: center; gap: 5px;
+/* Fold control: the whole "목표 3" label is the hit target. */
+.list-fold {
+  display: inline-flex; align-items: center; gap: 6px;
   background: none; border: none; padding: 0; cursor: pointer;
   color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit;
   -webkit-appearance: none;
 }
-.goals-fold .ico { width: 13px; height: 13px; transition: transform 0.2s cubic-bezier(0.2,0.7,0.2,1); }
-.goals-fold.folded .ico { transform: rotate(-90deg); }
-.goals-fold .goals-count {
-  font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: 0;
+.list-fold .ico { width: 14px; height: 14px; flex-shrink: 0;
+  transition: transform 0.2s cubic-bezier(0.2,0.7,0.2,1); }
+.list-fold.folded .ico { transform: rotate(-90deg); }
+.list-count {
+  font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: 0;
   color: var(--sub); background: var(--surf2); border-radius: 999px;
-  padding: 1px 6px; min-width: 16px; text-align: center;
+  padding: 1px 7px; min-width: 18px; text-align: center;
 }
-.goals-list.folded { display: none; }
+.list-count.all { color: var(--on-accent); background: var(--accent); }
+.goals-list.folded, .todo-list.folded { display: none; }
 
-/* Reorder toggle beside the 목표 label — same affordance as the notes list. */
-.goal-reorder-toggle {
+/* Reorder toggle beside the label — same affordance as the notes list. */
+.list-reorder-toggle {
   background: none; border: 1px solid transparent; border-radius: 7px;
   color: var(--dim); cursor: pointer; padding: 2px 5px; -webkit-appearance: none;
   display: inline-flex; align-items: center; justify-content: center;
   transition: color 0.15s, background 0.15s, border-color 0.15s;
 }
-.goal-reorder-toggle.on { color: var(--accent); border-color: var(--accent);
+.list-reorder-toggle.on { color: var(--accent); border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 10%, transparent); }
+/* First control after the fold label pushes the rest to the right edge. */
+.list-head > .list-fold + * { margin-left: auto; }
 .goals-list { display: flex; flex-direction: column; gap: 6px; }
 .goal-item {
   position: relative;
@@ -504,44 +508,52 @@ svg.ico-sm { width: 1em; height: 1em; display: inline-block; vertical-align: -0.
 .goal-drag-handle:active { cursor: grabbing; color: var(--sub); }
 .goals-list.reordering .goal-item { padding-left: 36px; }
 .goals-list.reordering .goal-drag-handle { opacity: 1; transform: none; pointer-events: auto; }
-.goal-item.goal-dragging { transition: none; z-index: 5; overflow: visible;
-  background: var(--surf2); box-shadow: 0 10px 26px rgba(0,0,0,0.5); opacity: 0.97; }
+/* Dragged row (goals and todos share beginRowDrag). */
+.goal-item.row-dragging, .todo-row.row-dragging {
+  transition: none; z-index: 5; overflow: visible;
+  background: var(--surf2); box-shadow: 0 10px 26px rgba(0,0,0,0.5); opacity: 0.97;
+}
 
 /* ── Todo checklist (shares the goals' scroll region) ────────── */
 #goalsSection, #todosSection { display: flex; flex-direction: column; gap: 6px; }
-#todosSection:empty { display: none; }
-.todo-head {
-  position: sticky; top: 0; background: var(--bg); z-index: 1;
-  display: flex; align-items: center; gap: 7px;
-  padding: 10px 0 4px; margin-bottom: 2px;
-  font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--dim);
-}
-.todo-count {
-  font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: 0;
-  color: var(--sub); background: var(--surf2); border-radius: 999px; padding: 1px 6px;
-}
-.todo-count.all { color: var(--on-accent); background: var(--accent); }
+#goalsSection:empty, #todosSection:empty { display: none; }
 .todo-clear {
-  margin-left: auto; background: none; border: none; padding: 2px 4px;
-  color: var(--dim); font-family: 'Noto Sans KR', sans-serif; font-size: 9.5px;
+  background: none; border: none; padding: 2px 4px;
+  color: var(--dim); font-family: 'Noto Sans KR', sans-serif; font-size: 10.5px;
   letter-spacing: 0; cursor: pointer; -webkit-appearance: none; white-space: nowrap;
 }
 .todo-clear:active { color: var(--danger); }
 .todo-add-btn {
-  margin-left: auto; background: none; border: 1px solid var(--bord2); border-radius: 7px;
+  background: none; border: 1px solid var(--bord2); border-radius: 7px;
   color: var(--sub); cursor: pointer; padding: 2px 6px; -webkit-appearance: none;
   display: inline-flex; align-items: center; justify-content: center;
   transition: color 0.15s, border-color 0.15s;
 }
-.todo-clear + .todo-add-btn { margin-left: 0; }
 .todo-add-btn:active { color: var(--accent); border-color: var(--accent); }
 .todo-list { display: flex; flex-direction: column; gap: 5px; }
 .todo-empty { font-size: 11px; color: var(--dim); padding: 2px 2px 4px; }
 .todo-row {
+  position: relative;
   display: flex; align-items: center; gap: 9px;
   padding: 8px 11px; background: var(--surface);
   border: 1px solid var(--border); border-radius: 9px;
+  transition: transform 0.16s cubic-bezier(0.2,0.7,0.2,1),
+              padding-left 0.22s cubic-bezier(0.2,0.7,0.2,1);
 }
+/* Handle overlays the left edge, hidden until reorder mode is on. */
+.todo-drag-handle {
+  position: absolute; left: 3px; top: 0; bottom: 0; width: 24px;
+  background: none; border: none; color: var(--dim); cursor: grab;
+  padding: 0; margin: 0; touch-action: none; -webkit-appearance: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  opacity: 0; transform: translateX(-10px); pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.22s cubic-bezier(0.2,0.7,0.2,1);
+}
+.todo-drag-handle:active { cursor: grabbing; color: var(--sub); }
+.todo-list.reordering .todo-row[data-done="0"] { padding-left: 32px; }
+.todo-list.reordering .todo-drag-handle { opacity: 1; transform: none; pointer-events: auto; }
+/* Ticked rows aren't draggable, so dim them while reordering to say so. */
+.todo-list.reordering .todo-row.done { opacity: 0.55; }
 .todo-check { background: none; border: none; padding: 0; cursor: pointer;
   flex-shrink: 0; display: inline-flex; -webkit-appearance: none; }
 .todo-box {
