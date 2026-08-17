@@ -8,8 +8,8 @@
 //   usernames/{nameLower}      { uid, name }
 //   groups/{gid}               { name, ownerUid, createdAt }
 //   groups/{gid}/members/{uid} { name, joinedAt }
-//   groups/{gid}/stats/{uid}   { name, day, todaySec, weekSec, subjects,
-//                                days, subj30, live, at }
+//   groups/{gid}/stats/{uid}   { name, day, todaySec, weekSec, subjects, days,
+//                                subj30, goalSec, resetHour, live, at }
 //   invites/{gid}__{toUid}     { gid, gname, fromUid, fromName, toUid, toName, at }
 const PROFILE_KEY = 'timer_profile_v1';   // { name } cached for instant display
 
@@ -168,11 +168,14 @@ async function declineInvite(inv) {
 }
 
 // ── Publishing my numbers ──────────────────────────────────────
-// What gets shared, and nothing else: daily totals for the last 90 days (what
+// What gets shared, and nothing else: daily totals for the last 18 weeks (what
 // a member's dashboard is drawn from), the per-subject split for today and the
-// last 30 days, and whether the stopwatch is running right now. Session names,
-// memos, goals and todos stay private. ~2KB at full history.
-const SHARE_DAYS = 90;   // history depth behind a member's dashboard
+// last 30 days, the daily-goal and day-start settings so their dashboard can
+// show the same gauge, and whether the stopwatch is running right now. Session
+// names and ids, memos, goals and todos stay private.
+// 18 weeks is what the heatmap draws, plus a few days so the grid's leading
+// week is complete however the anchor date falls.
+const SHARE_DAYS = 18 * 7 + 7;
 function myShareableStats() {
   const day = studyDayKey(Date.now());
   const t = totals();
@@ -206,6 +209,10 @@ function myShareableStats() {
     subjects,
     days,
     subj30,
+    // So a member's dashboard can show the same goal gauge and day-start as
+    // the owner's own: both are settings, not records.
+    goalSec: Math.floor(study.dailyGoalSec || 0),
+    resetHour: study.resetHour || 0,
     live: { on: !!runSid, since: runSid ? activeRunStart() : 0, subj: study.curSubject || '' },
     at: Date.now(),
   };
@@ -322,8 +329,11 @@ function dayKeyMinus(anchor, n) {
 }
 
 // ── One member's dashboard ─────────────────────────────────────
-// Built entirely from what they published; days are counted back from THEIR
-// reported day so a different reset hour doesn't shift the whole chart.
+// Mirrors the owner's own dashboard, minus the session split (sessions aren't
+// shared): the same cards, goal gauge, 14-day chart, 18-week heatmap, subject
+// bars and day-start row, all drawn from what they published. Days are counted
+// back from THEIR reported day, so a different reset hour doesn't shift the
+// whole chart by one.
 function memberDashHTML(m) {
   const s = m.stats;
   if (!s) return '<div class="acct-note">아직 공유된 기록이 없어요.</div>';
@@ -333,66 +343,145 @@ function memberDashHTML(m) {
   const sumLast = n => { let t = 0; for (let i = 0; i < n; i++) t += at(dayKeyMinus(anchor, i)); return t; };
 
   const today = isTodayish(s) ? (s.todaySec || 0) : 0;
-  const week = sumLast(7), month = sumLast(30);
-  const recorded = Object.values(days).filter(v => v > 0.5);
-  const total = recorded.reduce((a, v) => a + v, 0);
-  const best = recorded.reduce((mx, v) => Math.max(mx, v), 0);
+  const recorded = Object.entries(days).filter(([, v]) => v > 0.5);
+  const total = recorded.reduce((a, [, v]) => a + v, 0);
+  const best = recorded.reduce((mx, [, v]) => Math.max(mx, v), 0);
+  // Average over elapsed days since their first record — the same "start date"
+  // basis the owner's own cards use, since we have no session dates here.
+  const firstKey = recorded.map(([k]) => k).sort()[0] || anchor;
+  const elapsed = Math.max(1, Math.round((dayKeyToDate(anchor) - dayKeyToDate(firstKey)) / 86400000) + 1);
+  const avg = total / elapsed;
   let streak = 0;
   for (let i = (at(anchor) > 0.5 ? 0 : 1); at(dayKeyMinus(anchor, i)) > 0.5; i++) streak++;
 
-  // 14-day bars, oldest to newest.
+  // ── goal gauge (their daily goal, their today) ──
+  const goal = s.goalSec || 0;
+  const gaugePct = goal ? Math.min(100, today / goal * 100) : 0;
+  const gaugeHit = goal && today >= goal;
+  const gauge = goal ? `
+    <div class="chart-block">
+      <div class="chart-title"><span>오늘 목표 달성률</span></div>
+      <div class="goal-gauge ${gaugeHit ? 'hit' : ''}">
+        <div class="gg-top">
+          <span class="gg-pct">${Math.round(gaugePct)}%</span>
+          <span class="gg-sub">${fmt(today).slice(0,5)} / ${fmtHrs(goal)}${gaugeHit ? ' · 달성 🎉' : ''}</span>
+        </div>
+        <div class="gg-bar"><i style="width:${gaugePct.toFixed(1)}%"></i></div>
+      </div>
+    </div>` : '';
+
+  // ── last 14 days ──
   const N = 14, data = [];
   for (let i = N - 1; i >= 0; i--) {
     const k = dayKeyMinus(anchor, i), p = k.split('-');
     data.push({ k, sec: at(k), label: `${+p[1]}/${+p[2]}` });
   }
   const maxSec = Math.max(...data.map(d => d.sec), 1);
-  const W = 440, H = 140, padL = 4, padR = 4, padT = 10, padB = 20;
+  const W = 440, H = 150, padL = 4, padR = 4, padT = 12, padB = 20;
   const plotW = W - padL - padR, plotH = H - padT - padB, bw = plotW / N;
+  const avgY = padT + plotH - (avg / maxSec) * plotH;
   const bars = data.map((d, i) => {
     const bh = (d.sec / maxSec) * plotH;
     const x = padL + i * bw + bw * 0.18, w = bw * 0.64;
-    if (d.sec <= 0) return `<rect x="${x.toFixed(1)}" y="${(padT+plotH-2).toFixed(1)}" width="${w.toFixed(1)}" height="2" rx="1" fill="var(--surf2)"></rect>`;
-    return `<rect x="${x.toFixed(1)}" y="${(padT + plotH - bh).toFixed(1)}" width="${w.toFixed(1)}" height="${bh.toFixed(1)}" rx="2" fill="${i === N-1 ? 'var(--accent)' : 'color-mix(in srgb, var(--accent) 45%, var(--surf2))'}"></rect>`;
+    const fill = i === N - 1 ? 'var(--accent)'
+               : (d.sec > 0 ? 'color-mix(in srgb, var(--accent) 45%, var(--surf2))' : 'var(--surf2)');
+    return `<rect x="${x.toFixed(1)}" y="${(padT + plotH - bh).toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(0, bh).toFixed(1)}" rx="2" fill="${fill}"></rect>`;
   }).join('');
-  const labels = data.map((d, i) => i % 2 !== (N-1) % 2 ? '' :
+  const labels = data.map((d, i) => i % 2 !== (N - 1) % 2 ? '' :
     `<text x="${(padL + i*bw + bw/2).toFixed(1)}" y="${H-6}" fill="var(--dim)" font-size="9" text-anchor="middle" font-family="Space Mono">${d.label}</text>`).join('');
+  const avgLine = avg > 0
+    ? `<line x1="${padL}" y1="${avgY.toFixed(1)}" x2="${W-padR}" y2="${avgY.toFixed(1)}" stroke="var(--accent)" stroke-width="1" stroke-dasharray="4 3" opacity="0.8"></line>`
+    : '';
 
-  const subjToday = Object.entries(s.subjects || {}).sort((a, b) => b[1] - a[1]);
-  const subj30 = Object.entries(s.subj30 || {}).sort((a, b) => b[1] - a[1]).slice(0, 8);
-  const subjBars = list => {
-    const top = list.reduce((mx, [, v]) => Math.max(mx, v), 1);
-    return list.map(([n, v], i) => `
+  // ── 18-week heatmap, aligned to weekdays like the owner's own ──
+  const WEEKS = 18;
+  const base = dayKeyToDate(anchor);
+  const start = new Date(base);
+  start.setDate(start.getDate() - (WEEKS - 1) * 7 - base.getDay());
+  let hmax = 1;
+  const cells = [];
+  const cur = new Date(start);
+  for (let i = 0; i < WEEKS * 7; i++) {
+    const k = `${cur.getFullYear()}-${pad(cur.getMonth()+1)}-${pad(cur.getDate())}`;
+    const future = cur.getTime() > base.getTime();
+    const sec = future ? -1 : at(k);
+    if (sec > hmax) hmax = sec;
+    cells.push({ sec, future, label: `${cur.getMonth()+1}/${cur.getDate()}` });
+    cur.setDate(cur.getDate() + 1);
+  }
+  const heatBody = cells.map(c => {
+    if (c.future) return '<div class="heat-cell" style="visibility:hidden"></div>';
+    let bg = 'var(--surf2)';
+    if (c.sec > 0.5) {
+      const t = Math.min(1, c.sec / hmax);
+      bg = `color-mix(in srgb, var(--accent) ${Math.round((0.22 + 0.78*t)*100)}%, var(--surf2))`;
+    }
+    return `<div class="heat-cell" style="background:${bg}" title="${c.label} · ${fmtHrs(Math.max(0,c.sec))}"></div>`;
+  }).join('');
+  const legend = ['var(--surf2)','color-mix(in srgb, var(--accent) 35%, var(--surf2))',
+                  'color-mix(in srgb, var(--accent) 70%, var(--surf2))','var(--accent)']
+    .map(c => `<span class="hl-cell" style="background:${c}"></span>`).join('');
+
+  // ── subject bars (today, then the last 30 days) ──
+  const subjBars = (list, dayTotal) => {
+    const tagged = list.reduce((a, [, v]) => a + v, 0);
+    const rows = list.slice();
+    if (dayTotal != null && dayTotal - tagged >= 1) rows.push(['기타', dayTotal - tagged]);
+    const denom = Math.max(dayTotal != null ? dayTotal : 0, tagged, 1);
+    return rows.map(([n, v], i) => `
       <div class="subj-line">
         <div class="subj-line-top"><span class="sl-name">${escHtml(n)}</span>
           <div class="sl-right"><span class="sl-val">${fmt(v).slice(0,5)}</span></div></div>
-        <div class="subj-line-bar"><i style="width:${(v/top*100).toFixed(1)}%;background:${SUBJECT_COLORS[i % SUBJECT_COLORS.length]}"></i></div>
+        <div class="subj-line-bar"><i style="width:${Math.min(100, v/denom*100).toFixed(1)}%;background:${n === '기타' ? 'var(--dim)' : SUBJECT_COLORS[i % SUBJECT_COLORS.length]}"></i></div>
       </div>`).join('');
   };
+  const subjToday = Object.entries(s.subjects || {}).sort((a, b) => b[1] - a[1]);
+  const subj30 = Object.entries(s.subj30 || {}).sort((a, b) => b[1] - a[1]).slice(0, 10);
 
   return `
     <div class="stat-grid">
       <div class="stat-card"><div class="stat-label">오늘</div><div class="stat-value">${fmtHrs(today)}<small> ${fmt(today).slice(0,5)}</small></div></div>
+      <div class="stat-card"><div class="stat-label">일 평균</div><div class="stat-value">${fmtHrs(avg)}</div></div>
+      <div class="stat-card"><div class="stat-label">총 공부</div><div class="stat-value">${fmtHrs(total)}</div></div>
       <div class="stat-card"><div class="stat-label">연속 일수</div><div class="stat-value">${streak}<small> 일</small></div></div>
-      <div class="stat-card"><div class="stat-label">최근 7일</div><div class="stat-value">${fmtHrs(week)}</div></div>
-      <div class="stat-card"><div class="stat-label">최근 30일</div><div class="stat-value">${fmtHrs(month)}</div></div>
     </div>
-    <div class="chart-block">
-      <div class="chart-title"><span>최근 14일</span></div>
-      <svg class="chart-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${bars}${labels}</svg>
+
+    ${gauge}
+
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-label">최근 7일</div><div class="stat-value">${fmtHrs(sumLast(7))}</div></div>
+      <div class="stat-card"><div class="stat-label">최근 30일</div><div class="stat-value">${fmtHrs(sumLast(30))}</div></div>
     </div>
-    ${subjToday.length ? `<div class="chart-block">
+
+    ${subjToday.length || today >= 1 ? `<div class="chart-block">
       <div class="chart-title"><span>오늘 과목별</span></div>
-      <div class="subj-break">${subjBars(subjToday)}</div>
+      <div class="subj-break">${subjBars(subjToday, today)}</div>
     </div>` : ''}
+
+    <div class="chart-block">
+      <div class="chart-title">
+        <span>최근 14일</span>
+        <span class="legend-avg"><span class="legend-dash"></span>평균 ${fmtHrs(avg)}</span>
+      </div>
+      <svg class="chart-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${avgLine}${bars}${labels}</svg>
+    </div>
+
+    <div class="chart-block">
+      <div class="chart-title"><span>최근 18주</span></div>
+      <div class="heat-wrap"><div class="heat">${heatBody}</div></div>
+      <div class="heat-legend">적음 ${legend} 많음</div>
+    </div>
+
     ${subj30.length ? `<div class="chart-block">
       <div class="chart-title"><span>최근 30일 과목별</span></div>
-      <div class="subj-break">${subjBars(subj30)}</div>
+      <div class="subj-break">${subjBars(subj30, null)}</div>
     </div>` : ''}
+
     <div class="stat-grid">
       <div class="stat-card"><div class="stat-label">하루 최대</div><div class="stat-value">${fmtHrs(best)}</div></div>
-      <div class="stat-card"><div class="stat-label">기록 합계</div><div class="stat-value">${fmtHrs(total)}</div></div>
+      <div class="stat-card"><div class="stat-label">하루 시작 시각</div><div class="stat-value">${pad(s.resetHour || 0)}<small>:00</small></div></div>
     </div>
+
     <div class="fr-hint">${escHtml(m.name)} 님이 공유한 기록 · ${fmtAgo(s.at)} 갱신</div>`;
 }
 function renderFriends() {
