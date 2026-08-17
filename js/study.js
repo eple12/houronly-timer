@@ -19,6 +19,7 @@ function toggleStopwatch() {
   // Propagate start/stop promptly instead of waiting out the debounce.
   flushSyncSoon();
   shareStats(true);   // group members see 공부 중 flip right away
+  refreshStudyingNote();
 }
 
 // Returning to the foreground: the ledger already holds the truth, so there is
@@ -45,23 +46,14 @@ function notifyDayEnd(dayKey) {
   const avg = others.length ? others.reduce((a,b)=>a+b,0) / others.length : 0;
   const diff = sec - avg;
   const sign = diff >= 0 ? '+' : '−';
-  const body = `오늘 ${fmtHrs(sec)} · 평균 ${fmtHrs(avg)} (${sign}${fmtHrs(Math.abs(diff))})`;
-  notify('하루 공부 기록', body);
+  const bits = [`공부 ${fmtHrs(sec)}`, `평균 ${fmtHrs(avg)} (${sign}${fmtHrs(Math.abs(diff))})`];
+  // The current session's countdown, as a D-day, if it has one.
+  const dd = dDayNum();
+  if (dd !== null) bits.unshift(dd > 0 ? `D-${dd}` : dd === 0 ? 'D-DAY' : `D+${-dd}`);
+  showNote(NOTE_TAGS.dayEnd, '하루 공부 기록', bits.join(' · '), { sticky: true });
 }
 
-// ── Notifications ──────────────────────────────────────────────
-function requestNotifyPermission() {
-  if ('Notification' in window && Notification.permission === 'default') {
-    try { Notification.requestPermission(); } catch(e) {}
-  }
-}
-function notify(title, body) {
-  if ('Notification' in window && Notification.permission === 'granted') {
-    try { new Notification(title, { body }); showToast(`${title} · ${body}`); return; }
-    catch(e) {}
-  }
-  showToast(`${title} · ${body}`);
-}
+// Notifications live in js/notify.js (they need the service worker).
 let toastTimer = null;
 function showToast(msg) {
   const t = $('toast');

@@ -453,6 +453,7 @@ function applyLive(notesChanged) {
   updateStudyUI();
   // Only rebuild the memo card when the notes themselves changed — otherwise a
   // study-only sync would replay its open/close animation and look like a flicker.
+  if (typeof refreshStudyingNote === 'function') refreshStudyingNote();
   if (notesChanged !== false) renderMemoWidget();
   const isOpen = id => { const m = $(id); return !!m && m.classList.contains('open'); };
   if (isOpen('dashModal'))  renderDashboard();

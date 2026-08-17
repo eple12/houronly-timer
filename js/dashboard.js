@@ -750,6 +750,16 @@ function renderSettings() {
     <div class="set-section">
       <div class="setting-row">
         <div class="sr-text">
+          <div class="sr-label">알림</div>
+          <div class="sr-sub">${notifySubText()}</div>
+        </div>
+        ${notifyBtnHTML()}
+      </div>
+    </div>
+
+    <div class="set-section">
+      <div class="setting-row">
+        <div class="sr-text">
           <div class="sr-label">캐시 비우고 새로고침</div>
           <div class="sr-sub">앱이 최신 버전으로 안 보일 때 캐시를 지우고 다시 불러와요 (저장된 기록·메모는 유지)</div>
         </div>
@@ -781,6 +791,35 @@ function renderSettings() {
   bindPomo('pomoFocus','focus',1,180); bindPomo('pomoShort','short',1,60);
   bindPomo('pomoLong','long',1,60);    bindPomo('pomoSets','sets',1,12);
   $('cacheReset').addEventListener('click', fullCacheRefresh);
+  const nb = $('notifyBtn');
+  if (nb) nb.addEventListener('click', async () => {
+    if (notifyState() === 'default') {
+      await requestNotifyPermission();
+      renderSettings();                                   // repaint with the new state
+      if (notifyState() === 'granted') refreshStudyingNote();
+      return;
+    }
+    const ok = await showNote('test', '알림 테스트', '이렇게 보이면 정상이에요', { quiet: true });
+    showToast(ok ? '알림을 보냈어요' : '알림을 보낼 수 없어요');
+  });
+}
+
+// ── Notification permission, surfaced in settings ───────────────
+// Without this the only symptom of a blocked permission is "notifications just
+// don't appear", which is impossible for a user to diagnose.
+function notifySubText() {
+  switch (notifyState()) {
+    case 'granted': return '타이머 종료, 공부 시작, 초대, 하루 마감 알림을 보냅니다';
+    case 'denied':  return '브라우저에서 차단했어요. 사이트 설정에서 알림을 허용해 주세요';
+    case 'unsupported': return '이 기기에서는 알림을 지원하지 않아요';
+    default: return '타이머 종료·초대·하루 마감 등을 알려드릴 수 있어요';
+  }
+}
+function notifyBtnHTML() {
+  const st = notifyState();
+  if (st === 'unsupported') return '';
+  if (st === 'denied') return `<button class="acct-secondary" disabled>차단됨</button>`;
+  return `<button class="acct-secondary" id="notifyBtn">${st === 'granted' ? '테스트' : '허용'}</button>`;
 }
 
 // Clear cached app assets (Cache Storage + any service worker) and hard-reload

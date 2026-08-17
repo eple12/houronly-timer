@@ -1155,6 +1155,12 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 .note-row-del { background: none; border: none; color: var(--dim); font-size: 14px;
   cursor: pointer; padding: 4px 2px; flex-shrink: 0; -webkit-appearance: none; }
 .note-row-del:active { color: var(--danger); }
+/* Sits right next to 삭제, so it gets a slightly taller tap target than the
+   icon needs — the row has the height to spare and a mis-tap here is annoying. */
+.note-row-bell { background: none; border: none; color: var(--dim);
+  cursor: pointer; padding: 8px 6px; flex-shrink: 0; -webkit-appearance: none;
+  display: inline-flex; align-items: center; justify-content: center; transition: color 0.15s; }
+.note-row-bell:active { color: var(--accent); }
 .notes-empty { font-size: 13px; color: var(--dim); text-align: center; padding: 22px 0; }
 
 .note-pin-row { display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--sub); cursor: pointer; }

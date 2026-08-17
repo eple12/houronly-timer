@@ -308,6 +308,8 @@ function startTick() {
       const endedAt = goalEpoch;
       goalEpoch = null;
       if ('vibrate' in navigator) navigator.vibrate([400,200,400,200,400]);
+      showNote(NOTE_TAGS.timer, `${curSession().name} 타이머 종료`,
+               `${fmt(totalSeconds)} 완료`, { sticky: true });
       // Stamp the finish with the moment it was due, not "now": every device
       // then derives an identical end state instead of racing to claim it.
       render(); save(endedAt);

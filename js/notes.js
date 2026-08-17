@@ -146,6 +146,25 @@ function plainNoteText(raw) {
     })
     .join(' ').replace(/\s+/g, ' ').trim();
 }
+// Put a memo straight into the notification tray, so a checklist or a note can
+// sit where you'll see it without the app open. Tagged per note, so pushing the
+// same one again replaces it rather than stacking up.
+async function pushNoteToNotification(id) {
+  const n = notes.find(x => x.id === id);
+  if (!n) return;
+  const state = await requestNotifyPermission();
+  if (state !== 'granted') {
+    showToast(state === 'denied' ? '알림이 차단되어 있어요. 브라우저 설정에서 허용해 주세요.'
+                                 : '알림 권한이 필요해요');
+    return;
+  }
+  const body = n.type === 'list'
+    ? checkItems(n).map(i => `${i.done ? '☑' : '☐'} ${i.t}`).join('\n') || '항목 없음'
+    : plainNoteText(n.text) || '내용 없음';
+  const ok = await showNote('memo-' + n.id, n.title || '메모', body.slice(0, 400),
+                            { sticky: true, quiet: true });
+  showToast(ok ? '알림으로 띄웠어요' : '알림을 띄울 수 없어요');
+}
 function notePreviewText(n) {
   if (n.type === 'list') {
     const items = checkItems(n);
@@ -396,7 +415,8 @@ function renderNotesList() {
            <button class="note-confirm-yes" data-del="${n.id}">삭제</button>
            <button class="note-confirm-no" data-cancel="${n.id}">취소</button>
          </div>`
-      : `<button class="note-row-del" data-del="${n.id}" title="삭제">${ICONS.trash}</button>`;
+      : `<button class="note-row-bell" data-bell="${n.id}" title="알림으로 띄우기">${icoSm('bell')}</button>
+         <button class="note-row-del" data-del="${n.id}" title="삭제">${ICONS.trash}</button>`;
     return `<div class="note-row${confirmDeleteId === n.id ? ' confirming' : ''}" data-id="${n.id}" data-pinned="${n.pinned ? '1' : '0'}">
        <button class="note-drag-handle" title="끌어서 순서 변경" tabindex="-1">${ICONS.grip}</button>
        <div class="note-row-body">
@@ -408,7 +428,8 @@ function renderNotesList() {
   }).join('');
   list.querySelectorAll('.note-row').forEach(r => {
     r.addEventListener('click', e => {
-      if (e.target.closest('.note-row-del') || e.target.closest('.note-drag-handle') || e.target.closest('.note-row-confirm')) return;
+      if (e.target.closest('.note-row-del') || e.target.closest('.note-row-bell') ||
+          e.target.closest('.note-drag-handle') || e.target.closest('.note-row-confirm')) return;
       if (noteReorderMode) return;                    // reorder mode: a row tap shouldn't open the editor
       if (confirmDeleteId != null) { confirmDeleteId = null; renderNotesList(); return; }  // a stray tap cancels a pending delete
       openNoteEditor(r.dataset.id);
@@ -417,6 +438,8 @@ function renderNotesList() {
   if (noteReorderMode) enableNoteDrag(list);
   list.querySelectorAll('.note-row-del').forEach(b =>
     b.addEventListener('click', () => { confirmDeleteId = b.dataset.del; renderNotesList(); }));
+  list.querySelectorAll('.note-row-bell').forEach(b =>
+    b.addEventListener('click', () => pushNoteToNotification(b.dataset.bell)));
   list.querySelectorAll('.note-confirm-yes').forEach(b =>
     b.addEventListener('click', () => {
       const delId = b.dataset.del;

@@ -142,12 +142,25 @@ async function loadMyInvites() {
 // Watch for invites arriving while the app is open, so the badge appears the
 // moment a friend sends one instead of on the next reload.
 let inviteUnsub = null;
+let seenInviteIds = null;      // null until the first snapshot lands
 function watchInvites() {
   if (inviteUnsub) { try { inviteUnsub(); } catch (e) {} inviteUnsub = null; }
+  seenInviteIds = null;
   if (!fsReady()) return;
   inviteUnsub = db.collection('invites').where('toUid', '==', cloudUid)
     .onSnapshot(snap => {
       myInvites = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+      // Notify only for invites that arrive while we're running. The first
+      // snapshot is whatever was already waiting, so it seeds the set quietly
+      // instead of firing a notification per old invite on every launch.
+      const ids = new Set(myInvites.map(i => i.id));
+      if (seenInviteIds) {
+        myInvites.filter(i => !seenInviteIds.has(i.id)).forEach(i =>
+          showNote('invite-' + i.id, '스터디 그룹 초대',
+                   `${i.fromName || '누군가'} 님이 '${i.gname || '그룹'}'에 초대했어요`,
+                   { sticky: true }));
+      }
+      seenInviteIds = ids;
       renderFriendsBadge();
       // Only repaint the list view; a group or member view shouldn't jump away.
       if (isModalOpen('friendsModal') && !openGroupId) renderFriends();
