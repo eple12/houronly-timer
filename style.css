@@ -182,7 +182,10 @@ svg.ico-sm { width: 1em; height: 1em; display: inline-block; vertical-align: -0.
   font-family: 'Space Mono', monospace;
   /* min(vw,vh) keeps the clock within BOTH dimensions, so it never gets
      clipped in landscape; sized to clear the corner buttons horizontally. */
-  font-size: clamp(42px, min(13.5vw, 18vh), 100px);
+  /* --clock-fit is set in render(): the clock is monospace, so a 5-digit hour
+     count is wider than the column it sits in (worst on a landscape tablet,
+     where it only gets half the width). Scaling the type keeps it inside. */
+  font-size: calc(clamp(42px, min(13.5vw, 18vh), 100px) * var(--clock-fit, 1));
   font-weight: 700;
   letter-spacing: -3px;
   line-height: 1;
@@ -194,7 +197,7 @@ svg.ico-sm { width: 1em; height: 1em; display: inline-block; vertical-align: -0.
 }
 /* In-app browsers (Instagram / Facebook) render cramped; shrink the big
    monospace numbers a notch so the clock and study-time fit comfortably. */
-.inapp .time-display { font-size: clamp(36px, min(11vw, 15vh), 84px); }
+.inapp .time-display { font-size: calc(clamp(36px, min(11vw, 15vh), 84px) * var(--clock-fit, 1)); }
 .time-display.done      { color: var(--danger); animation: pulse 1.1s ease-in-out infinite; }
 .time-display.emergency { color: var(--emg-a);  animation: flicker 0.9s ease-in-out infinite; }
 @keyframes pulse   { 0%,100%{opacity:1} 50%{opacity:0.28} }
@@ -239,7 +242,7 @@ svg.ico-sm { width: 1em; height: 1em; display: inline-block; vertical-align: -0.
   width: 0%;
   transition: width 0.5s linear;
 }
-.progress-fill.running   { box-shadow: 0 0 10px rgba(206,242,49,0.45); }
+.progress-fill.running   { box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 45%, transparent); }
 .progress-fill.emergency { background: var(--emg-a); box-shadow: 0 0 10px rgba(255,107,26,0.45); }
 
 /* Day boundary ticks (local midnight) */
@@ -374,7 +377,7 @@ svg.ico-sm { width: 1em; height: 1em; display: inline-block; vertical-align: -0.
   background: var(--accent);
   border-color: var(--accent);
   color: #0a0a0a;
-  box-shadow: 0 0 12px rgba(206,242,49,0.4);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 40%, transparent);
 }
 .sw-info { flex: 1; min-width: 0; overflow: hidden; }
 .sw-label {
@@ -525,7 +528,7 @@ svg.ico-sm { width: 1em; height: 1em; display: inline-block; vertical-align: -0.
   white-space: nowrap;
   -webkit-appearance: none;
 }
-.preset-btn:active { color: var(--accent); border-color: var(--accent); background: rgba(206,242,49,0.06); }
+.preset-btn:active { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, transparent); }
 .input-row { display: flex; gap: 6px; align-items: center; }
 .input-group { flex: 1; display: flex; flex-direction: column; gap: 4px; }
 .input-group label {
@@ -661,7 +664,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 .cal-day.today     { border-color: var(--dim); }
 .cal-day.sel-start { background: #3a7fff; color: #fff; font-weight: 700; border-color: #3a7fff; }
 .cal-day.sel-end   { background: var(--accent); color: #0a0a0a; font-weight: 700; border-color: var(--accent); }
-.cal-day.in-range  { background: rgba(206,242,49,0.1); }
+.cal-day.in-range  { background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .cal-day:not(:empty):hover { background: var(--surf2); }
 .cal-legend { font-size: 10px; color: var(--dim); text-align: center; margin-top: -6px; }
 
@@ -674,7 +677,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   cursor: pointer; -webkit-appearance: none; text-align: left;
   transition: border-color 0.15s, background 0.15s;
 }
-.cal-step.active { border-color: var(--accent); background: rgba(206,242,49,0.06); }
+.cal-step.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, transparent); }
 .cal-step .dot-s, .cal-step .dot-e { width: 9px; height: 9px; }
 .cal-step-text { display: flex; flex-direction: column; min-width: 0; }
 .cal-step-l { font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); }
@@ -780,8 +783,8 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 .chart-svg { width: 100%; height: auto; display: block; }
 
 .proj-card {
-  background: linear-gradient(135deg, rgba(206,242,49,0.08), rgba(206,242,49,0.02));
-  border: 1px solid rgba(206,242,49,0.25);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 8%, transparent), color-mix(in srgb, var(--accent) 2%, transparent));
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
   border-radius: 10px;
   padding: 14px;
 }
@@ -1018,7 +1021,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   color: var(--dim); cursor: pointer; padding: 4px 6px; -webkit-appearance: none;
   display: inline-flex; align-items: center; justify-content: center;
   transition: color 0.15s, background 0.15s, border-color 0.15s; }
-.note-reorder-toggle.on { color: var(--accent); border-color: var(--accent); background: rgba(206,242,49,0.10); }
+.note-reorder-toggle.on { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .note-row-body { flex: 1; min-width: 0; }
 .note-row-title { font-size: 14px; color: var(--text); font-weight: 500;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 6px; }
@@ -1264,6 +1267,15 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 .sess-legend { display: flex; flex-wrap: wrap; gap: 10px; margin: -2px 0 8px; }
 .sess-legend-item { display: inline-flex; align-items: center; font-size: 10.5px; color: var(--dim); }
 
+/* Says which session the headline cards below are counting. */
+.dash-scope {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 11px; color: var(--sub); margin-bottom: -2px;
+}
+.dash-scope .ds-name { font-weight: 600; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dash-scope .ds-since { color: var(--dim); flex-shrink: 0; margin-left: auto; }
+
 /* Per-session totals, each on its own calendar (see sessionStartDayKey). */
 .sess-cum { display: flex; flex-direction: column; gap: 10px; }
 .sess-cum-row { display: flex; align-items: center; gap: 4px; }
@@ -1459,7 +1471,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   .side-panel .goals-wrap { flex: 0 1 auto; min-height: 0; max-height: 32vh; }
   .progress-track { max-width: 100%; }
   /* clock fits within HALF the width, so cap by vw more tightly */
-  .time-display { font-size: clamp(38px, min(9vw, 15vh), 88px); }
+  .time-display { font-size: calc(clamp(38px, min(9vw, 15vh), 88px) * var(--clock-fit, 1)); }
 }
 
 /* ── Compact landscape (phones / small tablets sideways): tighten ── */

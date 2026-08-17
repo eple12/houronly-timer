@@ -176,7 +176,16 @@ function render() {
   const rem  = getRem();
   const done = rem === 0 && totalSeconds > 0;
 
-  if (rem !== lastDisplayed) { lastDisplayed = rem; timeDisplay.textContent = fmt(rem); }
+  if (rem !== lastDisplayed) {
+    lastDisplayed = rem;
+    const txt = fmt(rem);
+    timeDisplay.textContent = txt;
+    // Space Mono is fixed-width, so the clock's width tracks its character
+    // count exactly. Past the usual 8 ("HH:MM:SS") a five-digit hour count
+    // would run off the right edge; scale by 8/chars to hold the same width.
+    timeDisplay.style.setProperty('--clock-fit',
+      txt.length > 8 ? (8 / txt.length).toFixed(3) : '1');
+  }
 
   timeDisplay.classList.toggle('done',      done && !emergency);
   timeDisplay.classList.toggle('emergency', emergency && !done);

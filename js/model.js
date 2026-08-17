@@ -588,6 +588,33 @@ function sessionDaysElapsed(sid) {
 }
 function sessionDailyAvg(sid) { return sessionSecAllTime(sid) / sessionDaysElapsed(sid); }
 
+// { day -> seconds } for one session, the per-session twin of effRecords().
+function sessionRecords(sid) {
+  const by = totals().bySess, out = {};
+  for (const d in by) { const v = by[d][sid] || 0; if (v > 0) out[d] = v; }
+  return out;
+}
+// Headline numbers for one session. The average is over CALENDAR days since
+// the session started (idle days included), matching the 세션별 누적 block —
+// a session begun last week shouldn't be averaged across months.
+function sessionStats(sid) {
+  const R = sessionRecords(sid);
+  const vals = Object.values(R).filter(v => v > 0.5);
+  const total = vals.reduce((a, v) => a + v, 0);
+  const days  = sessionDaysElapsed(sid);
+  const best  = vals.reduce((m, v) => Math.max(m, v), 0);
+  let streak = 0;
+  let i = (R[studyDayKeyOffset(0)] || 0) > 0.5 ? 0 : 1;
+  while ((R[studyDayKeyOffset(i)] || 0) > 0.5) { streak++; i++; }
+  return { total, days, activeDays: vals.length, avg: days ? total / days : 0, best, streak };
+}
+// Seconds in this session over the last n study days.
+function sessionSumLastDays(sid, n) {
+  let t = 0;
+  for (let i = 0; i < n; i++) t += sessionSecOn(studyDayKeyOffset(i), sid);
+  return t;
+}
+
 // ── Distractions ───────────────────────────────────────────────
 // One counter per device, summed for display: two devices can both count a
 // distraction in the same minute without either increment being swallowed.

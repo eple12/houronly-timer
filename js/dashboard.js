@@ -327,14 +327,19 @@ function heatmapHTML() {
 
 function renderDashboard() {
   const body = $('dashBody');
-  const st   = studyStats();
-  const today = todayStudySec();
+  // The headline cards describe the CURRENT session, on its own calendar; the
+  // blocks further down (세션별 …, the stacked chart, the heatmap) are the
+  // cross-session views. gst keeps the all-sessions figures those need.
+  const sid   = curSessionId();
+  const st    = sessionStats(sid);
+  const gst   = studyStats();
+  const today = sessionSecToday(sid);
 
   // Reset-hour selector options
   const hourOpts = Array.from({length:24}, (_,h) =>
     `<option value="${h}" ${h===study.resetHour?'selected':''}>${pad(h)}:00</option>`).join('');
 
-  if (st.days === 0 && today < 1) {
+  if (gst.days === 0 && todayStudySec() < 1) {
     body.innerHTML = `
       <div class="dash-empty">아직 기록이 없어요.<br>공부 스톱워치를 시작해 보세요 ${icoSm('play')}</div>
       ${sessionCumulativeHTML()}
@@ -362,7 +367,7 @@ function renderDashboard() {
   const W = 440, H = 150, padL = 4, padR = 4, padT = 12, padB = 20;
   const plotW = W - padL - padR, plotH = H - padT - padB;
   const bw = plotW / N;
-  const avgY = padT + plotH - (st.avg / maxSec) * plotH;
+  const avgY = padT + plotH - (gst.avg / maxSec) * plotH;
 
   // Each day's bar is split into its sessions, in the session's index colour,
   // so the chart reads as "how much of this went where".
@@ -401,7 +406,7 @@ function renderDashboard() {
     return `<text x="${x.toFixed(1)}" y="${H-6}" fill="var(--dim)" font-size="9" text-anchor="middle" font-family="Space Mono">${d.label}</text>`;
   }).join('');
 
-  const avgLine = st.avg > 0
+  const avgLine = gst.avg > 0
     ? `<line x1="${padL}" y1="${avgY.toFixed(1)}" x2="${W-padR}" y2="${avgY.toFixed(1)}" stroke="var(--accent)" stroke-width="1" stroke-dasharray="4 3" opacity="0.8"></line>`
     : '';
 
@@ -429,7 +434,13 @@ function renderDashboard() {
     ? `<div class="stat-card"><div class="stat-label">오늘 이탈</div><div class="stat-value">${distToday}<small> 회</small></div></div>`
     : '';
 
+  const cur = curSession();
   body.innerHTML = `
+    <div class="dash-scope">
+      <span class="sess-inline-dot" style="background:${cur.color}"></span>
+      <span class="ds-name">${escHtml(cur.name)}</span>
+      <span class="ds-since">${(k => { const p = String(k).split('-'); return `${+p[1]}/${+p[2]}`; })(sessionStartDayKey(sid))}부터 · ${st.days}일째</span>
+    </div>
     <div class="stat-grid">
       <div class="stat-card"><div class="stat-label">오늘</div><div class="stat-value"><span id="dvToday">${fmtHrs(today)}</span><small id="dvTodayS"> ${fmt(today).slice(0,5)}</small></div></div>
       <div class="stat-card"><div class="stat-label">일 평균</div><div class="stat-value" id="dvAvg">${fmtHrs(st.avg)}</div></div>
@@ -440,8 +451,8 @@ function renderDashboard() {
     <div id="dashGoalGauge">${goalGaugeHTML(today)}</div>
 
     <div class="stat-grid">
-      <div class="stat-card"><div class="stat-label">최근 7일</div><div class="stat-value" id="dvWeek">${fmtHrs(sumLastDays(7))}</div></div>
-      <div class="stat-card"><div class="stat-label">최근 30일</div><div class="stat-value" id="dvMonth">${fmtHrs(sumLastDays(30))}</div></div>
+      <div class="stat-card"><div class="stat-label">최근 7일</div><div class="stat-value" id="dvWeek">${fmtHrs(sessionSumLastDays(sid, 7))}</div></div>
+      <div class="stat-card"><div class="stat-label">최근 30일</div><div class="stat-value" id="dvMonth">${fmtHrs(sessionSumLastDays(sid, 30))}</div></div>
     </div>
 
     ${projHTML}
@@ -455,7 +466,7 @@ function renderDashboard() {
     <div class="chart-block">
       <div class="chart-title">
         <span>최근 14일</span>
-        <span class="legend-avg"><span class="legend-dash"></span>평균 ${fmtHrs(st.avg)}</span>
+        <span class="legend-avg"><span class="legend-dash"></span>전체 평균 ${fmtHrs(gst.avg)}</span>
       </div>
       ${sessions.length > 1 ? `<div class="sess-legend">${sessions.map(s =>
         `<span class="sess-legend-item"><span class="sess-inline-dot" style="background:${s.color}"></span>${escHtml(s.name)}</span>`).join('')}</div>` : ''}
@@ -486,15 +497,18 @@ function refreshDashboardLive() {
   $('subjBreakRows').innerHTML = subjectBreakRowsHTML();
   if ($('sessBreakRows')) $('sessBreakRows').innerHTML = sessionRowsHTML(sessionTotalsLastDays(1));
 
-  const st    = studyStats();
-  const today = todayStudySec();
+  // Same session basis as the full render, or the cards would flip between
+  // session and all-sessions figures every second while the stopwatch runs.
+  const sid   = curSessionId();
+  const st    = sessionStats(sid);
+  const today = sessionSecToday(sid);
   const set = (id, txt) => { const el = $(id); if (el) el.textContent = txt; };
   set('dvToday',  fmtHrs(today));
   set('dvTodayS', ' ' + fmt(today).slice(0,5));
   set('dvAvg',    fmtHrs(st.avg));
   set('dvTotal',  fmtHrs(st.total));
-  set('dvWeek',   fmtHrs(sumLastDays(7)));
-  set('dvMonth',  fmtHrs(sumLastDays(30)));
+  set('dvWeek',   fmtHrs(sessionSumLastDays(sid, 7)));
+  set('dvMonth',  fmtHrs(sessionSumLastDays(sid, 30)));
   set('dvBest',   fmtHrs(st.best));
   const gg = $('dashGoalGauge');
   if (gg) gg.innerHTML = goalGaugeHTML(today);
