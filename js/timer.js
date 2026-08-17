@@ -266,10 +266,10 @@ setInterval(() => {
   updateStudyUI();
   if (goals.length && !rafId) { updateGoalTimes(); }
   // Keep the session list's clocks live while it's open.
-  if ($('sessModal').classList.contains('open')) renderSessionList();
+  if (isModalOpen('sessModal')) renderSessionList();
   // Keep the dashboard numbers/bars live while the stopwatch is running.
   // Surgical update (not a full re-render) so an open subject dropdown stays open.
-  if (swRunning() && dashModal.classList.contains('open')) {
+  if (swRunning() && isModalOpen('dashModal')) {
     refreshDashboardLive();
   }
 }, 1000);
@@ -337,7 +337,7 @@ function setDuration(secs) {
 }
 
 // ── Button events ──────────────────────────────────────────────
-startBtn.addEventListener('click', () => {
+on('startBtn', 'click', () => {
   if (isRunning()) { doPause(); return; }
   if (isPaused())  { doStart(); return; }
   // idle → read inputs and start
@@ -348,7 +348,7 @@ startBtn.addEventListener('click', () => {
 });
 // Reset wipes the session's countdown, so it asks first — it used to fire on a
 // single stray tap, right next to 시작/일시정지.
-resetBtn.addEventListener('click', () => {
+on('resetBtn', 'click', () => {
   if (isIdle() && totalSeconds === 0) { doReset(); return; }   // nothing to lose
   const rem = getRem();
   askConfirm('타이머 초기화',
@@ -372,12 +372,12 @@ document.querySelectorAll('.preset-btn').forEach(btn => {
     const t = h*3600+m*60+s; if (t) setDuration(t);
   });
 });
-emgBtn.addEventListener('click', () => { emergency = !emergency; render(); saveEmergency(); });
-swToggle.addEventListener('click', toggleStopwatch);
+on('emgBtn', 'click', () => { emergency = !emergency; render(); saveEmergency(); });
+on('swToggle', 'click', toggleStopwatch);
 
 // ── Fullscreen ─────────────────────────────────────────────────
 const fsBtn = $('fsBtn');
-fsBtn.addEventListener('click', () => {
+on('fsBtn', 'click', () => {
   const el = document.documentElement, isFs = document.fullscreenElement || document.webkitFullscreenElement;
   if (!isFs) { const req = el.requestFullscreen || el.webkitRequestFullscreen; if (req) req.call(el); }
   else       { const ex  = document.exitFullscreen || document.webkitExitFullscreen; if (ex) ex.call(document); }
@@ -472,14 +472,14 @@ function renderCal() {
     calGridEl.appendChild(btn);
   }
 }
-$('calPrev').addEventListener('click', () => { calMonth--; if(calMonth<0){calMonth=11;calYear--;} renderCal(); });
-$('calNext').addEventListener('click', () => { calMonth++; if(calMonth>11){calMonth=0;calYear++;} renderCal(); });
-$('calStepStart').addEventListener('click', () => { picking = 'start'; updateCalHint(); });
-$('calStepEnd').addEventListener('click', () => { picking = 'end'; updateCalHint(); });
-['sH','sM','sS','eH','eM','eS'].forEach(id => $(id).addEventListener('input', updateCalHint));
-$('calClose').addEventListener('click', () => calModal.classList.remove('open'));
-calModal.addEventListener('click', e => { if(e.target===calModal) calModal.classList.remove('open'); });
-$('calConfirm').addEventListener('click', () => {
+on('calPrev', 'click', () => { calMonth--; if(calMonth<0){calMonth=11;calYear--;} renderCal(); });
+on('calNext', 'click', () => { calMonth++; if(calMonth>11){calMonth=0;calYear++;} renderCal(); });
+on('calStepStart', 'click', () => { picking = 'start'; updateCalHint(); });
+on('calStepEnd', 'click', () => { picking = 'end'; updateCalHint(); });
+['sH','sM','sS','eH','eM','eS'].forEach(id => on(id, 'input', updateCalHint));
+on('calClose', 'click', () => calModal.classList.remove('open'));
+on('calModal', 'click', e => { if(e.target===calModal) calModal.classList.remove('open'); });
+on('calConfirm', 'click', () => {
   if (!selStart||!selEnd) { alert('시작일과 종료일을 모두 선택해주세요.'); return; }
   const sh=parseInt($('sH').value)||0, sm=parseInt($('sM').value)||0, ss=parseInt($('sS').value)||0;
   const eh=parseInt($('eH').value)||0, em=parseInt($('eM').value)||0, es=parseInt($('eS').value)||0;
@@ -494,4 +494,4 @@ $('calConfirm').addEventListener('click', () => {
   if (remSecs>0) startTick(); else { goalEpoch=null; pausedRemaining=0; }
   render(); save(); renderDayTicks();
 });
-$('calBtn').addEventListener('click', () => { if (!isRunning()) openCal(); });
+on('calBtn', 'click', () => { if (!isRunning()) openCal(); });

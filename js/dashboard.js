@@ -23,7 +23,7 @@ function setGoalMode(m) {
   goalMode = m;
   $('goalDurField').style.display  = (m === 'dur')  ? '' : 'none';
   $('goalDateField').style.display = (m === 'date') ? '' : 'none';
-  $('goalModeSeg').querySelectorAll('.seg-btn').forEach(b =>
+  ($('goalModeSeg') || document.createDocumentFragment()).querySelectorAll('.seg-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.gmode === m));
   if (m === 'date') renderGoalCal();
 }
@@ -81,7 +81,7 @@ function updateGoalCalHint() {
   hint.textContent = `${fmtDate(t).replace('종료 ', '')} · ${parts.join(' ')} 후`;
 }
 
-$('goalBtn').addEventListener('click', () => {
+on('goalBtn', 'click', () => {
   $('goalH').value=''; $('goalM').value=''; $('goalS').value=''; $('goalMemoInput').value='';
   const now = new Date();
   gcalYear = now.getFullYear(); gcalMonth = now.getMonth(); gcalSel = null;
@@ -89,14 +89,14 @@ $('goalBtn').addEventListener('click', () => {
   setGoalMode('dur');
   buildColorSwatches(); goalModal.classList.add('open');
 });
-$('goalModeSeg').querySelectorAll('.seg-btn').forEach(b =>
+($('goalModeSeg') || document.createDocumentFragment()).querySelectorAll('.seg-btn').forEach(b =>
   b.addEventListener('click', () => setGoalMode(b.dataset.gmode)));
-$('gcalPrev').addEventListener('click', () => { gcalMonth--; if (gcalMonth < 0) { gcalMonth = 11; gcalYear--; } renderGoalCal(); });
-$('gcalNext').addEventListener('click', () => { gcalMonth++; if (gcalMonth > 11) { gcalMonth = 0; gcalYear++; } renderGoalCal(); });
-['gcalH','gcalM'].forEach(id => $(id).addEventListener('input', updateGoalCalHint));
-$('goalModalClose').addEventListener('click', () => goalModal.classList.remove('open'));
-goalModal.addEventListener('click', e => { if(e.target===goalModal) goalModal.classList.remove('open'); });
-$('goalConfirm').addEventListener('click', () => {
+on('gcalPrev', 'click', () => { gcalMonth--; if (gcalMonth < 0) { gcalMonth = 11; gcalYear--; } renderGoalCal(); });
+on('gcalNext', 'click', () => { gcalMonth++; if (gcalMonth > 11) { gcalMonth = 0; gcalYear++; } renderGoalCal(); });
+['gcalH','gcalM'].forEach(id => on(id, 'input', updateGoalCalHint));
+on('goalModalClose', 'click', () => goalModal.classList.remove('open'));
+on('goalModal', 'click', e => { if(e.target===goalModal) goalModal.classList.remove('open'); });
+on('goalConfirm', 'click', () => {
   const target = goalTargetEpoch();
   if (!target) {
     alert(goalMode === 'dur' ? '시간을 입력해주세요.' : '목표 날짜를 선택해주세요.');
@@ -550,9 +550,9 @@ function bindResetHour() {
   });
 }
 
-$('dashBtn').addEventListener('click', () => { requestNotifyPermission(); renderDashboard(); dashModal.classList.add('open'); });
-$('dashClose').addEventListener('click', () => dashModal.classList.remove('open'));
-dashModal.addEventListener('click', e => { if(e.target===dashModal) dashModal.classList.remove('open'); });
+on('dashBtn', 'click', () => { requestNotifyPermission(); renderDashboard(); dashModal.classList.add('open'); });
+on('dashClose', 'click', () => dashModal.classList.remove('open'));
+on('dashModal', 'click', e => { if(e.target===dashModal) dashModal.classList.remove('open'); });
 // Close any open custom subject dropdown when clicking elsewhere (registered
 // once; survives dashboard re-renders since it targets live .subj-dd nodes).
 document.addEventListener('click', e => {
@@ -625,11 +625,11 @@ function addSubject() {
   setCurSubject(name);
   saveStudy(); renderSubjChips(); updateStudyUI();
 }
-$('swSubjectBtn').addEventListener('click', () => { renderSubjChips(); subjModal.classList.add('open'); });
-$('subjClose').addEventListener('click', () => subjModal.classList.remove('open'));
-subjModal.addEventListener('click', e => { if (e.target === subjModal) subjModal.classList.remove('open'); });
-$('subjAddBtn').addEventListener('click', addSubject);
-$('subjAddInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addSubject(); } });
+on('swSubjectBtn', 'click', () => { renderSubjChips(); subjModal.classList.add('open'); });
+on('subjClose', 'click', () => subjModal.classList.remove('open'));
+on('subjModal', 'click', e => { if (e.target === subjModal) subjModal.classList.remove('open'); });
+on('subjAddBtn', 'click', addSubject);
+on('subjAddInput', 'keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addSubject(); } });
 
 // ── Settings ───────────────────────────────────────────────────
 const setModal = $('setModal');
@@ -718,8 +718,8 @@ function renderSettings() {
 // Clear cached app assets (Cache Storage + any service worker) and hard-reload
 // to the freshest deployed version. Saved data in localStorage is kept — and if
 // signed in it's in the cloud anyway. Flushes pending sync first.
-async function fullCacheRefresh() {
-  if (!confirm('앱 캐시를 비우고 최신 버전으로 새로고침할까요?\n저장된 공부 기록·메모는 그대로 유지됩니다.')) return;
+async function fullCacheRefresh(skipConfirm) {
+  if (!skipConfirm && !confirm('앱 캐시를 비우고 최신 버전으로 새로고침할까요?\n저장된 공부 기록·메모는 그대로 유지됩니다.')) return;
   try { pushCloud(); } catch (e) {}
   try {
     if ('serviceWorker' in navigator) {
@@ -735,9 +735,9 @@ async function fullCacheRefresh() {
   u.searchParams.set('_', Date.now());   // cache-bust the document fetch
   location.replace(u.toString());
 }
-$('setBtn').addEventListener('click', () => { renderSettings(); setModal.classList.add('open'); });
-$('setClose').addEventListener('click', () => setModal.classList.remove('open'));
-setModal.addEventListener('click', e => { if (e.target === setModal) setModal.classList.remove('open'); });
+on('setBtn', 'click', () => { renderSettings(); setModal.classList.add('open'); });
+on('setClose', 'click', () => setModal.classList.remove('open'));
+on('setModal', 'click', e => { if (e.target === setModal) setModal.classList.remove('open'); });
 
 // ── Focus mode: distraction detection ──────────────────────────
 let focusLeftCount = 0;

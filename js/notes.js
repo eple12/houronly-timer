@@ -363,8 +363,8 @@ function renderMemoBig() {
     });
   }
 }
-$('memoBigClose').addEventListener('click', () => memoBigModal.classList.remove('open'));
-memoBigModal.addEventListener('click', e => { if (e.target === memoBigModal) memoBigModal.classList.remove('open'); });
+on('memoBigClose', 'click', () => memoBigModal.classList.remove('open'));
+on('memoBigModal', 'click', e => { if (e.target === memoBigModal) memoBigModal.classList.remove('open'); });
 
 // Notes manager
 let noteReorderMode = false;  // when on, a drag pad slides in beside each row
@@ -493,9 +493,10 @@ function openNoteEditor(id, newType) {
       `<div class="note-tools">
          <button class="note-tool" type="button" data-ins="hr" title="내용 구분선">${icoSm('hr')}구분선</button>
          <button class="note-tool" type="button" data-ins="hrTitle" title="제목이 붙은 구분선">${icoSm('hr')}제목 구분선</button>
-         <button class="note-tool" type="button" data-ins="table" title="표">${icoSm('table')}표</button>
+         <button class="note-tool" type="button" id="noteTableBtn" title="표 크기 선택">${icoSm('table')}표</button>
          <button class="note-tool right" type="button" id="notePreviewBtn" title="미리보기">${icoSm('eye')}미리보기</button>
        </div>
+       <div class="note-tool-panel" id="noteToolPanel" style="display:none"></div>
        <textarea id="noteTextInput" placeholder="내용">${escHtml(n.text || '')}</textarea>
        <div class="note-preview" id="notePreview" style="display:none"></div>`;
     const ta = $('noteTextInput');
@@ -506,8 +507,9 @@ function openNoteEditor(id, newType) {
       }
     });
     $('noteEditBody').querySelectorAll('.note-tool[data-ins]').forEach(b =>
-      b.addEventListener('click', () => insertNoteSnippet(b.dataset.ins)));
-    $('notePreviewBtn').addEventListener('click', toggleNotePreview);
+      b.addEventListener('click', () => { closeTablePicker(); insertNoteSnippet(b.dataset.ins); }));
+    $('noteTableBtn').addEventListener('click', openTablePicker);
+    $('notePreviewBtn').addEventListener('click', () => { closeTablePicker(); toggleNotePreview(); });
   } else {
     // Item ids are carried through the editor so a row edited here can be
     // matched with the same row edited on another device.
@@ -521,28 +523,124 @@ function openNoteEditor(id, newType) {
 // Drop a snippet in at the cursor, on its own line, and put the caret where
 // the user will want to type next (the divider's title, the first table cell).
 const NOTE_SNIPPETS = {
-  hr:      { text: '>>\n',                                  select: null },
-  hrTitle: { text: '>> 제목\n',                              select: '제목' },
-  table:   { text: '| 항목 | 내용 |\n| --- | --- |\n|  |  |\n', select: '항목' },
+  hr:      { text: '>>\n',      select: null },
+  hrTitle: { text: '>> 제목\n', select: '제목' },
 };
+// Build the markup for a cols × rows table. The first row is a header (with the
+// |---| separator under it); the rest are blank cells ready to fill in.
+function tableSnippet(cols, rows) {
+  const line = cells => '| ' + cells.join(' | ') + ' |\n';
+  let out = line(Array.from({ length: cols }, (_, i) => '제목' + (i + 1)));
+  out += line(Array.from({ length: cols }, () => '---'));
+  for (let r = 0; r < rows; r++) out += line(Array.from({ length: cols }, () => ' '));
+  return out;
+}
+function insertTable(cols, rows) {
+  insertSnippetText(tableSnippet(cols, rows), '제목1');
+}
 function insertNoteSnippet(kind) {
-  const ta = $('noteTextInput');
   const snip = NOTE_SNIPPETS[kind];
-  if (!ta || !snip) return;
-  if ($('notePreview').style.display !== 'none') toggleNotePreview();  // back to editing
+  if (snip) insertSnippetText(snip.text, snip.select);
+}
+// Where a new block should go: after the line the caret is on, and — if that
+// line is part of a table — after the whole table. Without this, inserting a
+// second block while the previous one's placeholder is still selected would
+// drop it into the middle of that block and corrupt the markup.
+function blockInsertIndex(v, at) {
+  // The line text must exclude its newline: isTableRow's `$` won't match past
+  // one, so passing the newline in would report every line as "not a table".
+  const lineAt    = i => { const n = v.indexOf('\n', i); return v.slice(i, n === -1 ? v.length : n); };
+  const nextStart = i => { const n = v.indexOf('\n', i); return n === -1 ? v.length : n + 1; };
+  const lineStart = v.lastIndexOf('\n', Math.max(0, at - 1)) + 1;
+  let idx = nextStart(lineStart);
+  if (isTableRow(lineAt(lineStart))) {
+    while (idx < v.length && isTableRow(lineAt(idx))) idx = nextStart(idx);
+  }
+  return idx;
+}
+// Drop a block in on its own line; if `select` is given, leave that placeholder
+// highlighted so the user can type straight over it.
+function insertSnippetText(text, select) {
+  const ta = $('noteTextInput');
+  if (!ta) return;
+  if ($('notePreview') && $('notePreview').style.display !== 'none') toggleNotePreview();
   const v = ta.value;
-  let at = ta.selectionStart ?? v.length;
-  // Always start on a fresh line so the marker is at the start of one.
-  const head = v.slice(0, at), tail = v.slice(ta.selectionEnd ?? at);
+  const idx = blockInsertIndex(v, Math.max(ta.selectionStart ?? 0, ta.selectionEnd ?? 0));
+  const head = v.slice(0, idx), tail = v.slice(idx);
   const lead = (head === '' || head.endsWith('\n')) ? '' : '\n';
-  const body = lead + snip.text;
+  // Consecutive pipe rows read as ONE table, so a new table going in right
+  // after an existing one needs a blank line or the two would fuse together.
+  const prevLine  = head.replace(/\n$/, '').split('\n').pop() || '';
+  const firstLine = text.split('\n')[0];   // isTableRow tests one line, not a block
+  const gap = (isTableRow(firstLine) && isTableRow(prevLine)) ? '\n' : '';
+  const body = lead + gap + text;
   ta.value = head + body + tail;
-  const caret = snip.select
-    ? head.length + body.indexOf(snip.select)
-    : head.length + body.length;
+  const caret = select ? head.length + body.indexOf(select) : head.length + body.length;
   ta.focus();
-  ta.setSelectionRange(caret, caret + (snip.select ? snip.select.length : 0));
+  ta.setSelectionRange(caret, caret + (select ? select.length : 0));
   ta.dispatchEvent(new Event('input'));
+}
+
+// ── Table size picker ──────────────────────────────────────────
+// Hovering/dragging over the grid sizes the table, the way a word processor's
+// insert-table control works; the label spells out the chosen 열 × 행.
+const TBL_MAX_COLS = 6, TBL_MAX_ROWS = 8;
+let tblCols = 2, tblRows = 2;
+function tablePickerHTML() {
+  let cells = '';
+  for (let r = 1; r <= TBL_MAX_ROWS; r++)
+    for (let c = 1; c <= TBL_MAX_COLS; c++)
+      cells += `<button type="button" class="tp-cell" data-c="${c}" data-r="${r}" tabindex="-1"></button>`;
+  return `<div class="table-picker" id="tablePicker">
+      <div class="tp-grid" id="tpGrid" style="grid-template-columns:repeat(${TBL_MAX_COLS},1fr)">${cells}</div>
+      <div class="tp-foot">
+        <span class="tp-label" id="tpLabel">2 × 2</span>
+        <button type="button" class="tp-insert" id="tpInsert">넣기</button>
+      </div>
+    </div>`;
+}
+function highlightTablePicker(c, r) {
+  tblCols = c; tblRows = r;
+  $('tpGrid').querySelectorAll('.tp-cell').forEach(el =>
+    el.classList.toggle('on', +el.dataset.c <= c && +el.dataset.r <= r));
+  $('tpLabel').textContent = `${c} × ${r}`;
+}
+function bindTablePicker() {
+  const pick = $('tablePicker');
+  if (!pick) return;
+  const grid = $('tpGrid');
+  grid.querySelectorAll('.tp-cell').forEach(el => {
+    const c = +el.dataset.c, r = +el.dataset.r;
+    el.addEventListener('pointerenter', () => highlightTablePicker(c, r));
+    el.addEventListener('pointerdown', e => { e.preventDefault(); highlightTablePicker(c, r); });
+    el.addEventListener('click', () => { highlightTablePicker(c, r); commitTablePicker(); });
+  });
+  $('tpInsert').addEventListener('click', commitTablePicker);
+  highlightTablePicker(tblCols, tblRows);
+}
+function commitTablePicker() {
+  insertTable(tblCols, tblRows);
+  closeTablePicker();
+}
+function openTablePicker() {
+  const wrap = $('noteToolPanel');
+  if (!wrap) return;
+  if (wrap.dataset.open === 'table') { closeTablePicker(); return; }
+  wrap.dataset.open = 'table';
+  wrap.innerHTML = tablePickerHTML();
+  wrap.style.display = '';
+  bindTablePicker();
+  const btn = $('noteTableBtn');
+  if (btn) btn.classList.add('on');
+}
+function closeTablePicker() {
+  const wrap = $('noteToolPanel');
+  if (!wrap) return;
+  wrap.dataset.open = '';
+  wrap.innerHTML = '';
+  wrap.style.display = 'none';
+  const btn = $('noteTableBtn');
+  if (btn) btn.classList.remove('on');
 }
 // Flip the editor between the raw text and how it will actually look. The
 // textarea stays in the DOM (just hidden) so saving still reads its value.
@@ -704,23 +802,23 @@ function noteDeleteClick() {
   deleteEditingNote();
 }
 
-$('notesBtn').addEventListener('click', openNotes);
-$('notesClose').addEventListener('click', () => notesModal.classList.remove('open'));
-notesModal.addEventListener('click', e => { if (e.target === notesModal) notesModal.classList.remove('open'); });
-$('newTextNote').addEventListener('click', () => openNoteEditor(null, 'text'));
-$('newListNote').addEventListener('click', () => openNoteEditor(null, 'list'));
-$('noteEditClose').addEventListener('click', leaveNoteEditor);
-noteEditModal.addEventListener('click', e => { if (e.target === noteEditModal) leaveNoteEditor(); });
-$('noteSave').addEventListener('click', saveNoteFromEditor);
-$('noteDelete').addEventListener('click', noteDeleteClick);
-$('notesReorderToggle').addEventListener('click', () => {
+on('notesBtn', 'click', openNotes);
+on('notesClose', 'click', () => notesModal.classList.remove('open'));
+on('notesModal', 'click', e => { if (e.target === notesModal) notesModal.classList.remove('open'); });
+on('newTextNote', 'click', () => openNoteEditor(null, 'text'));
+on('newListNote', 'click', () => openNoteEditor(null, 'list'));
+on('noteEditClose', 'click', leaveNoteEditor);
+on('noteEditModal', 'click', e => { if (e.target === noteEditModal) leaveNoteEditor(); });
+on('noteSave', 'click', saveNoteFromEditor);
+on('noteDelete', 'click', noteDeleteClick);
+on('notesReorderToggle', 'click', () => {
   noteReorderMode = !noteReorderMode;
   confirmDeleteId = null;
   $('notesReorderToggle').classList.toggle('on', noteReorderMode);
   renderNotesList();
 });
 // ArrowDown from the title drops into the body (first checklist item / memo text).
-$('noteTitleInput').addEventListener('keydown', e => {
+on('noteTitleInput', 'keydown', e => {
   if (e.key !== 'ArrowDown') return;
   const body = $('noteEditBody');
   if (editDraftType === 'list') {
@@ -787,3 +885,22 @@ if (pinnedOrRecentNote()) {
 // Everything is defined and painted — from here a cloud snapshot can be applied
 // straight to the live UI.
 appReady = true;
+
+// ── Stale-page guard ───────────────────────────────────────────
+// A browser will happily serve a cached index.html next to freshly fetched JS.
+// The markup then lacks elements the new code binds to, and the app comes up
+// with several buttons quietly doing nothing — which is impossible to diagnose
+// from the outside. Detect it and say so, with a one-tap fix.
+(function checkStalePage() {
+  if (!missingEls.length) return;
+  console.warn('Stale page: missing elements', missingEls);
+  const bar = document.createElement('div');
+  bar.className = 'stale-banner';
+  bar.innerHTML = '<span>앱이 업데이트되었어요. 새로고침해야 정상 동작합니다.</span>' +
+                  '<button id="staleReload">새로고침</button>';
+  document.body.appendChild(bar);
+  bar.querySelector('#staleReload').addEventListener('click', () => {
+    if (typeof fullCacheRefresh === 'function') fullCacheRefresh(true);
+    else location.reload();
+  });
+})();

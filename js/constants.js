@@ -117,6 +117,22 @@ let tomb = {};   // id -> deletedAt, so deletions propagate across devices
 
 // ── DOM ────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
+// Bind a listener at load time without assuming the element is there. A single
+// `$('x').addEventListener` on a missing id throws and takes every binding
+// AFTER it in the same file with it — which is how a browser serving a stale
+// index.html alongside fresh JS ends up with several dead buttons instead of
+// one. Returns the element (or null) so callers can still branch on it.
+function on(id, evt, fn, opts) {
+  const el = $(id);
+  if (el) el.addEventListener(evt, fn, opts);
+  else missingEls.push(id);
+  return el;
+}
+// Ids that were expected but absent — used to detect a stale cached page.
+const missingEls = [];
+// Null-safe "is this modal open?" — called from the once-a-second loop, where a
+// missing element would otherwise throw on every tick.
+const isModalOpen = id => { const m = $(id); return !!m && m.classList.contains('open'); };
 
 // ── Monochrome line/area icons (currentColor, transparent bg) ──
 const ICONS = {

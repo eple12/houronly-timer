@@ -164,8 +164,8 @@ function renderPomo() {
   updateModeDots();
 }
 
-pomoToggleBtn.addEventListener('click', pomoToggle);
-$('pomoReset').addEventListener('click', pomoReset);
+on('pomoToggle', 'click', pomoToggle);
+on('pomoReset', 'click', pomoReset);
 
 // ── Combined study/pomo card: mode switch ──────────────────────
 const studyCard = $('studyCard');
@@ -187,6 +187,6 @@ function setComboMode(m) {
   if (study.comboMode === m) return;
   study.comboMode = m; touchSetting('comboMode'); saveStudy();
 }
-$('modeStudy').addEventListener('click', () => setComboMode('study'));
-$('modePomo').addEventListener('click', () => setComboMode('pomo'));
+on('modeStudy', 'click', () => setComboMode('study'));
+on('modePomo', 'click', () => setComboMode('pomo'));
 // initial mode is applied during init (after study/sync state is loaded)

@@ -288,16 +288,18 @@ function mergeStudy(a, b) {
 // Bring it up to the current schema before merging so both sides are comparable.
 function normalizeRemote(remote) {
   if (!remote) return null;
-  const localHasLedger = Object.keys(study.runs || {}).length > 0
-                      || Object.keys(study.adj  || {}).length > 0;
-  // A v1 cloud document is converted so its recorded time survives the upgrade.
-  // Once this device has ledger entries of its own we leave it alone instead:
-  // v1 totals and ledger runs describe the same hours, and adding both would
-  // count them twice. (Only reachable while another device is still on the old
-  // build — the moment any device uploads, the cloud is on the new schema.)
-  const rStudy = (remote.study && remote.study.v === DOC_VERSION)
-    ? normalizeStudyDoc(remote.study, false)
-    : (localHasLedger ? null : normalizeStudyDoc(remote.study, false));
+  // Any document from the ledger era (v2 and up) upgrades cleanly and must be
+  // merged in full — dropping it would throw away whatever the other device
+  // recorded. Only a genuinely PRE-ledger document is risky: its day totals
+  // describe the same hours our runs already hold, so adding both would count
+  // them twice. That one we skip once this device has a ledger of its own.
+  let rStudy = null;
+  if (remote.study) {
+    const preLedger = !(remote.study.v >= 2);
+    const localHasLedger = Object.keys(study.runs || {}).length > 0
+                        || Object.keys(study.adj  || {}).length > 0;
+    if (!preLedger || !localHasLedger) rStudy = normalizeStudyDoc(remote.study, false);
+  }
   return {
     timer: normalizeTimers(remote.timer),
     goals: (remote.goals || []).filter(g => g && g.id != null).map(normalizeGoal),
@@ -577,4 +579,4 @@ window.addEventListener('storage', e => {
 const acctModal = $('acctModal');
 $('acctBtn').addEventListener('click', () => { renderAcct(); acctModal.classList.add('open'); });
 $('acctClose').addEventListener('click', () => acctModal.classList.remove('open'));
-acctModal.addEventListener('click', e => { if (e.target === acctModal) acctModal.classList.remove('open'); });
+on('acctModal', 'click', e => { if (e.target === acctModal) acctModal.classList.remove('open'); });
