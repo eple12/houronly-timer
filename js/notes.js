@@ -835,6 +835,7 @@ loadGoals();
 loadStudy();
 loadNotes();
 normalizeNoteOrders();   // seed `order` for notes that predate manual reordering
+loadTodos();
 loadTomb();
 loadTimer();
 observeBundle(localBundle());   // never issue a stamp older than our own data
@@ -851,7 +852,7 @@ reconcileSession();
 
 (function restore() {
   const saved = loadTimer();
-  if (!saved) { render(); renderGoals(); renderDayTicks(); renderGoalFlags(); updateStudyUI(); return; }
+  if (!saved) { render(); renderGoals(); renderTodos(); renderDayTicks(); renderGoalFlags(); updateStudyUI(); return; }
 
   let restoreMsg = '';
   if (goalEpoch) {
@@ -870,7 +871,7 @@ reconcileSession();
     restoreMsg = '세션 복원됨 — ' + fmt(pausedRemaining) + ' (일시정지 상태)';
   }
 
-  render(); renderGoals(); renderDayTicks(); renderGoalFlags(); updateStudyUI();
+  render(); renderGoals(); renderTodos(); renderDayTicks(); renderGoalFlags(); updateStudyUI();
   if (restoreMsg) setTimeout(() => showToast(restoreMsg), 300);
 })();
 

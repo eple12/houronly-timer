@@ -52,21 +52,34 @@ function renderDayTicks() {
 
 // ── Goals list ─────────────────────────────────────────────────
 let goalReorderMode = false;   // when on, each goal grows a drag pad
+// Folded state is per-device (see GOALS_FOLD_KEY) — a view preference, not data.
+let goalsFolded = (() => { try { return localStorage.getItem(GOALS_FOLD_KEY) === '1'; } catch (e) { return false; } })();
+function setGoalsFolded(v) {
+  goalsFolded = !!v;
+  try { localStorage.setItem(GOALS_FOLD_KEY, goalsFolded ? '1' : '0'); } catch (e) {}
+  if (goalsFolded) goalReorderMode = false;
+  renderGoals();
+}
 
+const goalsSection = $('goalsSection');
 function renderGoals() {
+  const wrap = goalsSection || goalsWrap;
   const list = sessionGoals();
   // Nothing to reorder below two goals — and the toggle is hidden there, so
   // leaving the mode on would strand the drag pads with no way to dismiss them.
   if (list.length < 2) goalReorderMode = false;
-  if (list.length === 0) { goalsWrap.innerHTML = ''; return; }
-  goalsWrap.innerHTML =
+  if (list.length === 0) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML =
     `<div class="goals-section-label">
-       <span>목표</span>
-       ${list.length > 1
+       <button class="goals-fold${goalsFolded ? ' folded' : ''}" id="goalsFold"
+               title="${goalsFolded ? '펼치기' : '접기'}">
+         ${icoSm('chevD')}<span>목표</span><span class="goals-count">${list.length}</span>
+       </button>
+       ${!goalsFolded && list.length > 1
          ? `<button class="goal-reorder-toggle${goalReorderMode ? ' on' : ''}" id="goalsReorderToggle" title="순서 변경">${icoSm('grip')}</button>`
          : ''}
      </div>
-     <div class="goals-list${goalReorderMode ? ' reordering' : ''}" id="goalsList">` +
+     <div class="goals-list${goalReorderMode ? ' reordering' : ''}${goalsFolded ? ' folded' : ''}" id="goalsList">` +
     list.map(g => {
       const rem      = Math.max(0, Math.floor((g.endEpoch - Date.now()) / 1000));
       const remText  = fmtGoalRem(g.endEpoch);
@@ -82,12 +95,15 @@ function renderGoals() {
       </div>`;
     }).join('') + '</div>';
 
+  const fold = $('goalsFold');
+  if (fold) fold.addEventListener('click', () => setGoalsFolded(!goalsFolded));
   const toggle = $('goalsReorderToggle');
   if (toggle) toggle.addEventListener('click', () => {
     goalReorderMode = !goalReorderMode;
     renderGoals();
   });
-  goalsWrap.querySelectorAll('.goal-del').forEach(btn => {
+  if (goalsFolded) return;   // nothing below is reachable while folded
+  wrap.querySelectorAll('.goal-del').forEach(btn => {
     btn.addEventListener('click', () => {
       const delId = btn.dataset.del;
       goals = goals.filter(g => g.id !== delId);
@@ -96,7 +112,7 @@ function renderGoals() {
     });
   });
   if (goalReorderMode) {
-    goalsWrap.querySelectorAll('.goal-drag-handle').forEach(h =>
+    wrap.querySelectorAll('.goal-drag-handle').forEach(h =>
       h.addEventListener('pointerdown', e => beginGoalDrag(e, h)));
   }
 }

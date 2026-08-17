@@ -155,7 +155,7 @@ function confirmDeleteSession(id) {
       saveGoals(); saveStudy();
       adoptTimer(curSessionId());
       restartTick(); render();
-      renderGoals(); renderDayTicks(); renderGoalFlags();
+      renderGoals(); renderTodos(); renderDayTicks(); renderGoalFlags();
       renderSessionList(); renderSessionChip(); updateStudyUI();
       flushSyncSoon();
     },

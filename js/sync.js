@@ -71,7 +71,7 @@ function localBundle() {
   // The live globals are the active session's copy — fold them in so an
   // in-flight edit is never a step behind the map.
   const t = Object.assign({}, timers, { [curSessionId()]: timerState() });
-  return { timer: t, goals, study, notes, tomb };
+  return { timer: t, goals, study, notes, todos, tomb };
 }
 function writeBundle(b) {
   try {
@@ -79,11 +79,12 @@ function writeBundle(b) {
     localStorage.setItem(GOALS_KEY, JSON.stringify(b.goals || []));
     localStorage.setItem(STUDY_KEY, JSON.stringify(b.study || {}));
     localStorage.setItem(NOTES_KEY, JSON.stringify(b.notes || []));
+    localStorage.setItem(TODOS_KEY, JSON.stringify(b.todos || []));
     localStorage.setItem(TOMB_KEY,  JSON.stringify(b.tomb  || {}));
   } catch(e) {}
 }
 function bundleSig(b) {
-  return stableStr([b.timer || null, b.goals || [], b.study || {}, b.notes || [], b.tomb || {}]);
+  return stableStr([b.timer || null, b.goals || [], b.study || {}, b.notes || [], b.todos || [], b.tomb || {}]);
 }
 
 // ── Merges ─────────────────────────────────────────────────────
@@ -128,6 +129,34 @@ function mergeGoal(a, b) {
   const ord  = newerBy(a, b, 'orderAt');
   return Object.assign({}, base, { order: ord.order, orderAt: ord.orderAt || 0 });
 }
+// A todo's text, its tick and its position each resolve on their own stamp, so
+// ticking one off on the phone can't revert a rename made on the laptop.
+function mergeTodo(a, b) {
+  const base = newerBy(a, b, 'at');
+  const tick = newerBy(a, b, 'doneAt');
+  const ord  = newerBy(a, b, 'orderAt');
+  return Object.assign({}, base, {
+    done: !!tick.done, doneAt: tick.doneAt || 0,
+    order: ord.order,  orderAt: ord.orderAt || 0,
+  });
+}
+function mergeTodos(a, b, tmb) {
+  const m = new Map();
+  [...(a || []), ...(b || [])].forEach(t => {
+    if (!t || t.id == null) return;
+    const id = String(t.id);
+    const prev = m.get(id);
+    m.set(id, prev ? mergeTodo(prev, t) : t);
+  });
+  tmb = tmb || {};
+  // A deletion sticks unless the item was touched after it was deleted.
+  return [...m.values()].filter(t => {
+    const d = tmb[t.id];
+    if (!d) return true;
+    return Math.max(t.at || 0, t.doneAt || 0, t.orderAt || 0) > d;
+  }).sort((x, y) => (x.at || 0) - (y.at || 0));
+}
+
 // Goals: union by id, newest version of each, minus anything deleted.
 function mergeGoals(a, b, tmb) {
   const m = new Map();
@@ -313,6 +342,7 @@ function normalizeRemote(remote) {
     goals: (remote.goals || []).filter(g => g && g.id != null).map(normalizeGoal),
     study: rStudy,
     notes: (remote.notes || []).filter(n => n && n.id != null).map(normalizeNote),
+    todos: (remote.todos || []).filter(t => t && t.id != null).map(normalizeTodo),
     tomb:  remote.tomb || {},
   };
 }
@@ -324,6 +354,7 @@ function mergeBundle(local, remote) {
     goals: mergeGoals(local.goals, remote.goals, tmb),
     study: mergeStudy(local.study, remote.study),
     notes: mergeNotes(local.notes, remote.notes, tmb),
+    todos: mergeTodos(local.todos, remote.todos, tmb),
     tomb:  tmb,
   };
   // Anything we do from now on must outrank everything we just learned about,
@@ -355,7 +386,7 @@ function pushCloud() {
     tx.set(ref, {
       docVersion: DOC_VERSION,
       timer: merged.timer ?? null, goals: merged.goals || [], study: merged.study || {},
-      notes: merged.notes || [], tomb: merged.tomb || {},
+      notes: merged.notes || [], todos: merged.todos || [], tomb: merged.tomb || {},
       updatedAt: Math.max(syncMeta().updatedAt || 0, raw?.updatedAt || 0) || Date.now(),
     });
   }));
@@ -395,6 +426,7 @@ function applyBundle(merged) {
     loadGoals();
     loadStudy();
     loadNotes();
+    loadTodos();
     loadTomb();
   } finally { applying = false; }
   // A snapshot can land before the last script has defined its renderers. The
@@ -414,6 +446,7 @@ function applyLive(notesChanged) {
   restartTick();
   render();
   renderGoals();
+  renderTodos();
   renderDayTicks();
   renderGoalFlags();
   updateStudyUI();
@@ -561,7 +594,7 @@ window.addEventListener('online', () => { pushRetry = 0; pushCloud(); });
 // this the second tab would happily overwrite the first tab's work.
 window.addEventListener('storage', e => {
   if (applying) return;
-  if (![STORE_KEY, GOALS_KEY, STUDY_KEY, NOTES_KEY, TOMB_KEY].includes(e.key)) return;
+  if (![STORE_KEY, GOALS_KEY, STUDY_KEY, NOTES_KEY, TODOS_KEY, TOMB_KEY].includes(e.key)) return;
   let other;
   try {
     other = normalizeRemote({
@@ -569,6 +602,7 @@ window.addEventListener('storage', e => {
       goals: JSON.parse(localStorage.getItem(GOALS_KEY) || '[]'),
       study: JSON.parse(localStorage.getItem(STUDY_KEY) || '{}'),
       notes: JSON.parse(localStorage.getItem(NOTES_KEY) || '[]'),
+      todos: JSON.parse(localStorage.getItem(TODOS_KEY) || '[]'),
       tomb:  JSON.parse(localStorage.getItem(TOMB_KEY)  || '{}'),
     });
   } catch (err) { return; }

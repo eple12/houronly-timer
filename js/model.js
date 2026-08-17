@@ -62,6 +62,7 @@ function observeBundle(b) {
     if (t) { observeStamp(t.at); observeStamp(t.emgAt); }
   }
   (b.goals || []).forEach(g => { observeStamp(g.at); observeStamp(g.orderAt); });
+  (b.todos || []).forEach(t => { observeStamp(t.at); observeStamp(t.doneAt); observeStamp(t.orderAt); });
   (b.notes || []).forEach(n => {
     observeStamp(n.updatedAt); observeStamp(n.pinAt); observeStamp(n.orderAt); observeStamp(n.itemsAt);
     (n.items || []).forEach(i => observeStamp(i.at));

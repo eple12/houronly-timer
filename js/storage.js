@@ -131,7 +131,7 @@ function switchSession(sid) {
   adoptTimer(curSessionId());
   restartTick();
   render();
-  renderGoals(); renderDayTicks(); renderGoalFlags();
+  renderGoals(); renderTodos(); renderDayTicks(); renderGoalFlags();
   updateStudyUI();
   renderSessionChip();
   flushSyncSoon();
@@ -168,6 +168,37 @@ function goalSortCmp(a, b) {
 // The goals belonging to the session on screen, in display order.
 function sessionGoals() {
   return goals.filter(g => g.sid === curSessionId()).sort(goalSortCmp);
+}
+
+function saveTodos() { try { localStorage.setItem(TODOS_KEY, JSON.stringify(todos)); } catch(e) {} syncTouch(); }
+function loadTodos() {
+  try { todos = JSON.parse(localStorage.getItem(TODOS_KEY)) || []; } catch(e) { todos = []; }
+  if (!Array.isArray(todos)) todos = [];
+  todos = todos.filter(t => t && t.id != null).map(normalizeTodo);
+}
+function normalizeTodo(t) {
+  t.id = String(t.id);
+  t.t = t.t || '';
+  t.done = !!t.done;
+  if (typeof t.sid !== 'string') t.sid = DEFAULT_SID;
+  if (typeof t.at !== 'number') t.at = Number(t.id) || 1;
+  if (typeof t.doneAt !== 'number') t.doneAt = 0;
+  if (typeof t.orderAt !== 'number') t.orderAt = 0;
+  if (!Number.isFinite(t.order)) t.order = null;
+  return t;
+}
+// Undone first, then by manual order, then oldest first — so ticking something
+// sinks it out of the way without reshuffling everything else.
+function todoSortCmp(a, b) {
+  if (!!a.done !== !!b.done) return a.done ? 1 : -1;
+  const ao = Number.isFinite(a.order) ? a.order : Infinity;
+  const bo = Number.isFinite(b.order) ? b.order : Infinity;
+  if (ao !== bo) return ao - bo;
+  if ((a.at || 0) !== (b.at || 0)) return (a.at || 0) - (b.at || 0);
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+function sessionTodos() {
+  return todos.filter(t => t.sid === curSessionId()).sort(todoSortCmp);
 }
 
 function saveStudy() { try { localStorage.setItem(STUDY_KEY, JSON.stringify(study)); } catch(e) {} invalidateTotals(); syncTouch(); }
