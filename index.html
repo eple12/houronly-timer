@@ -8,11 +8,14 @@
 <meta name="apple-mobile-web-app-title" content="타이머">
 <meta name="theme-color" content="#080808">
 <title>타이머</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
 <!-- ?v= on every asset: without it a browser happily pairs a freshly fetched
      index.html with yesterday's cached JS, which leaves half the app's buttons
      bound to code that no longer matches the markup. Bump on every release. -->
-<link rel="stylesheet" href="style.css?v=14">
+<link rel="stylesheet" href="style.css?v=15">
 <!-- Tag in-app browsers (Instagram / Facebook) early so the cramped-layout
      CSS (smaller clock & study-time numbers) applies before first paint. -->
 <script>if (/Instagram|FBAN|FBAV/i.test(navigator.userAgent)) document.documentElement.classList.add('inapp');</script>
@@ -31,6 +34,7 @@
     <span class="sess-dot"></span><span class="sess-name">기본</span><span class="sess-caret">▾</span>
   </button>
   <div class="status-row">
+    <button class="acct-btn" id="installBtn" title="앱 설치" hidden></button>
     <button class="acct-btn" id="setBtn" title="설정"></button>
     <button class="acct-btn" id="acctBtn" title="계정 / 동기화"></button>
     <span class="status-text" id="statusText"></span>
@@ -382,14 +386,20 @@
 <div class="toast" id="toast"></div>
 
 <!-- App scripts — loaded in dependency order; all share the global scope. -->
-<script src="js/constants.js?v=14"></script>
-<script src="js/model.js?v=14"></script>
-<script src="js/storage.js?v=14"></script>
-<script src="js/study.js?v=14"></script>
-<script src="js/timer.js?v=14"></script>
-<script src="js/dashboard.js?v=14"></script>
-<script src="js/sessions.js?v=14"></script>
-<script src="js/sync.js?v=14"></script>
-<script src="js/notes.js?v=14"></script>
+<script src="js/constants.js?v=15"></script>
+<script src="js/model.js?v=15"></script>
+<script src="js/storage.js?v=15"></script>
+<script src="js/study.js?v=15"></script>
+<script src="js/timer.js?v=15"></script>
+<script src="js/dashboard.js?v=15"></script>
+<script src="js/sessions.js?v=15"></script>
+<script src="js/sync.js?v=15"></script>
+<script src="js/notes.js?v=15"></script>
+<script src="js/pwa.js?v=15"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
+}
+</script>
 </body>
 </html>

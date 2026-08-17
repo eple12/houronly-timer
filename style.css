@@ -890,6 +890,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   transition: color 0.15s, border-color 0.15s;
 }
 .acct-btn.on { color: var(--accent); border-color: var(--accent); }
+.acct-btn[hidden] { display: none; }
 
 /* Larger, roomier account sheet */
 #acctModal .modal { padding: 28px 24px 40px; gap: 22px; min-height: 38dvh; }

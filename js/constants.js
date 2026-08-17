@@ -160,10 +160,11 @@ const ICONS = {
   hr:     '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="6" y1="7" x2="14" y2="7" opacity="0.4"/><line x1="6" y1="17" x2="18" y2="17" opacity="0.4"/></svg>',
   table:  '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="2"/><line x1="3.5" y1="9.5" x2="20.5" y2="9.5"/><line x1="3.5" y1="14.5" x2="20.5" y2="14.5"/><line x1="12" y1="9.5" x2="12" y2="19"/></svg>',
   eye:    '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/></svg>',
+  download:'<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5v11.5"/><path d="M7.5 10.5 12 15l4.5-4.5"/><path d="M4.5 17.5v2a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-2"/></svg>',
 };
 const icoSm = n => ICONS[n].replace('class="ico"', 'class="ico ico-sm"');
 // Swap the static button glyphs for the monochrome icons.
-['acctBtn:cloud','setBtn:gear','goalBtn:flag','emgBtn:warn','notesBtn:note','dashBtn:chart','calBtn:calendar','fsBtn:expand','pomoReset:refresh','notesReorderToggle:grip']
+['acctBtn:cloud','setBtn:gear','installBtn:download','goalBtn:flag','emgBtn:warn','notesBtn:note','dashBtn:chart','calBtn:calendar','fsBtn:expand','pomoReset:refresh','notesReorderToggle:grip']
   .forEach(p => { const [id, name] = p.split(':'); const el = $(id); if (el) el.innerHTML = ICONS[name]; });
 const timeDisplay   = $('timeDisplay');
 const elapsedLabel  = $('elapsedLabel');
