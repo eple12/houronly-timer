@@ -571,6 +571,12 @@ svg.ico-sm { width: 1em; height: 1em; display: inline-block; vertical-align: -0.
 .todo-del { background: none; border: none; color: var(--dim); font-size: 13px;
   cursor: pointer; padding: 2px 4px; flex-shrink: 0; -webkit-appearance: none; }
 .todo-del:active { color: var(--danger); }
+.todo-edit { background: none; border: none; color: var(--dim); cursor: pointer;
+  padding: 2px 3px; flex-shrink: 0; -webkit-appearance: none;
+  display: inline-flex; align-items: center; }
+.todo-edit .ico { width: 14px; height: 14px; }
+.todo-edit:active { color: var(--accent); }
+.todo-row.editing { border-color: var(--accent); }
 .todo-input {
   flex: 1; min-width: 0; background: none; border: none; outline: none;
   color: var(--text); font-family: 'Noto Sans KR', sans-serif; font-size: 13px;
@@ -1215,7 +1221,9 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 .note-item-edit input[type=text]:focus { border-color: var(--accent); }
 .note-item-del { background: none; border: none; color: var(--dim); font-size: 16px;
   cursor: pointer; padding: 2px 6px; flex-shrink: 0; -webkit-appearance: none; }
-.note-add-item { align-self: flex-start; background: none; border: 1px dashed var(--bord2);
+/* #noteEditBody isn't a flex column, so this button sat flush against the last
+   item — give it its own breathing room. */
+.note-add-item { margin-top: 10px; align-self: flex-start; background: none; border: 1px dashed var(--bord2);
   color: var(--sub); border-radius: 8px; padding: 8px 12px; font-size: 13px; cursor: pointer; -webkit-appearance: none; }
 .note-add-item:active { background: var(--surf2); }
 

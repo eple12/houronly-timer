@@ -6,6 +6,8 @@ const todosSection = $('todosSection');
 let todoAdding = false;      // the inline "new todo" field is open
 let todoDraft  = '';         // survives a re-render while typing
 let todoCommitting = false;  // guards the blur that a re-render triggers
+let todoEditingId = null;    // row being renamed inline
+let todoEditDraft = '';      // its text, kept here so a sync re-render can't lose it
 let todoReorderMode = false; // when on, undone rows grow a drag pad
 let todosFolded = (() => { try { return localStorage.getItem(TODOS_FOLD_KEY) === '1'; } catch (e) { return false; } })();
 
@@ -23,15 +25,21 @@ function renderTodos() {
   const openCount = list.length - doneCount;
   if (list.length < 2) todoReorderMode = false;
 
-  const rows = list.map(t => `
-    <div class="todo-row${t.done ? ' done' : ''}" data-tid="${escHtml(t.id)}" data-done="${t.done ? '1' : '0'}">
-      ${!t.done ? `<button class="todo-drag-handle" title="끌어서 순서 변경" tabindex="-1">${icoSm('grip')}</button>` : ''}
+  const rows = list.map(t => {
+    const editing = todoEditingId === t.id;
+    return `
+    <div class="todo-row${t.done ? ' done' : ''}${editing ? ' editing' : ''}" data-tid="${escHtml(t.id)}" data-done="${t.done ? '1' : '0'}">
+      ${!t.done && !editing ? `<button class="todo-drag-handle" title="끌어서 순서 변경" tabindex="-1">${icoSm('grip')}</button>` : ''}
       <button class="todo-check" data-toggle="${escHtml(t.id)}" aria-label="완료">
         <span class="todo-box">${t.done ? ICONS.tick : ''}</span>
       </button>
-      <span class="todo-text">${escHtml(t.t)}</span>
+      ${editing
+        ? `<input type="text" class="todo-input" id="todoEditInput" maxlength="80" value="${escHtml(todoEditDraft)}">`
+        : `<span class="todo-text">${escHtml(t.t)}</span>
+           <button class="todo-edit" data-edit="${escHtml(t.id)}" title="수정">${icoSm('pencil')}</button>`}
       <button class="todo-del" data-del="${escHtml(t.id)}" title="삭제">✕</button>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   todosSection.innerHTML = `
     <div class="list-head">
@@ -77,12 +85,31 @@ function renderTodos() {
     b.addEventListener('click', () => toggleTodo(b.dataset.toggle)));
   todosSection.querySelectorAll('[data-del]').forEach(b =>
     b.addEventListener('click', () => removeTodo(b.dataset.del)));
+  todosSection.querySelectorAll('[data-edit]').forEach(b =>
+    b.addEventListener('click', () => startEditTodo(b.dataset.edit)));
   // Tapping the label toggles too — the checkbox alone is a small target.
   todosSection.querySelectorAll('.todo-text').forEach(el =>
     el.addEventListener('click', () => {
       if (todoReorderMode) return;
       toggleTodo(el.closest('.todo-row').dataset.tid);
     }));
+
+  // Inline rename. Same shape as the add field: the commit re-renders, which
+  // detaches this input and fires blur, so the guard stops it committing twice.
+  const edit = $('todoEditInput');
+  if (edit) {
+    edit.addEventListener('input', () => { todoEditDraft = edit.value; });
+    edit.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); commitEditTodo(); }
+      else if (e.key === 'Escape') { cancelEditTodo(); }
+    });
+    edit.addEventListener('blur', () => { if (!todoCommitting) commitEditTodo(); });
+    // Re-focus after a re-render (a sync landing mid-edit repaints the list).
+    if (document.activeElement !== edit) {
+      edit.focus();
+      edit.setSelectionRange(edit.value.length, edit.value.length);
+    }
+  }
   if (todoReorderMode) {
     todosSection.querySelectorAll('.todo-drag-handle').forEach(h =>
       h.addEventListener('pointerdown', e => beginTodoDrag(e, h)));
@@ -135,6 +162,39 @@ function addTodo(text) {
   saveTodos();
   flushSyncSoon();
   return true;
+}
+function startEditTodo(id) {
+  const t = todos.find(x => x.id === id);
+  if (!t) return;
+  todoAdding = false;            // one field at a time
+  todoReorderMode = false;
+  todoEditingId = id;
+  todoEditDraft = t.t || '';
+  renderTodos();
+}
+function cancelEditTodo() {
+  todoCommitting = true;         // the re-render's blur must not commit
+  todoEditingId = null; todoEditDraft = '';
+  renderTodos();
+  todoCommitting = false;
+}
+function commitEditTodo() {
+  const id = todoEditingId;
+  if (!id) return;
+  const t = todos.find(x => x.id === id);
+  const text = (todoEditDraft || '').trim().slice(0, 80);
+  todoCommitting = true;
+  todoEditingId = null; todoEditDraft = '';
+  // Emptying the field is treated as "leave it alone", not as a delete — that's
+  // what the ✕ is for.
+  if (t && text && text !== t.t) {
+    t.t = text;
+    t.at = stamp();              // its own stamp, so a peer's tick still stands
+    saveTodos();
+    flushSyncSoon();
+  }
+  renderTodos();
+  todoCommitting = false;
 }
 function toggleTodo(id) {
   const t = todos.find(x => x.id === id);
