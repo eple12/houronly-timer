@@ -343,8 +343,13 @@ setInterval(() => {
 
 // Re-account when returning to foreground (don't count background time
 // beyond the wall clock; accounting uses real dt so this just commits).
+// Guarded by appReady (set at the end of js/notes.js's restore sequence):
+// a visibilitychange firing before that — plausible on a slow cold start, or
+// launching straight into the app from a notification tap — would otherwise
+// run this against `study` before loadStudy()/normalizeStudy() have filled
+// it in, throwing on study.legacy being undefined.
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') { reconcileSession(); updateStudyUI(); }
+  if (document.visibilityState === 'visible' && appReady) { reconcileSession(); updateStudyUI(); }
 });
 
 // ── Keyboard-aware modals ──────────────────────────────────────

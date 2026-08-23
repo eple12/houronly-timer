@@ -51,7 +51,13 @@ async function showNote(tag, title, body, opts) {
     body: body || '',
     tag,
     icon: 'icons/icon-192.png',
-    badge: 'icons/icon-192.png',
+    // Android draws the status-bar icon from ONLY this image's alpha channel,
+    // filled solid white — it ignores every other pixel's color entirely. Our
+    // full icon is opaque nearly edge-to-edge (a dark square with a mark on
+    // it), so handing that in made the status bar show a plain white square.
+    // badge.png is a transparent-background silhouette of just the mark, with
+    // no background fill, which is what a monochrome status-bar icon needs.
+    badge: 'icons/badge.png',
     renotify: !opts.silent,
     silent: !!opts.silent,
     requireInteraction: !!opts.sticky,

@@ -69,13 +69,21 @@ self.addEventListener('fetch', e => {
 });
 
 // Tapping a notification focuses the app rather than opening a second copy.
+// `clients.openWindow` is what actually launches the installed app shell
+// (standalone, no browser chrome) rather than a plain tab — but only when the
+// OS currently recognizes this as an installed PWA at all. On Android that
+// recognition is Chrome's own WebAPK for this origin+scope; if the home
+// screen shortcut predates the latest deploy (the exact icon-caching issue
+// fixed alongside this), Chrome can fall back to opening a normal tab
+// instead. Removing and re-adding the shortcut re-establishes that link.
 self.addEventListener('notificationclick', e => {
   e.notification.close();
+  const target = new URL('index.html', self.registration.scope).href;
   e.waitUntil((async () => {
     const open = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     for (const c of open) {
       if ('focus' in c) return c.focus();
     }
-    if (self.clients.openWindow) return self.clients.openWindow('./');
+    if (self.clients.openWindow) return self.clients.openWindow(target);
   })());
 });
