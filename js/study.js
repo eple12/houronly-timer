@@ -54,7 +54,11 @@ function notifyDayEnd(dayKey) {
   // The current session's countdown, as a D-day, if it has one.
   const dd = dDayNum();
   if (dd !== null) bits.unshift(dd > 0 ? `D-${dd}` : dd === 0 ? 'D-DAY' : `D+${-dd}`);
-  showNote(NOTE_TAGS.dayEnd, '하루 공부 기록', bits.join(' · '), { sticky: true });
+  // One quote per calendar day (js/quotes.js) — a pure function of dayKey, so
+  // it needs no storage of its own and never disagrees across devices.
+  const quote = quoteForDay(dayKey);
+  const body = quote ? `${bits.join(' · ')}\n"${quote.q}" — ${quote.a}` : bits.join(' · ');
+  showNote(NOTE_TAGS.dayEnd, '하루 공부 기록', body, { sticky: true });
 }
 
 // Notifications live in js/notify.js (they need the service worker).
