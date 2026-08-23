@@ -1,7 +1,7 @@
 {
-  "name": "타이머",
-  "short_name": "타이머",
-  "description": "공부/작업 시간을 기록하는 타이머",
+  "name": "Houronly",
+  "short_name": "Houronly",
+  "description": "공부/작업 시간을 기록하는 타이머, Houronly",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

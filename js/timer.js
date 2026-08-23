@@ -172,14 +172,9 @@ function updateProjection() {
   else if (dd === 0) ddText = 'D-DAY';
   else { ddText = `D+${-dd}`; ddClass += ' past'; }
   metaRow2.insertAdjacentHTML('beforeend', `<span class="${ddClass}">${ddText}</span>`);
-
-  // Projection: if we have study data and days remain
-  const st = studyStats();
-  if (st.days > 0 && dd > 0) {
-    const projSec = st.avg * dd;
-    metaRow2.insertAdjacentHTML('beforeend',
-      `<span class="proj-text">평균 <b>${fmtHrs(st.avg)}/일</b> · 이대로면 <b>+${fmtHrs(projSec)}</b> 더 공부</span>`);
-  }
+  // The 평균/이대로면 projection used to sit here too, but it duplicates the
+  // dashboard's own projection card — this row is just the D-day now, and
+  // .meta-row2 centers a lone chip on its own without any further change.
 }
 
 // ── Study UI ───────────────────────────────────────────────────
