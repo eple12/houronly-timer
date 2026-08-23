@@ -275,6 +275,7 @@ function render() {
   startBtn.disabled    = done;
   startBtn.textContent = isRunning() ? '일시정지' : isPaused() ? '계속' : '시작';
   startBtn.classList.toggle('running', isRunning());
+  updateDurBtn();
 
   const locked = isRunning();
   if (locked !== lastLocked) {
@@ -283,6 +284,10 @@ function render() {
     document.querySelectorAll('.preset-btn').forEach(b => {
       b.disabled = locked; b.style.opacity = locked ? '0.5' : '1'; b.style.pointerEvents = locked ? 'none' : '';
     });
+    // The sheet can't be opened mid-run (changing the duration would reset it),
+    // and leaving it open while a sync starts the timer would strand the fields.
+    if (durBtn) durBtn.disabled = locked;
+    if (locked) closeDurModal();
   }
 
   emgBtn.classList.toggle('on', emergency);
@@ -425,19 +430,101 @@ on('resetBtn', 'click', () => {
     doReset, { yes: '초기화', danger: true });
 });
 
+// ── Timer duration sheet ───────────────────────────────────────
+// The presets and the 시:분:초 fields live here rather than on the main screen:
+// they are only used while setting a timer, and the space they were holding
+// belongs to the 할 일 / 목표 lists the rest of the time.
+const durModal = $('durModal');
+
+// Compact label for the 시간 설정 button. The big clock already shows the time
+// remaining, so this only has to name the duration that's loaded — short enough
+// to sit in a quarter of one button row. Whole-hour spans read back in the same
+// words the presets use ("24h", "1주", "1달"), so the button confirms the
+// preset you just tapped.
+function fmtDurShort(secs) {
+  const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), s = secs % 60;
+  if (m === 0 && s === 0 && h > 0) {
+    if (h < 96)        return h + 'h';
+    if (h % 168 === 0) return (h / 168) + '주';
+    if (h % 720 === 0) return (h / 720) + '달';
+    if (h % 24 === 0)  return (h / 24) + '일';
+    return h + '시간';
+  }
+  if (s === 0 && h === 0) return m + '분';
+  return `${h}:${pad(m)}:${pad(s)}`;
+}
+let lastDurLabel = null;
+function updateDurBtn() {
+  const val = $('durVal');
+  if (!val) return;
+  const label = totalSeconds > 0 ? fmtDurShort(totalSeconds) : '시간 설정';
+  if (label !== lastDurLabel) { lastDurLabel = label; val.textContent = label; }
+  if (durBtn) durBtn.classList.toggle('set', totalSeconds > 0);
+}
+
+// Seconds currently typed into the three fields.
+function durInputSecs() {
+  const h = parseInt(hInput.value)||0, m = parseInt(mInput.value)||0, s = parseInt(sInput.value)||0;
+  return h*3600 + m*60 + s;
+}
+// Highlight the preset matching what's in the FIELDS — keying it off the loaded
+// duration instead would leave the preset you started from looking selected
+// after you edited the 분 field away from it.
+function markActivePreset() {
+  const t = durInputSecs();
+  document.querySelectorAll('#durModal .preset-btn').forEach(b => {
+    b.classList.toggle('on', t > 0 && parseInt(b.dataset.h) * 3600 === t);
+  });
+}
+function openDurModal() {
+  if (isRunning() || !durModal) return;
+  // Mirror the loaded duration, so adjusting it isn't a retype and a sheet
+  // opened after 초기화 doesn't offer to re-apply the value that was just wiped.
+  if (totalSeconds > 0) {
+    hInput.value = Math.floor(totalSeconds / 3600);
+    mInput.value = Math.floor((totalSeconds % 3600) / 60);
+    sInput.value = totalSeconds % 60;
+  } else {
+    hInput.value = mInput.value = sInput.value = '';
+  }
+  markActivePreset();
+  durModal.classList.add('open');
+}
+function closeDurModal() { if (durModal) durModal.classList.remove('open'); }
+
+// Read the fields and load that duration. Returns false when they're all empty,
+// so 설정 on an untouched sheet just dismisses instead of wiping the timer.
+function applyDurInputs() {
+  const t = durInputSecs();
+  if (!t) return false;
+  setDuration(t);
+  return true;
+}
+
+on('durBtn', 'click', openDurModal);
+on('durClose', 'click', closeDurModal);
+on('durModal', 'click', e => { if (e.target === durModal) closeDurModal(); });
+on('durConfirm', 'click', () => { applyDurInputs(); closeDurModal(); });
+
 document.querySelectorAll('.preset-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     if (isRunning() || !btn.dataset.h) return;
     hInput.value = btn.dataset.h; mInput.value = 0; sInput.value = 0;
     setDuration(parseInt(btn.dataset.h) * 3600);
+    markActivePreset();
+    closeDurModal();
   });
 });
+// Enter commits from any of the three fields — the sheet's own 설정 button is
+// what applies them otherwise, so a stray blur no longer resets the timer.
 [hInput, mInput, sInput].forEach(inp => {
-  inp.addEventListener('change', () => {
-    if (isRunning()) return;
-    const h = parseInt(hInput.value)||0, m = parseInt(mInput.value)||0, s = parseInt(sInput.value)||0;
-    const t = h*3600+m*60+s; if (t) setDuration(t);
+  inp.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' || isRunning()) return;
+    inp.blur();
+    applyDurInputs();
+    closeDurModal();
   });
+  inp.addEventListener('input', markActivePreset);
 });
 on('emgBtn', 'click', () => { emergency = !emergency; render(); saveEmergency(); });
 on('swToggle', 'click', toggleStopwatch);
@@ -561,4 +648,4 @@ on('calConfirm', 'click', () => {
   if (remSecs>0) startTick(); else { goalEpoch=null; pausedRemaining=0; }
   render(); save(); renderDayTicks();
 });
-on('calBtn', 'click', () => { if (!isRunning()) openCal(); });
+on('calBtn', 'click', () => { if (isRunning()) return; closeDurModal(); openCal(); });

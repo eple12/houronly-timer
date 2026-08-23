@@ -211,6 +211,7 @@ const ICONS = {
   pencil: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9a2 2 0 0 0-3-3L5 16z"/><line x1="14.5" y1="6.5" x2="17.5" y2="9.5"/></svg>',
   list:   '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><line x1="8.5" y1="9" x2="15.5" y2="9"/><line x1="8.5" y1="13" x2="15.5" y2="13"/><line x1="8.5" y1="17" x2="12.5" y2="17"/></svg>',
   calendar:'<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="16" rx="2.5"/><line x1="4" y1="9.5" x2="20" y2="9.5"/><line x1="9" y1="3" x2="9" y2="6"/><line x1="15" y1="3" x2="15" y2="6"/></svg>',
+  clock:  '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.2V12l3.2 2"/></svg>',
   cloud:  '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 18.5a4 4 0 0 1-.3-8 5 5 0 0 1 9.6-1.2 3.6 3.6 0 0 1 .2 7.2z"/></svg>',
   expand: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V5a1 1 0 0 1 1-1h4"/><path d="M20 9V5a1 1 0 0 0-1-1h-4"/><path d="M4 15v4a1 1 0 0 0 1 1h4"/><path d="M20 15v4a1 1 0 0 1-1 1h-4"/></svg>',
   close:  '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>',
@@ -236,7 +237,7 @@ const ICONS = {
 };
 const icoSm = n => ICONS[n].replace('class="ico"', 'class="ico ico-sm"');
 // Swap the static button glyphs for the monochrome icons.
-['acctBtn:cloud','setBtn:gear','installBtn:download','friendsBtn:people','goalBtn:flag','emgBtn:warn','notesBtn:note','dashBtn:chart','calBtn:calendar','fsBtn:expand','pomoReset:refresh','notesReorderToggle:grip']
+['acctBtn:cloud','setBtn:gear','installBtn:download','friendsBtn:people','goalBtn:flag','emgBtn:warn','notesBtn:note','dashBtn:chart','calIco:calendar','durIco:clock','fsBtn:expand','pomoReset:refresh','notesReorderToggle:grip']
   .forEach(p => { const [id, name] = p.split(':'); const el = $(id); if (el) el.innerHTML = ICONS[name]; });
 const timeDisplay   = $('timeDisplay');
 const elapsedLabel  = $('elapsedLabel');
@@ -252,6 +253,7 @@ const resetBtn      = $('resetBtn');
 const hInput        = $('hInput');
 const mInput        = $('mInput');
 const sInput        = $('sInput');
+const durBtn        = $('durBtn');
 const emgBtn        = $('emgBtn');
 const goalsWrap     = $('goalsWrap');
 const swToggle      = $('swToggle');

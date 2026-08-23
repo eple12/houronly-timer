@@ -112,32 +112,17 @@
   <div id="goalsSection"></div>
 </div>
 
-<!-- Controls -->
+<!-- Controls: one row.
+     The presets and the 시:분:초 fields moved into the 타이머 시간 sheet
+     (#durModal) — they are only touched while SETTING a timer, so standing
+     permanently above this row cost the 할 일 / 목표 lists two rows of height
+     for nothing. What stays here is what you press while a timer runs. -->
 <div class="controls">
-  <div class="presets">
-    <button class="preset-btn" data-h="24">24h</button>
-    <button class="preset-btn" data-h="48">48h</button>
-    <button class="preset-btn" data-h="72">72h</button>
-    <button class="preset-btn" data-h="168">1주</button>
-    <button class="preset-btn" data-h="336">2주</button>
-    <button class="preset-btn" data-h="720">1달</button>
-    <button class="preset-btn" id="calBtn" title="날짜로 설정" style="border-color:var(--accent);color:var(--accent);font-size:14px;"></button>
-  </div>
-  <div class="input-row">
-    <div class="input-group">
-      <input type="number" id="hInput" min="0" max="8760" placeholder="시간" inputmode="numeric">
-    </div>
-    <div class="colon">:</div>
-    <div class="input-group">
-      <input type="number" id="mInput" min="0" max="59" placeholder="분" inputmode="numeric">
-    </div>
-    <div class="colon">:</div>
-    <div class="input-group">
-      <input type="number" id="sInput" min="0" max="59" placeholder="초" inputmode="numeric">
-    </div>
-  </div>
   <div class="btn-row">
-    <button class="btn" id="fsBtn" title="전체화면"></button>
+    <button class="btn icon-only" id="fsBtn" title="전체화면"></button>
+    <button class="btn dur-btn" id="durBtn" title="타이머 시간 설정">
+      <span id="durIco"></span><span class="dur-val" id="durVal">시간 설정</span>
+    </button>
     <button class="btn" id="resetBtn">초기화</button>
     <button class="btn primary" id="startBtn">시작</button>
   </div>
@@ -147,6 +132,49 @@
 
 </div>
 <!-- /app -->
+
+<!-- Timer duration sheet: presets + 시:분:초, opened from the 시간 설정 button -->
+<div class="modal-overlay" id="durModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">타이머 시간</span>
+      <button class="modal-close" id="durClose">✕</button>
+    </div>
+    <div class="modal-field">
+      <span class="modal-field-label">빠른 설정</span>
+      <div class="presets">
+        <button class="preset-btn" data-h="24">24h</button>
+        <button class="preset-btn" data-h="48">48h</button>
+        <button class="preset-btn" data-h="72">72h</button>
+        <button class="preset-btn" data-h="168">1주</button>
+        <button class="preset-btn" data-h="336">2주</button>
+        <button class="preset-btn" data-h="720">1달</button>
+      </div>
+    </div>
+    <div class="modal-field">
+      <span class="modal-field-label">직접 입력</span>
+      <div class="input-row">
+        <div class="input-group">
+          <input type="number" id="hInput" min="0" max="8760" placeholder="시간" inputmode="numeric">
+        </div>
+        <div class="colon">:</div>
+        <div class="input-group">
+          <input type="number" id="mInput" min="0" max="59" placeholder="분" inputmode="numeric">
+        </div>
+        <div class="colon">:</div>
+        <div class="input-group">
+          <input type="number" id="sInput" min="0" max="59" placeholder="초" inputmode="numeric">
+        </div>
+      </div>
+    </div>
+    <button class="dur-cal-row" id="calBtn" title="날짜로 설정">
+      <span id="calIco"></span>
+      <span class="dur-cal-text">시작 · 종료 날짜로 설정</span>
+      <span class="dur-cal-arrow">›</span>
+    </button>
+    <button class="modal-confirm" id="durConfirm">설정</button>
+  </div>
+</div>
 
 <!-- Calendar modal -->
 <div class="modal-overlay" id="calModal">
