@@ -36,6 +36,10 @@ function checkDayRollover() {
   if (cur !== lastSeenStudyDay) {
     notifyDayEnd(lastSeenStudyDay);
     lastSeenStudyDay = cur;
+    // Mark today as already notified-through, so if the app is closed and
+    // reopened later today the load-time catch-up (js/notes.js) doesn't
+    // repeat this same notice.
+    try { localStorage.setItem(LAST_NOTIFIED_DAY_KEY, cur); } catch (e) {}
   }
 }
 function notifyDayEnd(dayKey) {

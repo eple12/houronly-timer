@@ -903,6 +903,22 @@ applyTheme();
 renderSessionChip();
 lastSeenStudyDay = studyDayKey(Date.now());
 
+// Catch-up day-end notice: if the app was closed when the day actually ended
+// (the common case — checkDayRollover only fires while the app is open, so a
+// day that ends overnight otherwise never gets reported), deliver it now, on
+// the first open of the new day. Guarded per-device so re-opening later the
+// same day doesn't repeat it, and silent on a device's very first run (no
+// prior day to report on).
+(function catchUpDayEnd() {
+  const today = studyDayKey(Date.now());
+  let lastNotified = null;
+  try { lastNotified = localStorage.getItem(LAST_NOTIFIED_DAY_KEY); } catch (e) {}
+  if (lastNotified && lastNotified !== today) {
+    swReady.then(() => notifyDayEnd(lastNotified));
+  }
+  try { localStorage.setItem(LAST_NOTIFIED_DAY_KEY, today); } catch (e) {}
+})();
+
 // Roll the pomodoro forward through any phase boundary that passed while the
 // page was closed. The roll-forward is derived from the phase's own end time,
 // so a device that was closed and one that stayed open land on the same phase.

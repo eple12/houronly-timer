@@ -14,12 +14,17 @@ const NOTE_TAGS = {
   pomo:     'pomo',
 };
 let swReg = null;
+// Resolves once registration has settled either way. A notification fired at
+// page-load time (the day-open catch-up note) would otherwise race this: with
+// swReg still null it falls through to `new Notification()`, which Android
+// Chrome silently refuses — awaiting this first keeps that path off Android.
+let swReady = Promise.resolve();
 
 // `'serviceWorker' in navigator` is true even where the property reads back
 // undefined (e.g. served over plain http from a non-localhost host), so test the
 // value — a throw here would take the whole file's functions down with it.
 if (navigator.serviceWorker) {
-  navigator.serviceWorker.register('sw.js')
+  swReady = navigator.serviceWorker.register('sw.js')
     .then(r => { swReg = r; })
     .catch(() => { /* file:// or unsupported — falls back to page notifications */ });
 }

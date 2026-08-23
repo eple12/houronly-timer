@@ -8,6 +8,9 @@ const TOMB_KEY  = 'timer_tomb_v1';   // deletion tombstones: { id: deletedAt }
 // device rather than syncing — collapsing here shouldn't fold it on your phone.
 const GOALS_FOLD_KEY = 'timer_goals_folded';
 const TODOS_FOLD_KEY = 'timer_todos_folded';
+// Last study-day key this device has already delivered a day-end notice for.
+// Per-device (not synced) on purpose — it's a notification receipt, not data.
+const LAST_NOTIFIED_DAY_KEY = 'timer_last_notified_day';
 
 // Zero-padding helper (used by the day-key functions in model.js, so it has to
 // be defined before anything that runs at load time).
